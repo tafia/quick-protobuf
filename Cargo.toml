@@ -1,0 +1,8 @@
+[package]
+name = "quick-protobuf"
+version = "0.1.0"
+authors = ["Johann Tuffe"]
+
+[dependencies]
+error-chain = "0.7.2"
+byteorder = "1.0.0"
