@@ -1,8 +1,8 @@
 //! A module to handle basic protobuf types
 
-pub const TAG_TYPE_BITS: u32 = 3;
-pub const TAG_TYPE_MASK: u32 = (1u32 << TAG_TYPE_BITS as usize) - 1;
-pub const FIELD_NUMBER_MAX: u32 = 0x1fffffff;
+const TAG_TYPE_BITS: u32 = 3;
+const TAG_TYPE_MASK: u32 = (1u32 << TAG_TYPE_BITS as usize) - 1;
+const FIELD_NUMBER_MAX: u32 = 0x1fffffff;
 
 /// An enum to define to type of field to be parsed next
 #[derive(PartialEq, Eq, Clone, Debug, Copy)]
@@ -52,7 +52,7 @@ impl Tag {
     }
 
     pub fn unpack(&self) -> (u32, WireType) {
-        (self.field_number(), self.wire_type())
+        (self.field_number, self.wire_type)
     }
 
     pub fn wire_type(&self) -> WireType {

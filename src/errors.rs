@@ -29,6 +29,11 @@ error_chain! {
             description("invalid message field")
             display("expecting '{}', got tag {:?}", field_type, tag)
         }
+        ParseMessage(s: String) {
+            description("error while parsing message")
+            display("error while parsing message: {}", s)
+
+        }
 //         Unexpected(t: String) {
 //             description("unexpected error")
 //             display("unexpected error: '{}'", t)

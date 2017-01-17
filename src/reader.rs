@@ -1,4 +1,4 @@
-use std::io::{BufRead, Read};
+use std::io::{BufRead};
 
 use errors::{Result, ErrorKind};
 use types::{Tag, WireType};
@@ -35,7 +35,6 @@ impl<R: BufRead> Reader<R> {
         for _ in 0..10 {
             self.len -= 1;
             let b = self.inner.read_u8()?;
-//             println!("b {:08b}", b);
             // TODO: may overflow if i == 9
             r |= ((b & 0x7f) as u64) << i;
             if b < 0x80 {
@@ -129,7 +128,6 @@ impl<R: BufRead> Reader<R> {
         }
 
         // consume len bytes
-        println!("ignore {} bytes", len);
         self.len -= len;
         loop {
             let read = match self.inner.fill_buf() {
@@ -149,7 +147,6 @@ impl<R: BufRead> Reader<R> {
 
     pub fn read_bytes(&mut self) -> Result<Vec<u8>> {
         let len = self.read_varint()? as usize;
-        println!("read {} bytes", len);
         self.len -= len;
         let mut vec = vec![0u8; len];
         self.inner.read_exact(&mut vec[..])?;
@@ -166,7 +163,7 @@ impl<R: BufRead> Reader<R> {
         unimplemented!()
     }
 
-    pub fn read_embedded_message<M: Message>(&mut self) -> Result<M> {
+    pub fn read_message<M: Message>(&mut self) -> Result<M> {
         let len = self.read_varint()? as usize;
         let cur_len = self.len;
         self.len = len;
