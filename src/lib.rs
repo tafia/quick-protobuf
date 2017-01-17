@@ -13,8 +13,3 @@ pub mod errors;
 pub mod types;
 pub mod reader;
 pub mod message;
-
-#[cfg(test)]
-mod tests {
-    
-}

@@ -9,7 +9,6 @@ error_chain! {
     foreign_links {
         Io(::std::io::Error);
         Utf8(::std::string::FromUtf8Error);
-//         ParseInt(::std::num::ParseIntError);
     }
     errors {
         Deprecated(feat: &'static str) {
@@ -34,9 +33,5 @@ error_chain! {
             display("error while parsing message: {}", s)
 
         }
-//         Unexpected(t: String) {
-//             description("unexpected error")
-//             display("unexpected error: '{}'", t)
-//         }
     }
 }

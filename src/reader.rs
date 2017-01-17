@@ -1,4 +1,4 @@
-use std::io::{BufRead};
+use std::io::{BufRead, Seek, SeekFrom};
 
 use errors::{Result, ErrorKind};
 use types::{Tag, WireType};
@@ -107,8 +107,34 @@ impl<R: BufRead> Reader<R> {
         self.read_varint().map(|i| i != 0)
     }
 
-    pub fn read_enum<E>(&mut self) -> Result<E> {
+    pub fn read_enum<E: From<u64>>(&mut self) -> Result<E> {
+        self.read_varint().map(|i| i.into())
+    }
+
+    pub fn read_bytes(&mut self) -> Result<Vec<u8>> {
+        let len = self.read_varint()? as usize;
+        self.len -= len;
+        let mut vec = vec![0u8; len];
+        self.inner.read_exact(&mut vec[..])?;
+        Ok(vec)
+    }
+
+    pub fn read_string(&mut self) -> Result<String> {
+        let vec = self.read_bytes()?;
+        String::from_utf8(vec).map_err(|e| e.into())
+    }
+
+    pub fn read_packed_repeated_field(&mut self) -> Result<()> {
         unimplemented!()
+    }
+
+    pub fn read_message<M: Message>(&mut self) -> Result<M> {
+        let len = self.read_varint()? as usize;
+        let cur_len = self.len;
+        self.len = len;
+        let msg = M::from_reader(self)?;
+        self.len = cur_len - len;
+        Ok(msg)
     }
 
     pub fn read_unknown(&mut self, wire_type: WireType) -> Result<()> {
@@ -145,31 +171,27 @@ impl<R: BufRead> Reader<R> {
         }
     }
 
-    pub fn read_bytes(&mut self) -> Result<Vec<u8>> {
-        let len = self.read_varint()? as usize;
+    pub fn read_unknown_seek(&mut self, wire_type: WireType) -> Result<()>
+        where R: Seek 
+    {
+        // TODO: explore using Seek inner reader
+        let len = match wire_type {
+            WireType::Varint => return self.read_varint().map(|_| ()),
+            WireType::Fixed64 => 8,
+            WireType::LengthDelimited => self.read_varint()? as usize,
+            WireType::StartGroup | 
+                WireType::EndGroup => return Err(ErrorKind::Deprecated("group").into()),
+            WireType::Fixed32 => 4,
+            WireType::Unknown => return Err(ErrorKind::UnknownWireType.into()),
+        };
+
+        if len == 0 {
+            return Ok(());
+        }
+
         self.len -= len;
-        let mut vec = vec![0u8; len];
-        self.inner.read_exact(&mut vec[..])?;
-        Ok(vec)
-    }
-
-    pub fn read_string(&mut self) -> Result<String> {
-        let mut vec = self.read_bytes()?;
-        let _: Vec<_> = vec.drain(..2).collect();
-        String::from_utf8(vec).map_err(|e| e.into())
-    }
-
-    pub fn read_packed_repeated_field(&mut self) -> Result<()> {
-        unimplemented!()
-    }
-
-    pub fn read_message<M: Message>(&mut self) -> Result<M> {
-        let len = self.read_varint()? as usize;
-        let cur_len = self.len;
-        self.len = len;
-        let msg = M::from_reader(self)?;
-        self.len = cur_len - len;
-        Ok(msg)
+        self.inner.seek(SeekFrom::Current(len as i64))?;
+        Ok(())
     }
 
     pub fn len(&self) -> usize {
