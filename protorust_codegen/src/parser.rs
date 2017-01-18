@@ -3,11 +3,16 @@ use std::io::Write;
 use nom::IError;
 
 #[derive(Debug)]
+enum Frequency {
+    Optional,
+    Repeated,
+    Required,
+}
+
+#[derive(Debug)]
 struct Field<'a> {
     name: &'a str,
-    repeated: bool,
-    optional: bool,
-    required: bool,
+    frequency: Frequency,
     typ: &'a str,
     number: i32,
     default: Option<&'a str>,
@@ -52,25 +57,27 @@ impl<'a> Field<'a> {
     }
 
     fn write_definition<W: Write>(&self, w: &mut W) -> IoResult<()> {
-        if self.optional {
-            writeln!(w, "    pub {}: Option<{}>,", self.name, self.rust_type())
-        } else if self.repeated {
-            writeln!(w, "    pub {}: Vec<{}>,", self.name, self.rust_type())
-        } else {
-            writeln!(w, "    pub {}: {},", self.name, self.rust_type())
+        match self.frequency {
+            Frequency::Optional => writeln!(w, "    pub {}: Option<{}>,", self.name, self.rust_type()),
+            Frequency::Repeated => writeln!(w, "    pub {}: Vec<{}>,", self.name, self.rust_type()),
+            Frequency::Required => writeln!(w, "    pub {}: {},", self.name, self.rust_type()),
         }
     }
 
     fn write_match_tag<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
-        if self.optional {
-            writeln!(w, "({}, {}) => msg.{} = Some(r.read_{}()?),",
-                self.number, self.wire_type(enums), self.name, self.read_fn(enums))
-        } else if self.repeated {
-            writeln!(w, "({}, {}) => msg.{}.push(r.read_{}()?),",
-                self.number, self.wire_type(enums), self.name, self.read_fn(enums))
-        } else {
-            writeln!(w, "({}, {}) => msg.{} = r.read_{}()?,",
-                self.number, self.wire_type(enums), self.name, self.read_fn(enums))
+        match self.frequency {
+            Frequency::Optional => {
+                writeln!(w, "({}, {}) => msg.{} = Some(r.read_{}()?),",
+                    self.number, self.wire_type(enums), self.name, self.read_fn(enums))
+            } 
+            Frequency::Repeated => {
+                writeln!(w, "({}, {}) => msg.{}.push(r.read_{}()?),",
+                    self.number, self.wire_type(enums), self.name, self.read_fn(enums))
+            }
+            Frequency::Required => {
+                writeln!(w, "({}, {}) => msg.{} = r.read_{}()?,",
+                    self.number, self.wire_type(enums), self.name, self.read_fn(enums))
+            }
         }
     }
 
@@ -127,7 +134,7 @@ impl<'a> Message<'a> {
 #[derive(Debug)]
 pub struct Enumerator<'a> {
     name: &'a str,
-    fields: Vec<(&'a str, u32)>,
+    fields: Vec<(&'a str, i32)>,
 }
 
 impl<'a> Enumerator<'a> {
@@ -233,78 +240,68 @@ mod parser {
     use std::str;
     use nom::{alphanumeric, multispace, digit};
 
-    named!(comment<()>, do_parse!(
-        many0!(multispace) >> tag!("//") >> take_until_and_consume!("\n") >> ()));
+    named!(comment<()>, do_parse!(tag!("//") >> take_until_and_consume!("\n") >> ()));
+
+    /// word break: multispace or comment
+    named!(br<()>, alt!(map!(multispace, |_| ()) | comment));
 
     named!(default_value<&str>, do_parse!(
-        many0!(multispace) >> tag!("[") >> many0!(multispace) >> tag!("default") >> many0!(multispace) >> tag!("=") >>
-        many0!(multispace) >> default: map_res!(alphanumeric, str::from_utf8) >> many0!(multispace) >> tag!("]") >> many0!(multispace) >>
+        tag!("[") >> many0!(br) >> tag!("default") >> many0!(br) >> tag!("=") >> many0!(br) >> 
+        default: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >> tag!("]") >>
         (default)));
 
     named!(message_field<Field>, do_parse!(
-        many0!(multispace) >>
-        repeated: opt!(do_parse!(tag!("repeated") >> many1!(multispace) >> ())) >>
-        optional: opt!(do_parse!(tag!("optional") >> many1!(multispace) >> ())) >>
-        required: opt!(do_parse!(tag!("required") >> many1!(multispace) >> ())) >>
-        typ: map_res!(alphanumeric, str::from_utf8) >> many1!(multispace) >>
-        name: map_res!(alphanumeric, str::from_utf8) >> many0!(multispace) >>
-        tag!("=") >> many0!(multispace) >>
-        number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >>
-        many0!(multispace) >> default: opt!(default_value) >>
-        tag!(";") >> opt!(comment) >>
+        frequency: alt!(map!(tag!("optional"), |_| Frequency::Optional) |
+                        map!(tag!("repeated"), |_| Frequency::Repeated) |
+                        map!(tag!("required"), |_| Frequency::Required)) >> many1!(br) >>
+        typ: map_res!(alphanumeric, str::from_utf8) >> many1!(br) >>
+        name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >>
+        tag!("=") >> many0!(br) >>
+        number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
+        default: opt!(default_value) >> many0!(br) >> tag!(";") >> many0!(br) >>
         (Field {
            name: name,
-           repeated: repeated.is_some(),
+           frequency: frequency,
            typ: typ,
            number: number,
-           optional: optional.is_some(),
-           required: required.is_some(),
            default: default,
         })));
 
     named!(message<Message>, do_parse!(
-        tag!("message") >> opt!(multispace) >> 
-        name: map_res!(alphanumeric, str::from_utf8) >> opt!(multispace) >> 
-        tag!("{") >> 
+        tag!("message") >> many0!(br) >> 
+        name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >> 
+        tag!("{") >> many0!(br) >>
         fields: many0!(message_field) >> 
-        many0!(multispace) >> tag!("}") >>
-        (Message {
-           name: name,
-           fields: fields,
-        })));
+        tag!("}") >> many0!(br) >>
+        (Message { name: name, fields: fields })));
 
-    named!(enum_field<(&str, u32)>, do_parse!(
-        many0!(multispace) >>
-        name: map_res!(alphanumeric, str::from_utf8) >> many0!(multispace) >>
-        tag!("=") >> many0!(multispace) >>
-        number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(multispace) >>
-        tag!(";") >>
+    named!(enum_field<(&str, i32)>, do_parse!(
+        name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >>
+        tag!("=") >> many0!(br) >>
+        number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >>
+        tag!(";") >> many0!(br) >>
         ((name, number))));
         
     named!(enumerator<Enumerator>, do_parse!(
-        tag!("enum") >> many1!(multispace) >>
-        name: map_res!(alphanumeric, str::from_utf8) >> many0!(multispace) >>
-        tag!("{") >>
-        fields: many0!(enum_field) >>
-        many0!(multispace) >> tag!("}") >>
-        (Enumerator {
-            name: name,
-            fields: fields,
-        })));
+        tag!("enum") >> many1!(br) >>
+        name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >>
+        tag!("{") >> many0!(br) >>
+        fields: many0!(enum_field) >> 
+        tag!("}") >> many0!(br) >>
+        (Enumerator { name: name, fields: fields })));
 
     named!(ignore<()>, do_parse!(
-        alt!(tag!("package") | tag!("option")) >> many1!(multispace) >> 
-        take_until_and_consume!(";") >> ()));
+        alt!(tag!("package") | tag!("option")) >> many1!(br) >> 
+        take_until_and_consume!(";") >> many0!(br) >> ()));
 
-    named!(message_or_enum<MessageOrEnum>, do_parse!(many0!(multispace) >> 
-        msg_or_enum: alt!(
+    named!(message_or_enum<MessageOrEnum>, alt!(
              message => { |m| MessageOrEnum::Msg(m) } | 
              enumerator => { |e| MessageOrEnum::Enum(e) } |
-             ignore => { |_| MessageOrEnum::Ignore } ) >>
-        (msg_or_enum)));
+             ignore => { |_| MessageOrEnum::Ignore } ));
 
     named!(pub file_descriptor<FileDescriptor>, do_parse!(
-        message_and_enums: many0!(message_or_enum) >> many0!(multispace) >>
+        many0!(br) >>
+        message_and_enums: many0!(message_or_enum) >>
         (FileDescriptor {
             message_and_enums: message_and_enums
         })));
