@@ -1,4 +1,4 @@
-use std::io::BufRead;
+use std::io::Read;
 
 use errors::{Result, ErrorKind};
 use types::{Tag, WireType};
@@ -13,7 +13,7 @@ pub struct Reader<R> {
     len: usize,
 }
 
-impl<R: BufRead> Reader<R> {
+impl<R: Read> Reader<R> {
 
     /// Creates a new protocol buffer reader with the maximum len of bytes to read
     pub fn from_reader(r: R, len: usize) -> Reader<R> {
@@ -26,6 +26,15 @@ impl<R: BufRead> Reader<R> {
             None
         } else {
             Some(self.read_varint().map(|i| (i as u32).into()))
+        }
+    }
+
+    /// Reads next tag, `None` if all bytes have been read
+    pub fn next_tag_value(&mut self) -> Option<Result<u32>> {
+        if self.len == 0 {
+            None
+        } else {
+            Some(self.read_varint().map(|i| (i as u32)))
         }
     }
 
@@ -153,20 +162,11 @@ impl<R: BufRead> Reader<R> {
             WireType::Unknown => return Err(ErrorKind::UnknownWireType.into()),
         };
 
-        // consume len bytes
+        let mut buf = Vec::with_capacity(len);
+        unsafe { buf.set_len(len); }
+        self.inner.read_exact(&mut buf)?;
         self.len -= len;
-        let mut read = 0;
-        loop {
-            read = match self.inner.fill_buf() {
-                Ok(v) if v.len() == read => return Err(ErrorKind::Eof.into()),
-                Ok(v) => v.len(),
-                Err(e) => return Err(e.into()),
-            };
-            if read >= len {
-                self.inner.consume(len);
-                return Ok(());
-            }
-        }
+        Ok(())
     }
 
     pub fn len(&self) -> usize {

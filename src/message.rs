@@ -2,7 +2,7 @@
 //!
 //! Creates the struct and implements a reader
 
-use std::io::{BufReader, BufRead};
+use std::io::{Read, BufReader};
 use std::path::Path;
 use std::fs::File;
 
@@ -16,7 +16,7 @@ pub trait Message: Sized {
     ///
     /// This method is generally automatically implemented when generating code
     /// out of .proto file
-    fn from_reader<R: BufRead>(r: &mut Reader<R>) -> Result<Self>;
+    fn from_reader<R: Read>(r: &mut Reader<R>) -> Result<Self>;
 
     /// Creates Message out of a file
     ///
