@@ -34,14 +34,14 @@ impl<'a> Field<'a> {
         }
     }
 
-    fn wire_type(&self, enums: &[&str]) -> &str {
+    fn wire_type_num(&self, enums: &[&str]) -> u32 {
         match self.typ {
             "int32" | "sint32" | "int64" | "sint64" | 
-                "uint32" | "uint64" | "bool" | "enum" => "WireType::Varint",
-            "fixed64" | "sfixed64" | "double" => "WireType::Fixed64",
-            "fixed32" | "sfixed32" | "float" => "WireType::Fixed32",
-            t if enums.contains(&t) => "WireType::Varint",
-            _ => "WireType::LengthDelimited",
+                "uint32" | "uint64" | "bool" | "enum" => 0,
+            "fixed64" | "sfixed64" | "double" => 1,
+            "fixed32" | "sfixed32" | "float" => 5,
+            t if enums.contains(&t) => 0,
+            _ => 2,
         }
     }
 
@@ -56,6 +56,10 @@ impl<'a> Field<'a> {
         }
     }
 
+    fn tag(&self, enums: &[&str]) -> u32 {
+        (self.number as u32) << 3 | self.wire_type_num(enums)
+    }
+
     fn write_definition<W: Write>(&self, w: &mut W) -> IoResult<()> {
         match self.frequency {
             Frequency::Optional => writeln!(w, "    pub {}: Option<{}>,", self.name, self.rust_type()),
@@ -66,25 +70,19 @@ impl<'a> Field<'a> {
 
     fn write_match_tag<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
         match self.frequency {
-            Frequency::Optional => {
-                writeln!(w, "({}, {}) => msg.{} = Some(r.read_{}()?),",
-                    self.number, self.wire_type(enums), self.name, self.read_fn(enums))
-            } 
-            Frequency::Repeated => {
-                writeln!(w, "({}, {}) => msg.{}.push(r.read_{}()?),",
-                    self.number, self.wire_type(enums), self.name, self.read_fn(enums))
-            }
-            Frequency::Required => {
-                writeln!(w, "({}, {}) => msg.{} = r.read_{}()?,",
-                    self.number, self.wire_type(enums), self.name, self.read_fn(enums))
-            }
+            Frequency::Optional => writeln!(w, "{} => msg.{} = Some(r.read_{}()?),",
+                                            self.tag(enums), self.name, self.read_fn(enums)),
+            Frequency::Repeated => writeln!(w, "{} => msg.{}.push(r.read_{}()?),",
+                                            self.tag(enums), self.name, self.read_fn(enums)),
+            Frequency::Required => writeln!(w, "{} => msg.{} = r.read_{}()?,",
+                                            self.tag(enums), self.name, self.read_fn(enums)),
         }
     }
 
-    fn write_match_not_tag<W: Write>(&self, w: &mut W, name: &str) -> IoResult<()> {
-        writeln!(w, "({}, _) => return Err(ErrorKind::InvalidMessage(tag, \"{} {}\").into()),",
-            self.number, name, self.typ)
-    }
+//     fn write_match_not_tag<W: Write>(&self, w: &mut W, name: &str) -> IoResult<()> {
+//         writeln!(w, "({}, _) => return Err(ErrorKind::InvalidMessage(tag, \"{} {}\").into()),",
+//             self.number, name, self.typ)
+//     }
 }
 
 #[derive(Debug)]
@@ -105,24 +103,23 @@ impl<'a> Message<'a> {
 
     fn write_impl_message<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
         writeln!(w, "impl Message for {} {{", self.name)?;
-        writeln!(w, "    fn from_reader<R: BufRead>(mut r: &mut Reader<R>) -> Result<Self> {{")?;
+        writeln!(w, "    fn from_reader<R: Read>(mut r: &mut Reader<R>) -> Result<Self> {{")?;
         writeln!(w, "        let mut msg = Self::default();")?;
         writeln!(w, "        loop {{")?;
-        writeln!(w, "            let tag = match r.next_tag() {{")?;
+        writeln!(w, "            let tag = match r.next_tag_value() {{")?;
         writeln!(w, "                None => break,")?;
         writeln!(w, "                Some(Err(e)) => return Err(e),")?;
         writeln!(w, "                Some(Ok(tag)) => tag,")?;
         writeln!(w, "            }};")?;
-        writeln!(w, "            match tag.unpack() {{")?;
+        writeln!(w, "            match tag {{")?;
         for f in &self.fields {
-            write!(w, "                 ")?;
+            write!(w, "                ")?;
             f.write_match_tag(w, enums)?;
         }
-        for f in &self.fields {
-            write!(w, "                 ")?;
-            f.write_match_not_tag(w, self.name)?;
-        }
-        writeln!(w, "                (_, wire_type) => r.read_unknown(wire_type)?,")?;
+        writeln!(w, "                t => {{")?;
+        writeln!(w, "                    let t: Tag = t.into();")?;
+        writeln!(w, "                    r.read_unknown(t.wire_type())?;")?;
+        writeln!(w, "                }},")?;
         writeln!(w, "            }}")?;
         writeln!(w, "        }}")?;
         writeln!(w, "        Ok(msg)")?;
@@ -198,11 +195,11 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "#![allow(non_snake_case)]")?;
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
         writeln!(w, "")?;
-        writeln!(w, "use std::io::BufRead;")?;
-        writeln!(w, "use quick_protobuf::errors::{{Result, ErrorKind}};")?;
+        writeln!(w, "use std::io::Read;")?;
+        writeln!(w, "use quick_protobuf::errors::Result;")?;
         writeln!(w, "use quick_protobuf::message::Message;")?;
         writeln!(w, "use quick_protobuf::reader::Reader;")?;
-        writeln!(w, "use quick_protobuf::types::WireType;")?;
+        writeln!(w, "use quick_protobuf::types::Tag;")?;
 
         let enums = self.message_and_enums.iter().filter_map(|m| {
             if let &MessageOrEnum::Enum(ref e) = m {
@@ -236,8 +233,8 @@ impl<'a> FileDescriptor<'a> {
 
 mod parser {
 
-    use super::*;
     use std::str;
+    use parser::{Frequency, Field, Message, Enumerator, MessageOrEnum, FileDescriptor};
     use nom::{alphanumeric, multispace, digit};
 
     named!(comment<()>, do_parse!(tag!("//") >> take_until_and_consume!("\n") >> ()));
@@ -250,10 +247,13 @@ mod parser {
         default: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >> tag!("]") >>
         (default)));
 
+    named!(frequency<Frequency>,
+           alt!(tag!("optional") => { |_| Frequency::Optional } |
+                tag!("repeated") => { |_| Frequency::Repeated } |
+                tag!("required") => { |_| Frequency::Required } ));
+
     named!(message_field<Field>, do_parse!(
-        frequency: alt!(map!(tag!("optional"), |_| Frequency::Optional) |
-                        map!(tag!("repeated"), |_| Frequency::Repeated) |
-                        map!(tag!("required"), |_| Frequency::Required)) >> many1!(br) >>
+        frequency: frequency >> many1!(br) >>
         typ: map_res!(alphanumeric, str::from_utf8) >> many1!(br) >>
         name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >>
         tag!("=") >> many0!(br) >>
