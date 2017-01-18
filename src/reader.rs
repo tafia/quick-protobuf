@@ -1,4 +1,4 @@
-use std::io::{BufRead, Seek, SeekFrom};
+use std::io::BufRead;
 
 use errors::{Result, ErrorKind};
 use types::{Tag, WireType};
@@ -114,7 +114,8 @@ impl<R: BufRead> Reader<R> {
     pub fn read_bytes(&mut self) -> Result<Vec<u8>> {
         let len = self.read_varint()? as usize;
         self.len -= len;
-        let mut vec = vec![0u8; len];
+        let mut vec = Vec::with_capacity(len);
+        unsafe { vec.set_len(len); }
         self.inner.read_exact(&mut vec[..])?;
         Ok(vec)
     }
@@ -138,60 +139,34 @@ impl<R: BufRead> Reader<R> {
     }
 
     pub fn read_unknown(&mut self, wire_type: WireType) -> Result<()> {
-        // TODO: explore using Seek inner reader
-        let mut len = match wire_type {
+        let len = match wire_type {
             WireType::Varint => return self.read_varint().map(|_| ()),
             WireType::Fixed64 => 8,
-            WireType::LengthDelimited => self.read_varint()? as usize,
+            WireType::LengthDelimited => {
+                let len = self.read_varint()? as usize;
+                if len == 0 { return Ok(()); }
+                len
+            },
             WireType::StartGroup | 
                 WireType::EndGroup => return Err(ErrorKind::Deprecated("group").into()),
             WireType::Fixed32 => 4,
             WireType::Unknown => return Err(ErrorKind::UnknownWireType.into()),
         };
-        
-        if len == 0 {
-            return Ok(());
-        }
 
         // consume len bytes
         self.len -= len;
+        let mut read = 0;
         loop {
-            let read = match self.inner.fill_buf() {
-                Ok(v) if v.is_empty() => return Err(ErrorKind::Eof.into()),
+            read = match self.inner.fill_buf() {
+                Ok(v) if v.len() == read => return Err(ErrorKind::Eof.into()),
                 Ok(v) => v.len(),
                 Err(e) => return Err(e.into()),
             };
             if read >= len {
                 self.inner.consume(len);
                 return Ok(());
-            } else {
-                len -= read;
-                self.inner.consume(read);
             }
         }
-    }
-
-    pub fn read_unknown_seek(&mut self, wire_type: WireType) -> Result<()>
-        where R: Seek 
-    {
-        // TODO: explore using Seek inner reader
-        let len = match wire_type {
-            WireType::Varint => return self.read_varint().map(|_| ()),
-            WireType::Fixed64 => 8,
-            WireType::LengthDelimited => self.read_varint()? as usize,
-            WireType::StartGroup | 
-                WireType::EndGroup => return Err(ErrorKind::Deprecated("group").into()),
-            WireType::Fixed32 => 4,
-            WireType::Unknown => return Err(ErrorKind::UnknownWireType.into()),
-        };
-
-        if len == 0 {
-            return Ok(());
-        }
-
-        self.len -= len;
-        self.inner.seek(SeekFrom::Current(len as i64))?;
-        Ok(())
     }
 
     pub fn len(&self) -> usize {
