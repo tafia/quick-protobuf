@@ -148,24 +148,28 @@ impl<R: Read> Reader<R> {
     }
 
     pub fn read_unknown(&mut self, wire_type: WireType) -> Result<()> {
-        let len = match wire_type {
-            WireType::Varint => return self.read_varint().map(|_| ()),
-            WireType::Fixed64 => 8,
+        match wire_type {
+            WireType::Varint => { self.read_varint()?; },
+            WireType::Fixed64 => {
+                self.len -= 8;
+                let _ = self.inner.read_exact(&mut [0; 8])?;
+            }
+            WireType::Fixed32 => {
+                self.len -= 4;
+                let _ = self.inner.read_exact(&mut [0; 4])?;
+            }
             WireType::LengthDelimited => {
                 let len = self.read_varint()? as usize;
                 if len == 0 { return Ok(()); }
-                len
+                self.len -= len;
+                let mut buf = Vec::with_capacity(len);
+                unsafe { buf.set_len(len); }
+                self.inner.read_exact(&mut buf)?;
             },
             WireType::StartGroup | 
-                WireType::EndGroup => return Err(ErrorKind::Deprecated("group").into()),
-            WireType::Fixed32 => 4,
-            WireType::Unknown => return Err(ErrorKind::UnknownWireType.into()),
-        };
-
-        let mut buf = Vec::with_capacity(len);
-        unsafe { buf.set_len(len); }
-        self.inner.read_exact(&mut buf)?;
-        self.len -= len;
+                WireType::EndGroup => { return Err(ErrorKind::Deprecated("group").into()); },
+            WireType::Unknown => { return Err(ErrorKind::UnknownWireType.into()); },
+        }
         Ok(())
     }
 
