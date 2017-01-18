@@ -75,11 +75,15 @@ impl<R: Read> Reader<R> {
     }
 
     pub fn read_sint32(&mut self) -> Result<i32> {
-        unimplemented!()
+        // zigzag
+        let n = self.read_varint()? as u32;
+        Ok(((n >> 1) as i32) ^ (-((n & 1) as i32)))
     }
 
     pub fn read_sint64(&mut self) -> Result<i64> {
-        unimplemented!()
+        // zigzag
+        let n = self.read_varint()?;
+        Ok(((n >> 1) as i64) ^ (-((n & 1) as i64)))
     }
 
     pub fn read_fixed64(&mut self) -> Result<u64> {
