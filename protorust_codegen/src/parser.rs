@@ -190,6 +190,8 @@ impl<'a> FileDescriptor<'a> {
 
     pub fn write<W: Write>(&self, w: &mut W, filename: &str) -> IoResult<()> {
         
+        println!("Found {} messages, enums or ignored expressions (imports ...)", self.message_and_enums.len());
+
         writeln!(w, "//! Automatically generated rust module for '{}' file", filename)?;
         writeln!(w, "")?;
         writeln!(w, "#![allow(non_snake_case)]")?;
@@ -234,7 +236,16 @@ mod parser {
 
     use std::str;
     use parser::{Frequency, Field, Message, Enumerator, MessageOrEnum, FileDescriptor};
-    use nom::{alphanumeric, multispace, digit};
+    use nom::{multispace, digit};
+
+    fn is_word(b: u8) -> bool {
+        match b {
+            b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => true,
+            _ => false
+        }
+    }
+
+    named!(word<&str>, map_res!(take_while!(is_word), str::from_utf8));
 
     named!(comment<()>, do_parse!(tag!("//") >> take_until_and_consume!("\n") >> ()));
 
@@ -243,12 +254,12 @@ mod parser {
 
     named!(default_value<&str>, do_parse!(
         tag!("[") >> many0!(br) >> tag!("default") >> many0!(br) >> tag!("=") >> many0!(br) >> 
-        default: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >> tag!("]") >>
+        default: word >> many0!(br) >> tag!("]") >>
         (default)));
 
     named!(packed<bool>, do_parse!(
         tag!("[") >> many0!(br) >> tag!("packed") >> many0!(br) >> tag!("=") >> many0!(br) >> 
-        packed: map_res!(map_res!(alphanumeric, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
+        packed: map_res!(word, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
         (packed)));
 
     named!(frequency<Frequency>,
@@ -258,8 +269,8 @@ mod parser {
 
     named!(message_field<Field>, do_parse!(
         frequency: frequency >> many1!(br) >>
-        typ: map_res!(alphanumeric, str::from_utf8) >> many1!(br) >>
-        name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >>
+        typ: word >> many1!(br) >>
+        name: word >> many0!(br) >>
         tag!("=") >> many0!(br) >>
         number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
         default: opt!(default_value) >> many0!(br) >> 
@@ -275,14 +286,14 @@ mod parser {
 
     named!(message<Message>, do_parse!(
         tag!("message") >> many0!(br) >> 
-        name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >> 
+        name: word >> many0!(br) >> 
         tag!("{") >> many0!(br) >>
         fields: many0!(message_field) >> 
         tag!("}") >> many0!(br) >>
         (Message { name: name, fields: fields })));
 
     named!(enum_field<(&str, i32)>, do_parse!(
-        name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >>
+        name: word >> many0!(br) >>
         tag!("=") >> many0!(br) >>
         number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >>
         tag!(";") >> many0!(br) >>
@@ -290,7 +301,7 @@ mod parser {
         
     named!(enumerator<Enumerator>, do_parse!(
         tag!("enum") >> many1!(br) >>
-        name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >>
+        name: word >> many0!(br) >>
         tag!("{") >> many0!(br) >>
         fields: many0!(enum_field) >> 
         tag!("}") >> many0!(br) >>
