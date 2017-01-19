@@ -140,10 +140,13 @@ impl<R: Read> Reader<R> {
 
     pub fn read_packed_repeated_field<M, F: FnMut(&mut Self) -> Result<M>>(&mut self, mut read: F) -> Result<Vec<M>> {
         let len = self.read_varint()? as usize;
-        let mut v = Vec::with_capacity(len);
-        for _ in 0..len {
+        let cur_len = self.len;
+        self.len = len;
+        let mut v = Vec::new();
+        while self.len > 0 {
             v.push(read(self)?);
         }
+        self.len = cur_len - len;
         Ok(v)
     }
 
