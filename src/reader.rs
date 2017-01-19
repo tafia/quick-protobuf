@@ -138,8 +138,13 @@ impl<R: Read> Reader<R> {
         String::from_utf8(vec).map_err(|e| e.into())
     }
 
-    pub fn read_packed_repeated_field(&mut self) -> Result<()> {
-        unimplemented!()
+    pub fn read_packed_repeated_field<M, F: FnMut(&mut Self) -> Result<M>>(&mut self, mut read: F) -> Result<Vec<M>> {
+        let len = self.read_varint()? as usize;
+        let mut v = Vec::with_capacity(len);
+        for _ in 0..len {
+            v.push(read(self)?);
+        }
+        Ok(v)
     }
 
     pub fn read_message<M: Message>(&mut self) -> Result<M> {

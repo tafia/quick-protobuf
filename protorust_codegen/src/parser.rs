@@ -16,6 +16,7 @@ struct Field<'a> {
     typ: &'a str,
     number: i32,
     default: Option<&'a str>,
+    packed: bool,
 }
 
 impl<'a> Field<'a> {
@@ -72,17 +73,19 @@ impl<'a> Field<'a> {
         match self.frequency {
             Frequency::Optional => writeln!(w, "{} => msg.{} = Some(r.read_{}()?),",
                                             self.tag(enums), self.name, self.read_fn(enums)),
-            Frequency::Repeated => writeln!(w, "{} => msg.{}.push(r.read_{}()?),",
-                                            self.tag(enums), self.name, self.read_fn(enums)),
+            Frequency::Repeated => {
+                if self.packed {
+                    writeln!(w, "{} => msg.{} = r.read_packed_repeated_field(|r| r.read_{}())?,",
+                             self.tag(enums), self.name, self.read_fn(enums))
+                } else {
+                    writeln!(w, "{} => msg.{}.push(r.read_{}()?),",
+                             self.tag(enums), self.name, self.read_fn(enums))
+                }
+            }
             Frequency::Required => writeln!(w, "{} => msg.{} = r.read_{}()?,",
                                             self.tag(enums), self.name, self.read_fn(enums)),
         }
     }
-
-//     fn write_match_not_tag<W: Write>(&self, w: &mut W, name: &str) -> IoResult<()> {
-//         writeln!(w, "({}, _) => return Err(ErrorKind::InvalidMessage(tag, \"{} {}\").into()),",
-//             self.number, name, self.typ)
-//     }
 }
 
 #[derive(Debug)]
@@ -243,6 +246,11 @@ mod parser {
         default: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >> tag!("]") >>
         (default)));
 
+    named!(packed<bool>, do_parse!(
+        tag!("[") >> many0!(br) >> tag!("packed") >> many0!(br) >> tag!("=") >> many0!(br) >> 
+        packed: map_res!(map_res!(alphanumeric, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
+        (packed)));
+
     named!(frequency<Frequency>,
            alt!(tag!("optional") => { |_| Frequency::Optional } |
                 tag!("repeated") => { |_| Frequency::Repeated } |
@@ -254,13 +262,15 @@ mod parser {
         name: map_res!(alphanumeric, str::from_utf8) >> many0!(br) >>
         tag!("=") >> many0!(br) >>
         number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
-        default: opt!(default_value) >> many0!(br) >> tag!(";") >> many0!(br) >>
+        default: opt!(default_value) >> many0!(br) >> 
+        packed: opt!(packed) >> many0!(br) >> tag!(";") >> many0!(br) >>
         (Field {
            name: name,
            frequency: frequency,
            typ: typ,
            number: number,
            default: default,
+           packed: packed.unwrap_or(false),
         })));
 
     named!(message<Message>, do_parse!(
