@@ -10,6 +10,5 @@ extern crate error_chain;
 extern crate byteorder;
 
 pub mod errors;
-pub mod types;
 pub mod reader;
 pub mod message;

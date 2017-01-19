@@ -116,10 +116,7 @@ impl<'a> Message<'a> {
             write!(w, "                ")?;
             f.write_match_tag(w, enums)?;
         }
-        writeln!(w, "                t => {{")?;
-        writeln!(w, "                    let t: Tag = t.into();")?;
-        writeln!(w, "                    r.read_unknown(t.wire_type())?;")?;
-        writeln!(w, "                }},")?;
+        writeln!(w, "                t => {{ r.read_unknown(t)?; }}")?;
         writeln!(w, "            }}")?;
         writeln!(w, "        }}")?;
         writeln!(w, "        Ok(msg)")?;
@@ -199,7 +196,6 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "use quick_protobuf::errors::Result;")?;
         writeln!(w, "use quick_protobuf::message::Message;")?;
         writeln!(w, "use quick_protobuf::reader::Reader;")?;
-        writeln!(w, "use quick_protobuf::types::Tag;")?;
 
         let enums = self.message_and_enums.iter().filter_map(|m| {
             if let &MessageOrEnum::Enum(ref e) = m {

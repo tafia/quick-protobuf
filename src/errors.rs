@@ -1,11 +1,6 @@
 //! A module to handle all errors via error-chain crate
 
-use types::Tag;
-
 error_chain! {
-//     links {
-//         I2R(::i2r::errors::Error, ::i2r::errors::ErrorKind);
-//     }
     foreign_links {
         Io(::std::io::Error);
         Utf8(::std::string::FromUtf8Error);
@@ -16,18 +11,15 @@ error_chain! {
             description("deprecated feature")
             display("feature '{}' has been deprecated", feat)
         }
-        UnknownWireType {
+        UnknownWireType(t: u8) {
             description("unknown wire type")
+            display("wire type must be less than 6, found {}", t)
         }
         Varint {
             description("cannot decode varint")
         }
         Eof {
             description("unexpected end of file")
-        }
-        InvalidMessage(tag: Tag, field_type: &'static str) {
-            description("invalid message field")
-            display("expecting '{}', got tag {:?}", field_type, tag)
         }
         ParseMessage(s: String) {
             description("error while parsing message")

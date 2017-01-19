@@ -1,11 +1,17 @@
 use std::io::Read;
 
 use errors::{Result, ErrorKind};
-use types::{Tag, WireType};
 use message::Message;
 
 use byteorder::ReadBytesExt;
 use byteorder::LittleEndian as LE;
+
+const WIRE_TYPE_VARINT: u8 = 0;
+const WIRE_TYPE_FIXED64: u8 = 1;
+const WIRE_TYPE_LENGTH_DELIMITED: u8 = 2;
+const WIRE_TYPE_START_GROUP: u8 = 3;
+const WIRE_TYPE_END_GROUP: u8 = 4;
+const WIRE_TYPE_FIXED32: u8 = 5;
 
 /// A struct to read protocol binary files
 pub struct Reader<R> {
@@ -18,15 +24,6 @@ impl<R: Read> Reader<R> {
     /// Creates a new protocol buffer reader with the maximum len of bytes to read
     pub fn from_reader(r: R, len: usize) -> Reader<R> {
         Reader { inner: r, len: len }
-    }
-
-    /// Reads next tag, `None` if all bytes have been read
-    pub fn next_tag(&mut self) -> Option<Result<Tag>> {
-        if self.len == 0 {
-            None
-        } else {
-            Some(self.read_varint().map(|i| (i as u32).into()))
-        }
     }
 
     /// Reads next tag, `None` if all bytes have been read
@@ -151,18 +148,18 @@ impl<R: Read> Reader<R> {
         Ok(msg)
     }
 
-    pub fn read_unknown(&mut self, wire_type: WireType) -> Result<()> {
-        match wire_type {
-            WireType::Varint => { self.read_varint()?; },
-            WireType::Fixed64 => {
+    pub fn read_unknown(&mut self, tag_value: u32) -> Result<()> {
+        match (tag_value & 0x7) as u8 {
+            WIRE_TYPE_VARINT => { self.read_varint()?; },
+            WIRE_TYPE_FIXED64 => {
                 self.len -= 8;
-                let _ = self.inner.read_exact(&mut [0; 8])?;
+                self.inner.read_exact(&mut [0; 8])?;
             }
-            WireType::Fixed32 => {
+            WIRE_TYPE_FIXED32 => {
                 self.len -= 4;
-                let _ = self.inner.read_exact(&mut [0; 4])?;
+                self.inner.read_exact(&mut [0; 4])?;
             }
-            WireType::LengthDelimited => {
+            WIRE_TYPE_LENGTH_DELIMITED => {
                 let len = self.read_varint()? as usize;
                 if len == 0 { return Ok(()); }
                 self.len -= len;
@@ -170,9 +167,9 @@ impl<R: Read> Reader<R> {
                 unsafe { buf.set_len(len); }
                 self.inner.read_exact(&mut buf)?;
             },
-            WireType::StartGroup | 
-                WireType::EndGroup => { return Err(ErrorKind::Deprecated("group").into()); },
-            WireType::Unknown => { return Err(ErrorKind::UnknownWireType.into()); },
+            WIRE_TYPE_START_GROUP | 
+                WIRE_TYPE_END_GROUP => { return Err(ErrorKind::Deprecated("group").into()); },
+            t => { return Err(ErrorKind::UnknownWireType(t).into()); },
         }
         Ok(())
     }
