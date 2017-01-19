@@ -38,20 +38,23 @@ impl<R: Read> Reader<R> {
     fn read_varint(&mut self) -> Result<u64> {
         let mut r: u64 = 0;
         let mut i = 0;
-        for _ in 0..10 {
+        for _ in 0..9 {
             self.len -= 1;
             let b = self.inner.read_u8()?;
-            // TODO: may overflow if i == 9
             r |= ((b & 0x7f) as u64) << i;
             if b < 0x80 {
                 return Ok(r);
             }
             i += 7;
         }
-        if i == 70 {
-            Err(ErrorKind::Varint.into())
-        } else {
-            Err(ErrorKind::Eof.into())
+        self.len -= 1;
+        match self.inner.read_u8()? {
+            0 => Ok(r),
+            1 => {
+                r |= 1 << 63;
+                Ok(r)
+            }
+            _ => Err(ErrorKind::Varint.into()), // we have only one spare bit to fit into
         }
     }
 
