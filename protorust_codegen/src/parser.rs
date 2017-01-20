@@ -17,6 +17,7 @@ struct Field<'a> {
     number: i32,
     default: Option<&'a str>,
     packed: bool,
+    boxed: bool,
 }
 
 impl<'a> Field<'a> {
@@ -63,16 +64,35 @@ impl<'a> Field<'a> {
 
     fn write_definition<W: Write>(&self, w: &mut W) -> IoResult<()> {
         match self.frequency {
-            Frequency::Optional => writeln!(w, "    pub {}: Option<{}>,", self.name, self.rust_type()),
+            Frequency::Optional => {
+                if self.boxed {
+                    writeln!(w, "    pub {}: Option<Box<{}>>,", self.name, self.rust_type())
+                } else {
+                    writeln!(w, "    pub {}: Option<{}>,", self.name, self.rust_type())
+                }
+            }
             Frequency::Repeated => writeln!(w, "    pub {}: Vec<{}>,", self.name, self.rust_type()),
-            Frequency::Required => writeln!(w, "    pub {}: {},", self.name, self.rust_type()),
+            Frequency::Required => {
+                if self.boxed {
+                    writeln!(w, "    pub {}: Box<{}>,", self.name, self.rust_type())
+                } else {
+                    writeln!(w, "    pub {}: {},", self.name, self.rust_type())
+                }
+            }
         }
     }
 
     fn write_match_tag<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
         match self.frequency {
-            Frequency::Optional => writeln!(w, "Ok({}) => msg.{} = Some(r.read_{}()?),",
-                                            self.tag(enums), self.name, self.read_fn(enums)),
+            Frequency::Optional => {
+                if self.boxed {
+                    writeln!(w, "Ok({}) => msg.{} = Some(Box::new(r.read_{}()?)),",
+                             self.tag(enums), self.name, self.read_fn(enums))
+                } else {
+                    writeln!(w, "Ok({}) => msg.{} = Some(r.read_{}()?),",
+                             self.tag(enums), self.name, self.read_fn(enums))
+                }
+            }
             Frequency::Repeated => {
                 if self.packed {
                     writeln!(w, "Ok({}) => msg.{} = r.read_packed_repeated_field(|r| r.read_{}())?,",
@@ -82,9 +102,28 @@ impl<'a> Field<'a> {
                              self.tag(enums), self.name, self.read_fn(enums))
                 }
             }
-            Frequency::Required => writeln!(w, "Ok({}) => msg.{} = r.read_{}()?,",
-                                            self.tag(enums), self.name, self.read_fn(enums)),
+            Frequency::Required => {
+                if self.boxed {
+                    writeln!(w, "Ok({}) => msg.{} = Box::new(r.read_{}()?),",
+                             self.tag(enums), self.name, self.read_fn(enums))
+                } else {
+                    writeln!(w, "Ok({}) => msg.{} = r.read_{}()?,",
+                             self.tag(enums), self.name, self.read_fn(enums))
+                }
+            }
         }
+    }
+
+    /// searches if the message must be boxed
+    fn is_leaf(&self, leaf_messages: &[&str], enums: &[&str]) -> bool {
+        match self.frequency {
+            Frequency::Repeated | Frequency::Required => return true,
+            Frequency::Optional => (),
+        }
+        if self.read_fn(enums) != "message" {
+            return true;
+        }
+        leaf_messages.iter().any(|m| m == &self.typ)
     }
 }
 
@@ -121,6 +160,10 @@ impl<'a> Message<'a> {
         writeln!(w, "        Ok(msg)")?;
         writeln!(w, "    }}")?;
         writeln!(w, "}}")
+    }
+
+    fn is_leaf(&self, leaf_messages: &[&str], enums: &[&str]) -> bool {
+        self.fields.iter().all(|f| f.is_leaf(leaf_messages, enums))
     }
 }
 
@@ -173,6 +216,8 @@ pub enum MessageOrEnum<'a> {
 #[derive(Debug)]
 pub struct FileDescriptor<'a> {
     message_and_enums: Vec<MessageOrEnum<'a>>,
+    messages: Vec<Message<'a>>,
+    enums: Vec<Enumerator<'a>>,
 }
 
 impl<'a> FileDescriptor<'a> {
@@ -186,7 +231,7 @@ impl<'a> FileDescriptor<'a> {
 
     pub fn write<W: Write>(&self, w: &mut W, filename: &str) -> IoResult<()> {
         
-        println!("Found {} messages, enums or ignored expressions (imports ...)", self.message_and_enums.len());
+        println!("Found {} messages, and {} enums", self.messages.len(), self.enums.len());
 
         writeln!(w, "//! Automatically generated rust module for '{}' file", filename)?;
         writeln!(w, "")?;
@@ -194,37 +239,69 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
         writeln!(w, "")?;
         writeln!(w, "use std::io::Read;")?;
-        writeln!(w, "use quick_protobuf::errors::Result;")?;
-        writeln!(w, "use quick_protobuf::message::Message;")?;
-        writeln!(w, "use quick_protobuf::reader::Reader;")?;
+        writeln!(w, "use quick_protobuf::{{Message, Reader, Result}};")?;
 
-        let enums = self.message_and_enums.iter().filter_map(|m| {
-            if let &MessageOrEnum::Enum(ref e) = m {
-                Some(e.name)
-            } else {
-                None
-            }
-        }).collect::<Vec<_>>();
-        for m in &self.message_and_enums {
-            match m {
-                &MessageOrEnum::Msg(ref m) => {
-                    writeln!(w, "")?;
-                    m.write_definition(w)?;
-                    writeln!(w, "")?;
-                    m.write_impl_message(w, &enums)?;
-                },
-                &MessageOrEnum::Enum(ref m) => {
-                    writeln!(w, "")?;
-                    m.write_definition(w)?;
-                    writeln!(w, "")?;
-                    m.write_impl_default(w)?;
-                    writeln!(w, "")?;
-                    m.write_from_u64(w)?;
-                },
-                &MessageOrEnum::Ignore => continue,
-            }
+        let enums = self.enums.iter().map(|e| e.name).collect::<Vec<_>>();
+        for m in &self.enums {
+            writeln!(w, "")?;
+            m.write_definition(w)?;
+            writeln!(w, "")?;
+            m.write_impl_default(w)?;
+            writeln!(w, "")?;
+            m.write_from_u64(w)?;
+        }
+        for m in &self.messages {
+            writeln!(w, "")?;
+            m.write_definition(w)?;
+            writeln!(w, "")?;
+            m.write_impl_message(w, &enums)?;
         }
         Ok(())
+    }
+
+    pub fn break_cycles(&mut self) {
+        let mut messages = Vec::new();
+        let mut enums = Vec::new();
+        for m in self.message_and_enums.drain(..) {
+            match m {
+                MessageOrEnum::Msg(m) => messages.push(m),
+                MessageOrEnum::Enum(e) => enums.push(e),
+                _ => (),
+            }
+        }
+        self.messages = messages;
+        self.enums = enums;
+
+        let message_names = self.messages.iter().map(|m| m.name.to_string()).collect::<Vec<_>>();
+        let enum_names = self.enums.iter().map(|m| m.name.to_string()).collect::<Vec<_>>();
+        let enums = enum_names.iter().map(|n| &**n).collect::<Vec<_>>();
+
+        let mut leaf_messages = Vec::new();
+        let mut undef_messages = (0..self.messages.len()).collect::<Vec<_>>();
+        while !undef_messages.is_empty() {
+            let len = undef_messages.len();
+            let mut new_undefs = Vec::new();
+            for i in undef_messages.into_iter() {
+                if self.messages[i].is_leaf(&leaf_messages, &enums) {
+                    leaf_messages.push(&*message_names[i])
+                } else {
+                    new_undefs.push(i);
+                }
+            }
+            undef_messages = new_undefs;
+            if len == undef_messages.len() {
+                // try boxing messages, one by one ...
+                let k = undef_messages.pop().unwrap();
+                {
+                    let m = self.messages.get_mut(k).unwrap();
+                    for f in m.fields.iter_mut() {
+                        if !f.is_leaf(&leaf_messages, &enums) {
+                            f.boxed = true;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -278,6 +355,7 @@ mod parser {
            number: number,
            default: default,
            packed: packed.unwrap_or(false),
+           boxed: false,
         })));
 
     named!(message<Message>, do_parse!(
@@ -316,7 +394,9 @@ mod parser {
         many0!(br) >>
         message_and_enums: many0!(message_or_enum) >>
         (FileDescriptor {
-            message_and_enums: message_and_enums
+            message_and_enums: message_and_enums,
+            messages: Vec::new(),
+            enums: Vec::new(),
         })));
 
     #[test]

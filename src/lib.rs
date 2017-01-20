@@ -12,3 +12,7 @@ extern crate byteorder;
 pub mod errors;
 pub mod reader;
 pub mod message;
+
+pub use errors::Result;
+pub use reader::Reader;
+pub use message::Message;

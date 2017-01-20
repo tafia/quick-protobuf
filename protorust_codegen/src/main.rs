@@ -34,12 +34,15 @@ fn main() {
     let mut data = Vec::with_capacity(in_file.metadata()
                                      .expect("Cannot get input file length")
                                      .len() as usize);
-    let parsed_file = {
+    let mut parsed_file = {
         let f = File::open(&in_file).expect(&usage);
         let mut reader = BufReader::new(f);
         reader.read_to_end(&mut data).expect("Cannot read input file");
         FileDescriptor::from_bytes(&data).expect("Cannot parse protobuf messages")
     };
+
+
+    parsed_file.break_cycles();
 
     let name = in_file.file_name().and_then(|e| e.to_str()).unwrap();
     let mut w = BufWriter::new(File::create(out_file).expect("Cannot create output file"));
