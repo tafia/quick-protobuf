@@ -10,8 +10,9 @@ extern crate error_chain;
 extern crate byteorder;
 
 pub mod errors;
-pub mod reader;
 pub mod message;
+pub mod reader;
+pub mod writer;
 
 pub use errors::Result;
 pub use reader::Reader;
