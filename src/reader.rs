@@ -185,6 +185,10 @@ impl<R: Read> Reader<R> {
         self.len
     }
 
+    pub fn inner(&mut self) -> &mut R {
+        &mut self.inner
+    }
+
     pub fn is_eof(&self) -> bool {
         self.len == 0
     }
