@@ -71,18 +71,18 @@ impl<'a> Field<'a> {
 
     fn write_match_tag<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
         match self.frequency {
-            Frequency::Optional => writeln!(w, "{} => msg.{} = Some(r.read_{}()?),",
+            Frequency::Optional => writeln!(w, "Ok({}) => msg.{} = Some(r.read_{}()?),",
                                             self.tag(enums), self.name, self.read_fn(enums)),
             Frequency::Repeated => {
                 if self.packed {
-                    writeln!(w, "{} => msg.{} = r.read_packed_repeated_field(|r| r.read_{}())?,",
+                    writeln!(w, "Ok({}) => msg.{} = r.read_packed_repeated_field(|r| r.read_{}())?,",
                              self.tag(enums), self.name, self.read_fn(enums))
                 } else {
-                    writeln!(w, "{} => msg.{}.push(r.read_{}()?),",
+                    writeln!(w, "Ok({}) => msg.{}.push(r.read_{}()?),",
                              self.tag(enums), self.name, self.read_fn(enums))
                 }
             }
-            Frequency::Required => writeln!(w, "{} => msg.{} = r.read_{}()?,",
+            Frequency::Required => writeln!(w, "Ok({}) => msg.{} = r.read_{}()?,",
                                             self.tag(enums), self.name, self.read_fn(enums)),
         }
     }
@@ -108,18 +108,14 @@ impl<'a> Message<'a> {
         writeln!(w, "impl Message for {} {{", self.name)?;
         writeln!(w, "    fn from_reader<R: Read>(mut r: &mut Reader<R>) -> Result<Self> {{")?;
         writeln!(w, "        let mut msg = Self::default();")?;
-        writeln!(w, "        loop {{")?;
-        writeln!(w, "            let tag = match r.next_tag_value() {{")?;
-        writeln!(w, "                None => break,")?;
-        writeln!(w, "                Some(Err(e)) => return Err(e),")?;
-        writeln!(w, "                Some(Ok(tag)) => tag,")?;
-        writeln!(w, "            }};")?;
-        writeln!(w, "            match tag {{")?;
+        writeln!(w, "        while !r.is_eof() {{")?;
+        writeln!(w, "            match r.next_tag() {{")?;
         for f in &self.fields {
             write!(w, "                ")?;
             f.write_match_tag(w, enums)?;
         }
-        writeln!(w, "                t => {{ r.read_unknown(t)?; }}")?;
+        writeln!(w, "                Ok(t) => {{ r.read_unknown(t)?; }}")?;
+        writeln!(w, "                Err(e) => return Err(e),")?;
         writeln!(w, "            }}")?;
         writeln!(w, "        }}")?;
         writeln!(w, "        Ok(msg)")?;

@@ -27,12 +27,8 @@ impl<R: Read> Reader<R> {
     }
 
     /// Reads next tag, `None` if all bytes have been read
-    pub fn next_tag_value(&mut self) -> Option<Result<u32>> {
-        if self.len == 0 {
-            None
-        } else {
-            Some(self.read_varint().map(|i| (i as u32)))
-        }
+    pub fn next_tag(&mut self) -> Result<u32> {
+        self.read_varint().map(|i| (i as u32))
     }
 
     fn read_varint(&mut self) -> Result<u64> {
@@ -187,6 +183,10 @@ impl<R: Read> Reader<R> {
 
     pub fn len(&self) -> usize {
         self.len
+    }
+
+    pub fn is_eof(&self) -> bool {
+        self.len == 0
     }
 }
 
