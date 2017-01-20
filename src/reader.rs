@@ -195,15 +195,5 @@ fn test_varint() {
     let data: &[u8] = &[0x96, 0x01];
     let mut r = Reader::from_reader(data, data.len());
     assert_eq!(150, r.read_varint().unwrap());
-    assert!(r.next_tag().is_none());
-}
-
-#[test]
-fn test_next_field() {
-    let data: &[u8] = &[0x08, 0x96, 0x01];
-    let mut r = Reader::from_reader(data, data.len());
-    let tag = r.next_tag().unwrap().unwrap();
-    assert_eq!((1, WireType::Varint), tag.unpack());
-    assert_eq!(150, r.read_varint().unwrap());
-    assert!(r.next_tag().is_none());
+    assert!(r.next_tag_value().is_none());
 }
