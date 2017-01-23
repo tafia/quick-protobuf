@@ -199,5 +199,5 @@ fn test_varint() {
     let data: &[u8] = &[0x96, 0x01];
     let mut r = Reader::from_reader(data, data.len());
     assert_eq!(150, r.read_varint().unwrap());
-    assert!(r.next_tag_value().is_none());
+    assert!(r.is_eof());
 }
