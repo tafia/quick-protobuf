@@ -24,15 +24,16 @@ cargo run /my/proto/path/my_file.proto
 quick-protobuf = { git = "https://github.com/tafia/quick-protobuf" }
     ```
 
-3. Import the generated module
+3. Use the generated module
 
     ```rust
 // main.rs or lib.rs
+
 extern crate quick_protobuf;
 
 mod my_file; // generated with protorust_codegen
 
-use quick_protobuf::{Message, Result, Reader};
+use quick_protobuf::{Message, Result};
 use my_file::Foo;
 
 fn main() {
@@ -43,6 +44,7 @@ fn run(p: &str) -> Result<()> {
     // Foo implements Message trait, thus we can directly deserialize .bin files
     let msg = Foo::from_file(p)?;
     println!("Deserialized msg: {:#?}", msg);
+    Ok(())
 }
     ```
 
