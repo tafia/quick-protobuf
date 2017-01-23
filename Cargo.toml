@@ -1,7 +1,11 @@
 [package]
 name = "quick-protobuf"
+description = "A pure Rust protobuf (de)serializer. Quick."
 version = "0.1.0"
-authors = ["Johann Tuffe"]
+authors = ["Johann Tuffe tafia973@gmail.com"]
+keywords = ["protobuf", "parser"]
+license = "LICENSE-MIT.md"
+readme = "README.md" 
 
 [dependencies]
 error-chain = "0.7.2"
