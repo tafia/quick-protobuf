@@ -1,13 +1,14 @@
 #[macro_use]
 extern crate nom;
 
-pub mod parser;
+mod parser;
+mod types;
 
 use std::env;
 use std::path::PathBuf;
 use std::fs::File;
 use std::io::{Read, BufReader, BufWriter};
-use parser::FileDescriptor;
+use types::FileDescriptor;
 
 fn main() {
 

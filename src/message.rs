@@ -2,12 +2,13 @@
 //!
 //! Creates the struct and implements a reader
 
-use std::io::{Read, BufReader};
+use std::io::{Read, BufReader, Write, BufWriter};
 use std::path::Path;
 use std::fs::File;
 
 use errors::Result;
 use reader::Reader;
+use writer::Writer;
 
 /// A trait to handle deserialization based on parsed `Field`s
 pub trait Message: Sized {
@@ -17,6 +18,12 @@ pub trait Message: Sized {
     /// This method is generally automatically implemented when generating code
     /// out of .proto file
     fn from_reader<R: Read>(r: &mut Reader<R>) -> Result<Self>;
+
+    /// Writes `Self` into W writer
+    fn write<W: Write>(&self, w: &mut Writer<W>) -> Result<()>;
+
+    /// Computes necessary binary size of self once serialized in protobuf
+    fn get_size(&self) -> usize;
 
     /// Creates Message out of a file
     ///
@@ -46,4 +53,12 @@ pub trait Message: Sized {
         let mut reader = Reader::from_reader(&mut v, len);
         Self::from_reader(&mut reader)
     }
+
+    /// Writes self into a file
+    fn write_file<P: AsRef<Path>>(&self, p: P) -> Result<()> {
+        let file = BufWriter::new(File::create(p)?);
+        let mut writer = Writer::new(file);
+        self.write(&mut writer)
+    }
+
 }
