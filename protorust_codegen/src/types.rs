@@ -49,6 +49,14 @@ impl<'a> Field<'a> {
     }
 
     fn wire_type_num(&self, enums: &[&str]) -> u32 {
+        if self.packed {
+            2
+        } else {
+            self.wire_type_num_non_packed(enums)
+        }
+    }
+
+    fn wire_type_num_non_packed(&self, enums: &[&str]) -> u32 {
         match self.typ {
             "int32" | "sint32" | "int64" | "sint64" | 
                 "uint32" | "uint64" | "bool" | "enum" => 0,
@@ -160,20 +168,22 @@ impl<'a> Field<'a> {
                 let read_fn = self.read_fn(enums);
                 let as_enum = if read_fn == "enum" { " as i32" } else { "" };
                 if self.packed {
-                    match self.wire_type_num(enums) {
-                        0 => writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_{}(*s{})).sum::<usize>())", 
-                                      tag_size, self.name, read_fn, as_enum)?,
-                        1 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 8)", tag_size, self.name)?,
-                        5 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 4)", tag_size, self.name)?,
+                    write!(w, "if self.{}.is_empty() {{ 0 }} else {{ ", self.name)?;
+                    match self.wire_type_num_non_packed(enums) {
+                        0 => write!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_{}(*s{})).sum::<usize>())", 
+                                    tag_size, self.name, read_fn, as_enum)?,
+                        1 => write!(w, "{} + sizeof_var_length(self.{}.len() * 8)", tag_size, self.name)?,
+                        5 => write!(w, "{} + sizeof_var_length(self.{}.len() * 4)", tag_size, self.name)?,
                         2 => {
                             let len = if self.read_fn(enums) == "message" { "get_size" } else { "len" };
-                            writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_var_length(s.{}())).sum::<usize>())", 
-                                     tag_size, self.name, len)?;
+                            write!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_var_length(s.{}())).sum::<usize>())", 
+                                   tag_size, self.name, len)?;
                         }
                         e => panic!("expecting wire type number, got: {}", e),
                     }
+                    writeln!(w, " }}")?;
                 } else {
-                    match self.wire_type_num(enums) {
+                    match self.wire_type_num_non_packed(enums) {
                         0 => writeln!(w, "self.{}.iter().map(|s| {} + sizeof_{}(*s{})).sum::<usize>()", 
                                       self.name, tag_size, read_fn, as_enum)?,
                         1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
@@ -193,7 +203,7 @@ impl<'a> Field<'a> {
 
     fn write_inner_get_size<W: Write>(&self, w: &mut W, enums: &[&str], s: &str, as_ref: &str) -> IoResult<()> {
         let tag_size = sizeof_varint(self.tag(enums));
-        match self.wire_type_num(enums) {
+        match self.wire_type_num_non_packed(enums) {
             0 => {
                 let read_fn = self.read_fn(enums);
                 let as_enum = if read_fn == "enum" { " as i32" } else { "" };
@@ -203,7 +213,11 @@ impl<'a> Field<'a> {
             5 => write!(w, "{} + 4", tag_size)?,
             2 => {
                 let len = if self.read_fn(enums) == "message" { "get_size" } else { "len" };
-                write!(w, "{} + sizeof_var_length({}.{}())", tag_size, s, len)?;
+                if self.packed {
+                    write!(w, "if s.is_empty() {{ 0 }} else {{ {} + sizeof_var_length({}.{}()) }}", tag_size, s, len)?;
+                } else {
+                    write!(w, "{} + sizeof_var_length({}.{}())", tag_size, s, len)?;
+                }
             }
             e => panic!("expecting wire type number, got: {}", e),
         }

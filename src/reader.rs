@@ -139,7 +139,7 @@ impl<R: Read> Reader<R> {
         let cur_len = self.len;
         self.len = len;
         let mut v = Vec::new();
-        while self.len > 0 {
+        while !self.is_eof() {
             v.push(read(self)?);
         }
         self.len = cur_len - len;

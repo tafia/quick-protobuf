@@ -205,6 +205,10 @@ impl<W: Write> Writer<W> {
         where F: FnMut(&mut Self, &M) -> Result<()>,
               S: Fn(&M) -> usize,
     {
+        if v.is_empty() {
+            return Ok(());
+        }
+
         self.write_tag(tag)?;
         let len: usize = v.iter().map(|m| size(m)).sum();
         self.write_varint(len as u64)?;
