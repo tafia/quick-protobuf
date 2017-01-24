@@ -142,16 +142,16 @@ impl<'a> Field<'a> {
         match self.frequency {
             Frequency::Required => {
                 if is_first { write!(w, "        ")? } else { write!(w, "        + ")? }
-                self.write_inner_get_size(w, enums, &format!("self.{}", self.name))?;
+                self.write_inner_get_size(w, enums, &format!("self.{}", self.name), "")?;
                 writeln!(w, "")?;
             }
             Frequency::Optional => {
                 if is_first {
-                    write!(w, "        self.{}.map_or(0, |m| ", self.name)?
+                    write!(w, "        self.{}.as_ref().map_or(0, |m| ", self.name)?
                 } else {
-                    write!(w, "        + self.{}.map_or(0, |m| ", self.name)?
+                    write!(w, "        + self.{}.as_ref().map_or(0, |m| ", self.name)?
                 }
-                self.write_inner_get_size(w, enums, "m")?;
+                self.write_inner_get_size(w, enums, "m", "*")?;
                 writeln!(w, ")")?;
             }
             Frequency::Repeated => {
@@ -159,24 +159,26 @@ impl<'a> Field<'a> {
                 if is_first { write!(w, "        ")? } else { write!(w, "        + ")? }
                 if self.packed {
                     match self.wire_type_num(enums) {
-                        0 => writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_varint(s)).sum())", tag_size, self.name)?,
+                        0 => writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_{}(s)).sum::<usize>())", 
+                                      tag_size, self.name, self.read_fn(enums))?,
                         1 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 8)", tag_size, self.name)?,
                         5 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 4)", tag_size, self.name)?,
                         2 => {
                             let len = if self.read_fn(enums) == "message" { "get_size" } else { "len" };
-                            writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_var_length(s.{}())).sum())", 
+                            writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_var_length(s.{}())).sum::<usize>())", 
                                      tag_size, self.name, len)?;
                         }
                         e => panic!("expecting wire type number, got: {}", e),
                     }
                 } else {
                     match self.wire_type_num(enums) {
-                        0 => writeln!(w, "self.{}.iter().map(|s| {} + sizeof_varint(s)).sum()", self.name, tag_size)?,
+                        0 => writeln!(w, "self.{}.iter().map(|s| {} + sizeof_{}(s)).sum::<usize>()", 
+                                      self.name, tag_size, self.read_fn(enums))?,
                         1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
                         5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
                         2 => {
                             let len = if self.read_fn(enums) == "message" { "get_size" } else { "len" };
-                            writeln!(w, "self.{}.iter().map(|s| {} + sizeof_var_length(s.{}())).sum()", 
+                            writeln!(w, "self.{}.iter().map(|s| {} + sizeof_var_length(s.{}())).sum::<usize>()", 
                                      self.name, tag_size, len)?;
                         }
                         e => panic!("expecting wire type number, got: {}", e),
@@ -187,10 +189,14 @@ impl<'a> Field<'a> {
         Ok(())
     }
 
-    fn write_inner_get_size<W: Write>(&self, w: &mut W, enums: &[&str], s: &str) -> IoResult<()> {
+    fn write_inner_get_size<W: Write>(&self, w: &mut W, enums: &[&str], s: &str, as_ref: &str) -> IoResult<()> {
         let tag_size = sizeof_varint(self.tag(enums));
         match self.wire_type_num(enums) {
-            0 => write!(w, "{} + sizeof_varint({})", tag_size, s)?,
+            0 => {
+                let read_fn = self.read_fn(enums);
+                let as_enum = if read_fn == "enum" { " as i32" } else { "" };
+                write!(w, "{} + sizeof_{}({}{}{})", tag_size, read_fn, as_ref, s, as_enum)?
+            },
             1 => write!(w, "{} + 8", tag_size)?,
             5 => write!(w, "{} + 4", tag_size)?,
             2 => {
@@ -198,6 +204,38 @@ impl<'a> Field<'a> {
                 write!(w, "{} + sizeof_var_length({}.{}())", tag_size, s, len)?;
             }
             e => panic!("expecting wire type number, got: {}", e),
+        }
+        Ok(())
+    }
+
+    fn write_write<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
+        let tag = self.tag(enums);
+        let use_ref = match self.rust_type() {
+            "i32" | "i64" | "u32" | "u64" | "f32" | "f64" | "bool" => false,
+            t => !enums.contains(&t),
+        };
+        let read_fn = self.read_fn(enums);
+        let as_enum = if read_fn == "enum" { " as i32" } else { "" };
+        match self.frequency {
+            Frequency::Required => {
+                let r = if use_ref { "&" } else { "" };
+                writeln!(w, "        r.write_{}_with_tag({}, {}self.{}{})?;", read_fn, tag, r, self.name, as_enum)?;
+            },
+            Frequency::Optional => {
+                let r = if use_ref { "" } else { "*" };
+                writeln!(w, "        if let Some(ref s) = self.{} {{ r.write_{}_with_tag({}, {}s{})?; }}", 
+                         self.name, read_fn, tag, r, as_enum)?;
+            }
+            Frequency::Repeated => {
+                if self.packed {
+                    writeln!(w, "        r.write_tag({})?;", tag)?;
+                    writeln!(w, "        r.write_packed_repeated_field(&self.{}, |r, m| r.write_{}({}m{}), |_| 1)?;", 
+                             self.name, read_fn, if use_ref { "" } else { "*" }, as_enum)?;
+                } else {
+                    writeln!(w, "        for s in &self.{} {{ r.write_{}_with_tag({}, {}s{})? }}", 
+                             self.name, read_fn, tag, if use_ref { "" } else { "*" }, as_enum)?;
+                }
+            }
         }
         Ok(())
     }
@@ -219,11 +257,17 @@ impl<'a> Message<'a> {
         writeln!(w, "}}")
     }
 
-    fn write_impl_message<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
-        writeln!(w, "impl Message for {} {{", self.name)?;
+    fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
+        writeln!(w, "impl MessageRead for {} {{", self.name)?;
         self.write_from_reader(w, enums)?;
-        writeln!(w, "")?;
+        writeln!(w, "}}")
+    }
+
+    fn write_impl_message_write<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
+        writeln!(w, "impl MessageWrite for {} {{", self.name)?;
         self.write_get_size(w, enums)?;
+        writeln!(w, "")?;
+        self.write_write_message(w, enums)?;
         writeln!(w, "}}")
     }
 
@@ -252,6 +296,15 @@ impl<'a> Message<'a> {
         writeln!(w, "    }}")
     }
 
+    fn write_write_message<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
+        writeln!(w, "    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {{")?;
+        for f in self.fields.iter() {
+            f.write_write(w, enums)?;
+        }
+        writeln!(w, "        Ok(())")?;
+        writeln!(w, "    }}")
+    }
+
     fn is_leaf(&self, leaf_messages: &[&str], enums: &[&str]) -> bool {
         self.fields.iter().all(|f| f.is_leaf(leaf_messages, enums))
     }
@@ -265,10 +318,10 @@ pub struct Enumerator<'a> {
 
 impl<'a> Enumerator<'a> {
     fn write_definition<W: Write>(&self, w: &mut W) -> IoResult<()> {
-        writeln!(w, "#[derive(Debug, PartialEq, Eq, Clone)]")?;
+        writeln!(w, "#[derive(Debug, PartialEq, Eq, Clone, Copy)]")?;
         writeln!(w, "pub enum {} {{", self.name)?;
-        for &(f, _) in &self.fields {
-            writeln!(w, "    {},", f)?;
+        for &(f, number) in &self.fields {
+            writeln!(w, "    {} = {},", f, number)?;
         }
         writeln!(w, "}}")
     }
@@ -282,9 +335,9 @@ impl<'a> Enumerator<'a> {
         writeln!(w, "}}")
     }
 
-    fn write_from_u64<W: Write>(&self, w: &mut W) -> IoResult<()> {
-        writeln!(w, "impl From<u64> for {} {{", self.name)?;
-        writeln!(w, "    fn from(i: u64) -> Self {{")?;
+    fn write_from_i32<W: Write>(&self, w: &mut W) -> IoResult<()> {
+        writeln!(w, "impl From<i32> for {} {{", self.name)?;
+        writeln!(w, "    fn from(i: i32) -> Self {{")?;
         writeln!(w, "        match i {{")?;
         for &(f, number) in &self.fields {
             writeln!(w, "            {} => {}::{},", number, self.name, f)?;
@@ -311,6 +364,7 @@ pub struct FileDescriptor<'a> {
 }
 
 impl<'a> FileDescriptor<'a> {
+
     pub fn from_bytes(b: &'a [u8]) -> Result<FileDescriptor<'a>, IError<u32>> {
         file_descriptor(b).to_full_result()
     }
@@ -324,9 +378,9 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "#![allow(non_snake_case)]")?;
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
         writeln!(w, "")?;
-        writeln!(w, "use std::io::Read;")?;
-        writeln!(w, "use quick_protobuf::{{Message, Reader, Result}};")?;
-        writeln!(w, "use quick_protobuf::writer::{{sizeof_varint, sizeof_var_length}};")?;
+        writeln!(w, "use std::io::{{Read, Write}};")?;
+        writeln!(w, "use quick_protobuf::{{MessageRead, MessageWrite, Reader, Writer, Result}};")?;
+        writeln!(w, "use quick_protobuf::sizeofs::*;")?;
 
         let enums = self.enums.iter().map(|e| e.name).collect::<Vec<_>>();
         for m in &self.enums {
@@ -335,13 +389,15 @@ impl<'a> FileDescriptor<'a> {
             writeln!(w, "")?;
             m.write_impl_default(w)?;
             writeln!(w, "")?;
-            m.write_from_u64(w)?;
+            m.write_from_i32(w)?;
         }
         for m in &self.messages {
             writeln!(w, "")?;
             m.write_definition(w)?;
             writeln!(w, "")?;
-            m.write_impl_message(w, &enums)?;
+            m.write_impl_message_read(w, &enums)?;
+            writeln!(w, "")?;
+            m.write_impl_message_write(w, &enums)?;
         }
         Ok(())
     }
