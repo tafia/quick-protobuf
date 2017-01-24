@@ -27,25 +27,36 @@ quick-protobuf = { git = "https://github.com/tafia/quick-protobuf" }
 3. Use the generated module
 
     ```rust
-// main.rs or lib.rs
+    // main.rs or lib.rs
+    extern crate quick_protobuf;
 
-extern crate quick_protobuf;
+    mod my_file; // generated with protorust_codegen
 
-mod my_file; // generated with protorust_codegen
+    use std::io::Write;
+    use quick_protobuf::{MessageRead, MessageWrite, Writer, Result};
+    use my_file::Foo;
 
-use quick_protobuf::{Message, Result};
-use my_file::Foo;
+    fn main() {
+        run("/path/to/my/binary/file.bin").unwrap();
+    }
 
-fn main() {
-    run("/path/to/my/binary/file.bin").unwrap();
-}
+    fn run(p: &str) -> Result<()> {
+        // Foo implements Message trait, thus we can directly deserialize .bin files
+        let mut msg = Foo::from_file(p)?;
+        println!("Deserialized msg: {:#?}", msg);
 
-fn run(p: &str) -> Result<()> {
-    // Foo implements Message trait, thus we can directly deserialize .bin files
-    let msg = Foo::from_file(p)?;
-    println!("Deserialized msg: {:#?}", msg);
-    Ok(())
-}
+        // Make some chanegs on msg
+        msg.repeated_field_1.clear();
+
+        // Write down updated message using any `Write` ...
+        let mut buf = Vec::with_capacity(msg.get_size());
+        {
+            let mut writer = Writer::new(&mut buf);
+            writer.write_message(&msg)?;
+        }
+        
+        Ok(())
+    }
     ```
 
 # Objectives
@@ -57,9 +68,10 @@ This library is an alternative to the widely used [rust-protobuf](https://github
   - No trait objects: faster/simpler parser
   - Dead simple generated modules: 
     - a struct with public fields
-    - an implementation of Message, which means just one match loop for reader (writer not implemented yet)
+    - an implementation of Message, which means just one match loop for reader
     - more than 10x smaller modules in practice
-    - modifying the generated code (e.g. use `HashMap`s instead of `Vec`s), while not necessarily advised is totally fine as the code is easy to reason about
+    - modifying the generated code (e.g. use `HashMap`s instead of `Vec`s), 
+      while not necessarily advised is totally fine as the code is easy to reason about
   - Easier on memory (no trait objects, no storage of unknown fields)
 
 - Cons
