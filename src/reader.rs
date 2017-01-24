@@ -1,7 +1,7 @@
 use std::io::Read;
 
 use errors::{Result, ErrorKind};
-use message::Message;
+use message::MessageRead;
 
 use byteorder::ReadBytesExt;
 use byteorder::LittleEndian as LE;
@@ -116,8 +116,8 @@ impl<R: Read> Reader<R> {
         self.read_varint().map(|i| i != 0)
     }
 
-    pub fn read_enum<E: From<u64>>(&mut self) -> Result<E> {
-        self.read_varint().map(|i| i.into())
+    pub fn read_enum<E: From<i32>>(&mut self) -> Result<E> {
+        self.read_int32().map(|e| e.into())
     }
 
     pub fn read_bytes(&mut self) -> Result<Vec<u8>> {
@@ -139,14 +139,14 @@ impl<R: Read> Reader<R> {
         let cur_len = self.len;
         self.len = len;
         let mut v = Vec::new();
-        while self.len > 0 {
+        while !self.is_eof() {
             v.push(read(self)?);
         }
         self.len = cur_len - len;
         Ok(v)
     }
 
-    pub fn read_message<M: Message>(&mut self) -> Result<M> {
+    pub fn read_message<M: MessageRead>(&mut self) -> Result<M> {
         let len = self.read_varint()? as usize;
         let cur_len = self.len;
         self.len = len;
