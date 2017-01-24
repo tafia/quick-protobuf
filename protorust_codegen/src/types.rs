@@ -232,9 +232,23 @@ impl<'a> Field<'a> {
             }
             Frequency::Repeated => {
                 if self.packed {
-                    writeln!(w, "        r.write_tag({})?;", tag)?;
-                    writeln!(w, "        r.write_packed_repeated_field(&self.{}, |r, m| r.write_{}({}m{}), &|_| 1)?;", 
-                             self.name, read_fn, if use_ref { "" } else { "*" }, as_enum)?;
+                    match read_fn {
+                        "message" => {
+                            writeln!(w, "        r.write_packed_repeated_field_with_tag({}, &self.{}, |r, m| r.write_{}({}m{}), \
+                                        &|m| sizeof_var_length(m.get_size()))?;", 
+                                     tag, self.name, read_fn, if use_ref { "" } else { "*" }, as_enum)?
+                        },
+                        "bytes" | "string" => {
+                            writeln!(w, "        r.write_packed_repeated_field_with_tag({}, &self.{}, |r, m| r.write_{}({}m{}), \
+                                        &|m| sizeof_var_length(m.len()))?;", 
+                                     tag, self.name, read_fn, if use_ref { "" } else { "*" }, as_enum)?
+                        },
+                        t => {
+                            writeln!(w, "        r.write_packed_repeated_field_with_tag({}, &self.{}, |r, m| r.write_{}({}m{}), \
+                                        &|m| sizeof_{}(*m))?;", 
+                                     tag, self.name, read_fn, if use_ref { "" } else { "*" }, as_enum, t)?
+                        },
+                    }
                 } else {
                     writeln!(w, "        for s in &self.{} {{ r.write_{}_with_tag({}, {}s{})? }}", 
                              self.name, read_fn, tag, if use_ref { "" } else { "*" }, as_enum)?;

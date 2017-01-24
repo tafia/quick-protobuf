@@ -115,6 +115,12 @@ impl<W: Write> Writer<W> {
         self.write_bytes(bytes)
     }
 
+    pub fn write_message<M: MessageWrite>(&mut self, m: &M) -> Result<()> {
+        let len = m.get_size();
+        self.write_varint(len as u64)?;
+        m.write_message(self)
+    }
+
     pub fn write_int32_with_tag(&mut self, tag: u32, v: i32) -> Result<()> {
         self.write_tag(tag)?;
         self.write_varint(v as u64)
@@ -220,9 +226,7 @@ impl<W: Write> Writer<W> {
 
     pub fn write_message_with_tag<M: MessageWrite>(&mut self, tag: u32, m: &M) -> Result<()> {
         self.write_tag(tag)?;
-        let len = m.get_size();
-        self.write_varint(len as u64)?;
-        m.write_message(self)
+        self.write_message(m)
     }
 
     pub fn write_enum_with_tag(&mut self, tag: u32, v: i32) -> Result<()> {

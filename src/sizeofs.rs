@@ -1,4 +1,3 @@
-
 pub fn sizeof_varint(v: u64) -> usize {
     match v {
         0x0...0x7F => 1,
