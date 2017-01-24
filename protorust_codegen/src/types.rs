@@ -157,10 +157,12 @@ impl<'a> Field<'a> {
             Frequency::Repeated => {
                 let tag_size = sizeof_varint(self.tag(enums));
                 if is_first { write!(w, "        ")? } else { write!(w, "        + ")? }
+                let read_fn = self.read_fn(enums);
+                let as_enum = if read_fn == "enum" { " as i32" } else { "" };
                 if self.packed {
                     match self.wire_type_num(enums) {
-                        0 => writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_{}(s)).sum::<usize>())", 
-                                      tag_size, self.name, self.read_fn(enums))?,
+                        0 => writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_{}(*s{})).sum::<usize>())", 
+                                      tag_size, self.name, read_fn, as_enum)?,
                         1 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 8)", tag_size, self.name)?,
                         5 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 4)", tag_size, self.name)?,
                         2 => {
@@ -172,8 +174,8 @@ impl<'a> Field<'a> {
                     }
                 } else {
                     match self.wire_type_num(enums) {
-                        0 => writeln!(w, "self.{}.iter().map(|s| {} + sizeof_{}(s)).sum::<usize>()", 
-                                      self.name, tag_size, self.read_fn(enums))?,
+                        0 => writeln!(w, "self.{}.iter().map(|s| {} + sizeof_{}(*s{})).sum::<usize>()", 
+                                      self.name, tag_size, read_fn, as_enum)?,
                         1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
                         5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
                         2 => {
@@ -222,14 +224,16 @@ impl<'a> Field<'a> {
                 writeln!(w, "        r.write_{}_with_tag({}, {}self.{}{})?;", read_fn, tag, r, self.name, as_enum)?;
             },
             Frequency::Optional => {
-                let r = if use_ref { "" } else { "*" };
+                let r = if use_ref { 
+                    if self.boxed { "&**" } else { "" }
+                } else { "*" };
                 writeln!(w, "        if let Some(ref s) = self.{} {{ r.write_{}_with_tag({}, {}s{})?; }}", 
                          self.name, read_fn, tag, r, as_enum)?;
             }
             Frequency::Repeated => {
                 if self.packed {
                     writeln!(w, "        r.write_tag({})?;", tag)?;
-                    writeln!(w, "        r.write_packed_repeated_field(&self.{}, |r, m| r.write_{}({}m{}), |_| 1)?;", 
+                    writeln!(w, "        r.write_packed_repeated_field(&self.{}, |r, m| r.write_{}({}m{}), &|_| 1)?;", 
                              self.name, read_fn, if use_ref { "" } else { "*" }, as_enum)?;
                 } else {
                     writeln!(w, "        for s in &self.{} {{ r.write_{}_with_tag({}, {}s{})? }}", 
