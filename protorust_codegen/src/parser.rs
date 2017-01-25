@@ -1,5 +1,5 @@
 use std::str;
-use types::{Frequency, Field, Message, Enumerator, MessageOrEnum, FileDescriptor};
+use types::{Frequency, Field, Message, Enumerator, MessageOrEnum, FileDescriptor, Syntax};
 use nom::{multispace, digit};
 
 fn is_word(b: u8) -> bool {
@@ -15,6 +15,10 @@ named!(comment<()>, do_parse!(tag!("//") >> take_until_and_consume!("\n") >> ())
 
 /// word break: multispace or comment
 named!(br<()>, alt!(map!(multispace, |_| ()) | comment));
+
+named!(syntax<Syntax>, do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >>
+    proto: alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } |
+                tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >> (proto)));
 
 named!(default_value<&str>, do_parse!(
     tag!("[") >> many0!(br) >> tag!("default") >> many0!(br) >> tag!("=") >> many0!(br) >> 
@@ -82,9 +86,10 @@ named!(message_or_enum<MessageOrEnum>, alt!(
          ignore => { |_| MessageOrEnum::Ignore } ));
 
 named!(pub file_descriptor<FileDescriptor>, do_parse!(
-    many0!(br) >>
+    many0!(br) >> syntax: opt!(syntax) >> many0!(br) >>
     message_and_enums: many0!(message_or_enum) >>
     (FileDescriptor {
+        syntax: syntax.unwrap_or(Syntax::Proto2),
         message_and_enums: message_and_enums,
         messages: Vec::new(),
         enums: Vec::new(),

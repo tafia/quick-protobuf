@@ -389,7 +389,14 @@ pub enum MessageOrEnum<'a> {
 }
 
 #[derive(Debug)]
+pub enum Syntax {
+    Proto2,
+    Proto3,
+}
+
+#[derive(Debug)]
 pub struct FileDescriptor<'a> {
+    pub syntax: Syntax,
     pub message_and_enums: Vec<MessageOrEnum<'a>>,
     pub messages: Vec<Message<'a>>,
     pub enums: Vec<Enumerator<'a>>,
