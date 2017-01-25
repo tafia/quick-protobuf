@@ -339,7 +339,7 @@ impl<'a> Message<'a> {
     fn write_definition<W: Write>(&self, w: &mut W) -> IoResult<()> {
         writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
         writeln!(w, "pub struct {} {{", self.name)?;
-        for f in &self.fields {
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_definition(w)?;
         }
         writeln!(w, "}}")
@@ -348,7 +348,7 @@ impl<'a> Message<'a> {
     fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[Enumerator]) -> IoResult<()> {
         writeln!(w, "impl MessageRead for {} {{", self.name)?;
         self.write_from_reader(w, &*enums.iter().map(|e| e.name).collect::<Vec<_>>())?;
-        if self.fields.iter().any(|f| f.has_unregular_default(enums)) {
+        if self.fields.iter().any(|f| !f.deprecated && !f.has_unregular_default(enums)) {
             writeln!(w, "")?;
             self.write_impl_default(w)?;
         }
@@ -368,7 +368,7 @@ impl<'a> Message<'a> {
         writeln!(w, "        let mut msg = Self::default();")?;
         writeln!(w, "        while !r.is_eof() {{")?;
         writeln!(w, "            match r.next_tag() {{")?;
-        for f in &self.fields {
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
             write!(w, "                ")?;
             f.write_match_tag(w, enums)?;
         }
@@ -382,7 +382,7 @@ impl<'a> Message<'a> {
 
     fn write_get_size<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
-        for (i, f) in self.fields.iter().enumerate() {
+        for (i, f) in self.fields.iter().filter(|f| !f.deprecated).enumerate() {
             f.write_get_size(w, enums, i == 0)?;
         }
         writeln!(w, "    }}")
@@ -390,7 +390,7 @@ impl<'a> Message<'a> {
 
     fn write_write_message<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
         writeln!(w, "    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {{")?;
-        for f in self.fields.iter() {
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w, enums)?;
         }
         writeln!(w, "        Ok(())")?;
@@ -398,14 +398,14 @@ impl<'a> Message<'a> {
     }
 
     fn is_leaf(&self, leaf_messages: &[&str], enums: &[&str]) -> bool {
-        self.fields.iter().all(|f| f.is_leaf(leaf_messages, enums))
+        self.fields.iter().all(|f| f.is_leaf(leaf_messages, enums) || f.deprecated)
     }
 
     fn write_impl_default<W: Write>(&self, w: &mut W) -> IoResult<()> {
         writeln!(w, "impl Default for {} {{", self.name)?;
         writeln!(w, "    fn default(&self) -> Self {{")?;
         writeln!(w, "        {} {{", self.name)?;
-        for f in &self.fields {
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
             match f.default {
                 None => writeln!(w, "            {}::default(),", f.rust_type())?,
                 Some(ref d) => writeln!(w, "            {},", d)?,
