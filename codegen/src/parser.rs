@@ -88,10 +88,14 @@ named!(ignore<()>, do_parse!(
     alt!(tag!("package") | tag!("option") | tag!("import")) >> many1!(br) >> 
     take_until_and_consume!(";") >> many0!(br) >> ()));
 
+named!(service_ignore<()>, do_parse!(tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{") >>
+                                     take_until_and_consume!("}") >> many0!(br) >> ()));
+
 named!(message_or_enum<MessageOrEnum>, alt!(
          message => { |m| MessageOrEnum::Msg(m) } | 
          enumerator => { |e| MessageOrEnum::Enum(e) } |
-         ignore => { |_| MessageOrEnum::Ignore } ));
+         ignore => { |_| MessageOrEnum::Ignore } |
+         service_ignore => { |_| MessageOrEnum::Ignore } ));
 
 named!(pub file_descriptor<FileDescriptor>, do_parse!(
     many0!(br) >> syntax: opt!(syntax) >> many0!(br) >>
