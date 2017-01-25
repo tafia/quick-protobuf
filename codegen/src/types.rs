@@ -414,15 +414,15 @@ impl<'a> Message<'a> {
 
     fn write_impl_default<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
         writeln!(w, "impl Default for {} {{", self.name)?;
-        writeln!(w, "    fn default(&self) -> Self {{")?;
+        writeln!(w, "    fn default() -> Self {{")?;
         writeln!(w, "        {} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             match f.default {
                 None => writeln!(w, "            {}::default(),", f.rust_type())?,
                 Some(ref d) => if enums.contains(&f.typ) {
-                    writeln!(w, "            {}::{},", f.typ, d)?
+                    writeln!(w, "            {}: {}::{},", f.name, f.typ, d)?
                 } else {
-                    writeln!(w, "            {},", d)?
+                    writeln!(w, "            {}: {},", f.name, d)?
                 }
             }
         }

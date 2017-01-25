@@ -79,3 +79,7 @@ This library is an alternative to the widely used [rust-protobuf](https://github
   - Not a drop-in replacement of [rust-protobuf], in particular, you have to handle `Option`s unwrapping yourself
   - probably many other corner cases I overlooked
 
+## Benchmarks
+
+The only implemented benchmarks are the [adaptation from rust-protobuf perftest](benches/rust-protobuf).
+

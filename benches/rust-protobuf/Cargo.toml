@@ -1,0 +1,22 @@
+[project]
+name = "perftest"
+version = "0.0.0"
+authors = ["Stepan Koltsov <stepan.koltsov@gmail.com>",
+           "Johann Tuffe <tafia973@gmail.com>"]
+
+[dependencies.protobuf]
+version = "1.1.0"
+
+[dependencies.quick-protobuf]
+path = "../../"
+
+[dependencies.time]
+git = "https://github.com/rust-lang/time"
+
+[dependencies.rand]
+
+[[bin]]
+
+name = "rust-protobuf-perftest"
+path = "perftest.rs"
+test = false
