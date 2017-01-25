@@ -14,6 +14,12 @@ fn sizeof_varint(v: u32) -> usize {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum Syntax {
+    Proto2,
+    Proto3,
+}
+
 #[derive(Debug)]
 pub enum Frequency {
     Optional,
@@ -28,11 +34,25 @@ pub struct Field<'a> {
     pub typ: &'a str,
     pub number: i32,
     pub default: Option<&'a str>,
-    pub packed: bool,
+    pub packed: Option<bool>,
     pub boxed: bool,
 }
 
 impl<'a> Field<'a> {
+    fn packed(&self) -> bool {
+        self.packed.unwrap_or(false)
+    }
+
+    fn is_numeric(&self) -> bool {
+        match self.typ {
+            "int32" | "sint32" | "sfixed32" |
+            "int64" | "sint64" | "sfixed64" |
+            "uint32" | "fixed32" |
+            "uint64" | "fixed64" | 
+            "float" | "double" => true,
+            _ => false,
+        }
+    }
 
     fn rust_type(&self) -> &str {
         match self.typ {
@@ -49,7 +69,7 @@ impl<'a> Field<'a> {
     }
 
     fn wire_type_num(&self, enums: &[&str]) -> u32 {
-        if self.packed {
+        if self.packed() {
             2
         } else {
             self.wire_type_num_non_packed(enums)
@@ -88,17 +108,15 @@ impl<'a> Field<'a> {
                 if self.boxed {
                     writeln!(w, "    pub {}: Option<Box<{}>>,", self.name, self.rust_type())
                 } else {
-                    writeln!(w, "    pub {}: Option<{}>,", self.name, self.rust_type())
+                    if self.default.is_none() {
+                        writeln!(w, "    pub {}: Option<{}>,", self.name, self.rust_type())
+                    } else {
+                        writeln!(w, "    pub {}: {},", self.name, self.rust_type())
+                    }
                 }
             }
             Frequency::Repeated => writeln!(w, "    pub {}: Vec<{}>,", self.name, self.rust_type()),
-            Frequency::Required => {
-                if self.boxed {
-                    writeln!(w, "    pub {}: Box<{}>,", self.name, self.rust_type())
-                } else {
-                    writeln!(w, "    pub {}: {},", self.name, self.rust_type())
-                }
-            }
+            Frequency::Required => writeln!(w, "    pub {}: {},", self.name, self.rust_type()),
         }
     }
 
@@ -109,12 +127,17 @@ impl<'a> Field<'a> {
                     writeln!(w, "Ok({}) => msg.{} = Some(Box::new(r.read_{}()?)),",
                              self.tag(enums), self.name, self.read_fn(enums))
                 } else {
-                    writeln!(w, "Ok({}) => msg.{} = Some(r.read_{}()?),",
-                             self.tag(enums), self.name, self.read_fn(enums))
+                    if self.default.is_none() {
+                        writeln!(w, "Ok({}) => msg.{} = Some(r.read_{}()?),",
+                                 self.tag(enums), self.name, self.read_fn(enums))
+                    } else {
+                        writeln!(w, "Ok({}) => msg.{} = r.read_{}()?,",
+                                 self.tag(enums), self.name, self.read_fn(enums))
+                    }
                 }
             }
             Frequency::Repeated => {
-                if self.packed {
+                if self.packed() {
                     writeln!(w, "Ok({}) => msg.{} = r.read_packed_repeated_field(|r| r.read_{}())?,",
                              self.tag(enums), self.name, self.read_fn(enums))
                 } else {
@@ -138,36 +161,43 @@ impl<'a> Field<'a> {
     fn is_leaf(&self, leaf_messages: &[&str], enums: &[&str]) -> bool {
         match self.frequency {
             Frequency::Repeated | Frequency::Required => return true,
-            Frequency::Optional => (),
+            Frequency::Optional => {
+                if self.read_fn(enums) != "message" { return true; }
+                leaf_messages.iter().any(|m| m == &self.typ)
+            },
         }
-        if self.read_fn(enums) != "message" {
-            return true;
-        }
-        leaf_messages.iter().any(|m| m == &self.typ)
     }
 
     fn write_get_size<W: Write>(&self, w: &mut W, enums: &[&str], is_first: bool) -> IoResult<()> {
+        if is_first { 
+            write!(w, "        ")?;
+        } else { 
+            write!(w, "        + ")?;
+        }
         match self.frequency {
             Frequency::Required => {
-                if is_first { write!(w, "        ")? } else { write!(w, "        + ")? }
                 self.write_inner_get_size(w, enums, &format!("self.{}", self.name), "")?;
                 writeln!(w, "")?;
             }
             Frequency::Optional => {
-                if is_first {
-                    write!(w, "        self.{}.as_ref().map_or(0, |m| ", self.name)?
-                } else {
-                    write!(w, "        + self.{}.as_ref().map_or(0, |m| ", self.name)?
+                match self.default {
+                    None => {
+                        write!(w, "self.{}.as_ref().map_or(0, |m| ", self.name)?;
+                        self.write_inner_get_size(w, enums, "m", "*")?;
+                        writeln!(w, ")")?;
+                    }
+                    Some(d) => {
+                        write!(w, "if self.{} == {} {{ 0 }} else {{", self.name, d)?;
+                        self.write_inner_get_size(w, enums, &format!("self.{}", self.name), "")?;
+                        writeln!(w, "}}")?;
+                    }
                 }
-                self.write_inner_get_size(w, enums, "m", "*")?;
-                writeln!(w, ")")?;
             }
             Frequency::Repeated => {
                 let tag_size = sizeof_varint(self.tag(enums));
-                if is_first { write!(w, "        ")? } else { write!(w, "        + ")? }
                 let read_fn = self.read_fn(enums);
                 let as_enum = if read_fn == "enum" { " as i32" } else { "" };
-                if self.packed {
+                if self.packed() {
                     write!(w, "if self.{}.is_empty() {{ 0 }} else {{ ", self.name)?;
                     match self.wire_type_num_non_packed(enums) {
                         0 => write!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_{}(*s{})).sum::<usize>())", 
@@ -213,7 +243,7 @@ impl<'a> Field<'a> {
             5 => write!(w, "{} + 4", tag_size)?,
             2 => {
                 let len = if self.read_fn(enums) == "message" { "get_size" } else { "len" };
-                if self.packed {
+                if self.packed() {
                     write!(w, "if s.is_empty() {{ 0 }} else {{ {} + sizeof_var_length({}.{}()) }}", tag_size, s, len)?;
                 } else {
                     write!(w, "{} + sizeof_var_length({}.{}())", tag_size, s, len)?;
@@ -240,12 +270,22 @@ impl<'a> Field<'a> {
             Frequency::Optional => {
                 let r = if use_ref { 
                     if self.boxed { "&**" } else { "" }
-                } else { "*" };
-                writeln!(w, "        if let Some(ref s) = self.{} {{ r.write_{}_with_tag({}, {}s{})?; }}", 
-                         self.name, read_fn, tag, r, as_enum)?;
+                } else { 
+                    "*" 
+                };
+                match self.default {
+                    None => {
+                        writeln!(w, "        if let Some(ref s) = self.{} {{ r.write_{}_with_tag({}, {}s{})?; }}", 
+                                 self.name, read_fn, tag, r, as_enum)?;
+                    },
+                    Some(d) => {
+                        writeln!(w, "        if self.{} != {} {{ r.write_{}_with_tag({}, self.{0}{})?; }}", 
+                                 self.name, d, read_fn, tag, as_enum)?;
+                    }
+                }
             }
             Frequency::Repeated => {
-                if self.packed {
+                if self.packed() {
                     match read_fn {
                         "message" => {
                             writeln!(w, "        r.write_packed_repeated_field_with_tag({}, &self.{}, |r, m| r.write_{}({}m{}), \
@@ -271,6 +311,21 @@ impl<'a> Field<'a> {
         }
         Ok(())
     }
+
+    fn has_unregular_default(&self, enums: &[Enumerator]) -> bool {
+        match self.default {
+            None => false,
+            Some(ref d) => match self.rust_type() {
+                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
+                "bool" => *d != "false",
+                "String" | "Vec<u8>" => *d != "\"\"",
+                t => match enums.iter().find(|e| e.name == self.typ) {
+                    Some(e) => t != e.fields[0].0,
+                    None => true,
+                }
+            } 
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -289,9 +344,13 @@ impl<'a> Message<'a> {
         writeln!(w, "}}")
     }
 
-    fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
+    fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[Enumerator]) -> IoResult<()> {
         writeln!(w, "impl MessageRead for {} {{", self.name)?;
-        self.write_from_reader(w, enums)?;
+        self.write_from_reader(w, &*enums.iter().map(|e| e.name).collect::<Vec<_>>())?;
+        if self.fields.iter().any(|f| f.has_unregular_default(enums)) {
+            writeln!(w, "")?;
+            self.write_impl_default(w)?;
+        }
         writeln!(w, "}}")
     }
 
@@ -339,6 +398,20 @@ impl<'a> Message<'a> {
 
     fn is_leaf(&self, leaf_messages: &[&str], enums: &[&str]) -> bool {
         self.fields.iter().all(|f| f.is_leaf(leaf_messages, enums))
+    }
+
+    fn write_impl_default<W: Write>(&self, w: &mut W) -> IoResult<()> {
+        writeln!(w, "impl Default for {} {{", self.name)?;
+        writeln!(w, "    fn default(&self) -> Self {{")?;
+        writeln!(w, "        {} {{", self.name)?;
+        for f in &self.fields {
+            match f.default {
+                None => writeln!(w, "            {}::default(),", f.rust_type())?,
+                Some(ref d) => writeln!(w, "            {},", d)?,
+            }
+        }
+        writeln!(w, "        }}")?;
+        writeln!(w, "    }}")
     }
 }
 
@@ -390,6 +463,7 @@ pub enum MessageOrEnum<'a> {
 
 #[derive(Debug)]
 pub struct FileDescriptor<'a> {
+    pub syntax: Syntax,
     pub message_and_enums: Vec<MessageOrEnum<'a>>,
     pub messages: Vec<Message<'a>>,
     pub enums: Vec<Enumerator<'a>>,
@@ -398,7 +472,30 @@ pub struct FileDescriptor<'a> {
 impl<'a> FileDescriptor<'a> {
 
     pub fn from_bytes(b: &'a [u8]) -> Result<FileDescriptor<'a>, IError<u32>> {
-        file_descriptor(b).to_full_result()
+        let mut f = file_descriptor(b).to_full_result()?;
+        f.break_cycles();
+        f.set_defaults();
+        Ok(f)
+    }
+
+    fn set_defaults(&mut self) {
+
+        // if proto3, then changes several defaults
+        if let Syntax::Proto3 = self.syntax {
+            for m in &mut self.messages {
+                for f in &mut m.fields {
+                    if f.packed.is_none() { 
+                        if let Frequency::Repeated = f.frequency { 
+                            f.packed = Some(true); 
+                        }
+                    }
+                    if f.default.is_none() && f.is_numeric() { 
+                        f.default = Some("0");
+                    }
+                }
+            }
+        }
+
     }
 
     pub fn write<W: Write>(&self, w: &mut W, filename: &str) -> IoResult<()> {
@@ -427,14 +524,14 @@ impl<'a> FileDescriptor<'a> {
             writeln!(w, "")?;
             m.write_definition(w)?;
             writeln!(w, "")?;
-            m.write_impl_message_read(w, &enums)?;
+            m.write_impl_message_read(w, &self.enums)?;
             writeln!(w, "")?;
             m.write_impl_message_write(w, &enums)?;
         }
         Ok(())
     }
 
-    pub fn break_cycles(&mut self) {
+    fn break_cycles(&mut self) {
         let mut messages = Vec::new();
         let mut enums = Vec::new();
         for m in self.message_and_enums.drain(..) {
