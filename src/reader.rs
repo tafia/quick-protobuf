@@ -1,3 +1,5 @@
+//! A module to manage protobuf deserialization
+
 use std::io::Read;
 
 use errors::{Result, ErrorKind};
@@ -31,6 +33,7 @@ impl<R: Read> Reader<R> {
         self.read_varint().map(|i| (i as u32))
     }
 
+    /// Reads the next varint encoded u64
     fn read_varint(&mut self) -> Result<u64> {
         let mut r: u64 = 0;
         let mut i = 0;
@@ -54,72 +57,87 @@ impl<R: Read> Reader<R> {
         }
     }
 
+    /// Reads int32 (varint)
     pub fn read_int32(&mut self) -> Result<i32> {
         self.read_varint().map(|i| i as i32)
     }
 
+    /// Reads int64 (varint)
     pub fn read_int64(&mut self) -> Result<i64> {
         self.read_varint().map(|i| i as i64)
     }
 
+    /// Reads uint32 (varint)
     pub fn read_uint32(&mut self) -> Result<u32> {
         self.read_varint().map(|i| i as u32)
     }
 
+    /// Reads uint64 (varint)
     pub fn read_uint64(&mut self) -> Result<u64> {
         self.read_varint()
     }
 
+    /// Reads sint32 (varint)
     pub fn read_sint32(&mut self) -> Result<i32> {
         // zigzag
         let n = self.read_varint()? as u32;
         Ok(((n >> 1) as i32) ^ (-((n & 1) as i32)))
     }
 
+    /// Reads sint64 (varint)
     pub fn read_sint64(&mut self) -> Result<i64> {
         // zigzag
         let n = self.read_varint()?;
         Ok(((n >> 1) as i64) ^ (-((n & 1) as i64)))
     }
 
+    /// Reads fixed64 (little endian u64)
     pub fn read_fixed64(&mut self) -> Result<u64> {
         self.len -= 8;
         self.inner.read_u64::<LE>().map_err(|e| e.into())
     }
 
+    /// Reads fixed32 (little endian u32)
     pub fn read_fixed32(&mut self) -> Result<u32> {
         self.len -= 4;
         self.inner.read_u32::<LE>().map_err(|e| e.into())
     }
 
+    /// Reads sfixed64 (little endian i64)
     pub fn read_sfixed64(&mut self) -> Result<i64> {
         self.len -= 8;
         self.inner.read_i64::<LE>().map_err(|e| e.into())
     }
 
+    /// Reads sfixed32 (little endian i32)
     pub fn read_sfixed32(&mut self) -> Result<i32> {
         self.len -= 4;
         self.inner.read_i32::<LE>().map_err(|e| e.into())
     }
 
+    /// Reads float (little endian f32)
     pub fn read_float(&mut self) -> Result<f32> {
         self.len -= 4;
         self.inner.read_f32::<LE>().map_err(|e| e.into())
     }
 
+    /// Reads double (little endian f64)
     pub fn read_double(&mut self) -> Result<f64> {
         self.len -= 8;
         self.inner.read_f64::<LE>().map_err(|e| e.into())
     }
 
+    /// Reads bool (varint, check if == 0)
     pub fn read_bool(&mut self) -> Result<bool> {
         self.read_varint().map(|i| i != 0)
     }
 
+    /// Reads enum, encoded as i32
     pub fn read_enum<E: From<i32>>(&mut self) -> Result<E> {
         self.read_int32().map(|e| e.into())
     }
 
+    /// Reads bytes (Vec<u8>)
     pub fn read_bytes(&mut self) -> Result<Vec<u8>> {
         let len = self.read_varint()? as usize;
         self.len -= len;
@@ -129,11 +147,16 @@ impl<R: Read> Reader<R> {
         Ok(vec)
     }
 
+    /// Reads string (String)
     pub fn read_string(&mut self) -> Result<String> {
         let vec = self.read_bytes()?;
         String::from_utf8(vec).map_err(|e| e.into())
     }
 
+    /// Reads packed repeated field (Vec<M>)
+    ///
+    /// Note: packed field are stored as a variable length chunk of data, while regular repeated
+    /// fields behaves like an iterator, yielding their tag everytime
     pub fn read_packed_repeated_field<M, F: FnMut(&mut Self) -> Result<M>>(&mut self, mut read: F) -> Result<Vec<M>> {
         let len = self.read_varint()? as usize;
         let cur_len = self.len;
@@ -146,6 +169,7 @@ impl<R: Read> Reader<R> {
         Ok(v)
     }
 
+    /// Reads a nested message
     pub fn read_message<M: MessageRead>(&mut self) -> Result<M> {
         let len = self.read_varint()? as usize;
         let cur_len = self.len;
@@ -155,6 +179,7 @@ impl<R: Read> Reader<R> {
         Ok(msg)
     }
 
+    /// Reads unknown data, based on its tag value (which itself gives us the wire_type value)
     pub fn read_unknown(&mut self, tag_value: u32) -> Result<()> {
         match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => { self.read_varint()?; },
@@ -181,14 +206,17 @@ impl<R: Read> Reader<R> {
         Ok(())
     }
 
+    /// Gets the remaining length of bytes not read yet
     pub fn len(&self) -> usize {
         self.len
     }
 
+    /// Gets the inner reader
     pub fn inner(&mut self) -> &mut R {
         &mut self.inner
     }
 
+    /// Checks if `self.len == 0`
     pub fn is_eof(&self) -> bool {
         self.len == 0
     }
