@@ -39,7 +39,6 @@ pub struct Field<'a> {
 }
 
 impl<'a> Field<'a> {
-
     fn packed(&self) -> bool {
         self.packed.unwrap_or(false)
     }
@@ -312,6 +311,21 @@ impl<'a> Field<'a> {
         }
         Ok(())
     }
+
+    fn has_unregular_default(&self, enums: &[Enumerator]) -> bool {
+        match self.default {
+            None => false,
+            Some(ref d) => match self.rust_type() {
+                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
+                "bool" => *d != "false",
+                "String" | "Vec<u8>" => *d != "\"\"",
+                t => match enums.iter().find(|e| e.name == self.typ) {
+                    Some(e) => t != e.fields[0].0,
+                    None => true,
+                }
+            } 
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -330,9 +344,13 @@ impl<'a> Message<'a> {
         writeln!(w, "}}")
     }
 
-    fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
+    fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[Enumerator]) -> IoResult<()> {
         writeln!(w, "impl MessageRead for {} {{", self.name)?;
-        self.write_from_reader(w, enums)?;
+        self.write_from_reader(w, &*enums.iter().map(|e| e.name).collect::<Vec<_>>())?;
+        if self.fields.iter().any(|f| f.has_unregular_default(enums)) {
+            writeln!(w, "")?;
+            self.write_impl_default(w)?;
+        }
         writeln!(w, "}}")
     }
 
@@ -380,6 +398,20 @@ impl<'a> Message<'a> {
 
     fn is_leaf(&self, leaf_messages: &[&str], enums: &[&str]) -> bool {
         self.fields.iter().all(|f| f.is_leaf(leaf_messages, enums))
+    }
+
+    fn write_impl_default<W: Write>(&self, w: &mut W) -> IoResult<()> {
+        writeln!(w, "impl Default for {} {{", self.name)?;
+        writeln!(w, "    fn default(&self) -> Self {{")?;
+        writeln!(w, "        {} {{", self.name)?;
+        for f in &self.fields {
+            match f.default {
+                None => writeln!(w, "            {}::default(),", f.rust_type())?,
+                Some(ref d) => writeln!(w, "            {},", d)?,
+            }
+        }
+        writeln!(w, "        }}")?;
+        writeln!(w, "    }}")
     }
 }
 
@@ -492,7 +524,7 @@ impl<'a> FileDescriptor<'a> {
             writeln!(w, "")?;
             m.write_definition(w)?;
             writeln!(w, "")?;
-            m.write_impl_message_read(w, &enums)?;
+            m.write_impl_message_read(w, &self.enums)?;
             writeln!(w, "")?;
             m.write_impl_message_write(w, &enums)?;
         }
