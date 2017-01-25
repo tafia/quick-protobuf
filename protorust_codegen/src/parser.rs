@@ -26,6 +26,11 @@ named!(default_value<&str>, do_parse!(
     default: word >> many0!(br) >> tag!("]") >>
     (default)));
 
+named!(deprecated<bool>, do_parse!(
+    tag!("[") >> many0!(br) >> tag!("deprecated") >> many0!(br) >> tag!("=") >> many0!(br) >> 
+    deprecated: map_res!(word, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
+    (deprecated)));
+
 named!(packed<bool>, do_parse!(
     tag!("[") >> many0!(br) >> tag!("packed") >> many0!(br) >> tag!("=") >> many0!(br) >> 
     packed: map_res!(word, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
@@ -43,6 +48,7 @@ named!(message_field<Field>, do_parse!(
     tag!("=") >> many0!(br) >>
     number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
     default: opt!(default_value) >> many0!(br) >> 
+    deprecated: opt!(deprecated) >> many0!(br) >> 
     packed: opt!(packed) >> many0!(br) >> tag!(";") >> many0!(br) >>
     (Field {
        name: name,
@@ -52,6 +58,7 @@ named!(message_field<Field>, do_parse!(
        default: default,
        packed: packed,
        boxed: false,
+       deprecated: deprecated.unwrap_or(false),
     })));
 
 named!(message<Message>, do_parse!(
@@ -78,7 +85,7 @@ named!(enumerator<Enumerator>, do_parse!(
     (Enumerator { name: name, fields: fields })));
 
 named!(ignore<()>, do_parse!(
-    alt!(tag!("package") | tag!("option")) >> many1!(br) >> 
+    alt!(tag!("package") | tag!("option") | tag!("import")) >> many1!(br) >> 
     take_until_and_consume!(";") >> many0!(br) >> ()));
 
 named!(message_or_enum<MessageOrEnum>, alt!(

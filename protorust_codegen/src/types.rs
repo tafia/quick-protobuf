@@ -36,6 +36,7 @@ pub struct Field<'a> {
     pub default: Option<&'a str>,
     pub packed: Option<bool>,
     pub boxed: bool,
+    pub deprecated: bool,
 }
 
 impl<'a> Field<'a> {
