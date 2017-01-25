@@ -322,7 +322,7 @@ impl<'a> Field<'a> {
                 "String" | "Vec<u8>" => *d != "\"\"",
                 t => match enums.iter().find(|e| e.name == self.typ) {
                     Some(e) => t != e.fields[0].0,
-                    None => true,
+                    None => false, // Messages are regular defaults
                 }
             } 
         }
@@ -336,8 +336,12 @@ pub struct Message<'a> {
 }
 
 impl<'a> Message<'a> {
-    fn write_definition<W: Write>(&self, w: &mut W) -> IoResult<()> {
-        writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
+    fn write_definition<W: Write>(&self, w: &mut W, enums: &[Enumerator]) -> IoResult<()> {
+        if self.can_derive_default(enums) {
+            writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
+        } else {
+            writeln!(w, "#[derive(Debug, PartialEq, Clone)]")?;
+        }
         writeln!(w, "pub struct {} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_definition(w)?;
@@ -345,14 +349,21 @@ impl<'a> Message<'a> {
         writeln!(w, "}}")
     }
 
+    fn can_derive_default(&self, enums: &[Enumerator]) -> bool {
+        self.fields.iter().all(|f| f.deprecated || !f.has_unregular_default(enums))
+    }
+
     fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[Enumerator]) -> IoResult<()> {
         writeln!(w, "impl MessageRead for {} {{", self.name)?;
-        self.write_from_reader(w, &*enums.iter().map(|e| e.name).collect::<Vec<_>>())?;
-        if self.fields.iter().any(|f| !f.deprecated && !f.has_unregular_default(enums)) {
+        let enums_str = enums.iter().map(|e| e.name).collect::<Vec<_>>();
+        self.write_from_reader(w, &enums_str)?;
+        writeln!(w, "}}")?;
+
+        if !self.can_derive_default(enums) {
             writeln!(w, "")?;
-            self.write_impl_default(w)?;
+            self.write_impl_default(w, &enums_str)?;
         }
-        writeln!(w, "}}")
+        Ok(())
     }
 
     fn write_impl_message_write<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
@@ -401,18 +412,23 @@ impl<'a> Message<'a> {
         self.fields.iter().all(|f| f.is_leaf(leaf_messages, enums) || f.deprecated)
     }
 
-    fn write_impl_default<W: Write>(&self, w: &mut W) -> IoResult<()> {
+    fn write_impl_default<W: Write>(&self, w: &mut W, enums: &[&str]) -> IoResult<()> {
         writeln!(w, "impl Default for {} {{", self.name)?;
         writeln!(w, "    fn default(&self) -> Self {{")?;
         writeln!(w, "        {} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             match f.default {
                 None => writeln!(w, "            {}::default(),", f.rust_type())?,
-                Some(ref d) => writeln!(w, "            {},", d)?,
+                Some(ref d) => if enums.contains(&f.typ) {
+                    writeln!(w, "            {}::{},", f.typ, d)?
+                } else {
+                    writeln!(w, "            {},", d)?
+                }
             }
         }
         writeln!(w, "        }}")?;
-        writeln!(w, "    }}")
+        writeln!(w, "    }}")?;
+        writeln!(w, "}}")
     }
 }
 
@@ -523,7 +539,7 @@ impl<'a> FileDescriptor<'a> {
         }
         for m in &self.messages {
             writeln!(w, "")?;
-            m.write_definition(w)?;
+            m.write_definition(w, &self.enums)?;
             writeln!(w, "")?;
             m.write_impl_message_read(w, &self.enums)?;
             writeln!(w, "")?;
