@@ -12,9 +12,10 @@ fn is_word(b: u8) -> bool {
 named!(word<&str>, map_res!(take_while!(is_word), str::from_utf8));
 
 named!(comment<()>, do_parse!(tag!("//") >> take_until_and_consume!("\n") >> ()));
+named!(block_comment<()>, do_parse!(tag!("/*") >> take_until_and_consume!("*/") >> ()));
 
 /// word break: multispace or comment
-named!(br<()>, alt!(map!(multispace, |_| ()) | comment));
+named!(br<()>, alt!(map!(multispace, |_| ()) | comment | block_comment));
 
 named!(syntax<Syntax>, do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >>
     proto: alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } |
