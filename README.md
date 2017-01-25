@@ -4,6 +4,8 @@ A pure Rust library to deserialize protobuf files.
 
 Simple codegen. No need of protoc. Fast.
 
+[Documentation](https://docs.rs/quick-protobuf)
+
 # Getting started
 
 1. Convert your .proto files into rust modules using included pb-rs crate
@@ -21,7 +23,7 @@ Simple codegen. No need of protoc. Fast.
     ```toml
     # Cargo.toml
     [dependencies]
-    quick-protobuf = { git = "https://github.com/tafia/quick-protobuf" }
+    quick-protobuf = "0.1.0"
     ```
 
 3. Use the generated module
@@ -59,9 +61,13 @@ Simple codegen. No need of protoc. Fast.
     }
     ```
 
-# Objectives
+# Why not [rust-protobuf](https://github.com/stepancheg/rust-protobuf)
 
 This library is an alternative to the widely used [rust-protobuf](https://github.com/stepancheg/rust-protobuf).
+If you want to build anything serious, I strongly advise against using quick-protobuf which is very immature for the moment.
+
+
+## Pros / Cons
 
 - Pros
   - No need to install anything on your machine but rust
@@ -69,7 +75,7 @@ This library is an alternative to the widely used [rust-protobuf](https://github
   - Dead simple generated modules: 
     - a struct with public fields
     - an implementation of Message(Read/Write), which means just one match loop for reader
-    - more than 10x smaller modules in practice
+    - close to 10x smaller modules in practice
     - modifying the generated code if needed
       while not necessarily advised is totally fine as the code is easy to reason about
   - Easier on memory (no trait objects, no storage of unknown fields)
@@ -78,6 +84,12 @@ This library is an alternative to the widely used [rust-protobuf](https://github
   - Very immature library at the moment: [many missing functionalities](https://github.com/tafia/quick-protobuf/issues/12), very poor test coverage, very poor documentation
   - Not a drop-in replacement of [rust-protobuf], in particular, you have to handle `Option`s unwrapping yourself
   - probably many other corner cases I overlooked
+
+## Codegen
+
+Have a look at the different generated modules for the same .proto file:
+- [rust-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data.rs): 2322 loc
+- [quick-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data_quick.rs): 300 loc
 
 ## Benchmarks
 
