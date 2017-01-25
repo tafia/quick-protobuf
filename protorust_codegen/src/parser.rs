@@ -36,7 +36,7 @@ named!(frequency<Frequency>,
             tag!("required") => { |_| Frequency::Required } ));
 
 named!(message_field<Field>, do_parse!(
-    frequency: frequency >> many1!(br) >>
+    frequency: opt!(frequency) >> many1!(br) >>
     typ: word >> many1!(br) >>
     name: word >> many0!(br) >>
     tag!("=") >> many0!(br) >>
@@ -45,11 +45,11 @@ named!(message_field<Field>, do_parse!(
     packed: opt!(packed) >> many0!(br) >> tag!(";") >> many0!(br) >>
     (Field {
        name: name,
-       frequency: frequency,
+       frequency: frequency.unwrap_or(Frequency::Optional),
        typ: typ,
        number: number,
        default: default,
-       packed: packed.unwrap_or(false),
+       packed: packed,
        boxed: false,
     })));
 
