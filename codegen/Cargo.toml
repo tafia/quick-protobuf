@@ -1,0 +1,8 @@
+[package]
+name = "pb-rs"
+version = "0.1.0"
+authors = ["Johann Tuffe"]
+description = "A converter from proto files into quick-protobuf compatible rust module"
+
+[dependencies]
+nom = "2.0.1"

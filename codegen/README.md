@@ -1,9 +1,9 @@
-# protorust_codegen
+# pb-rs
 
 A simple converter from .proto files into rust quick-protobuf compatible modules.
 
 ## Usage
 
 ```
-protorust_codegen <file.proto>
+pb-rs <file.proto>
 ```
