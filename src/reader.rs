@@ -1,12 +1,10 @@
 //! A module to manage protobuf deserialization
 
-use std::io::Read;
-
 use errors::{Result, ErrorKind};
 use message::MessageRead;
 
-use byteorder::ReadBytesExt;
 use byteorder::LittleEndian as LE;
+use byteorder::ByteOrder;
 
 const WIRE_TYPE_VARINT: u8 = 0;
 const WIRE_TYPE_FIXED64: u8 = 1;
@@ -16,16 +14,22 @@ const WIRE_TYPE_END_GROUP: u8 = 4;
 const WIRE_TYPE_FIXED32: u8 = 5;
 
 /// A struct to read protocol binary files
-pub struct Reader<R> {
-    inner: R,
+pub struct Reader<'a> {
+    inner: &'a [u8],
+    pos: usize,
     len: usize,
 }
 
-impl<R: Read> Reader<R> {
+impl<'a> Reader<'a> {
 
-    /// Creates a new protocol buffer reader with the maximum len of bytes to read
-    pub fn from_reader(r: R, len: usize) -> Reader<R> {
-        Reader { inner: r, len: len }
+    /// Creates a new reader from chunks of data
+    pub fn from_bytes(bytes: &'a [u8]) -> Reader<'a> {
+        let len = bytes.len();
+        Reader {
+            inner: bytes,
+            len: len,
+            pos: 0,
+        }
     }
 
     /// Reads next tag, `None` if all bytes have been read
@@ -46,15 +50,16 @@ impl<R: Read> Reader<R> {
             }
             i += 7;
         }
-        self.len -= 1;
-        match self.inner.read_u8()? {
+        let res = match self.inner[self.pos] {
             0 => Ok(r),
             1 => {
                 r |= 1 << 63;
                 Ok(r)
             }
             _ => Err(ErrorKind::Varint.into()), // we have only one spare bit to fit into
-        }
+        };
+        self.pos += 1;
+        res
     }
 
     /// Reads int32 (varint)
@@ -93,38 +98,38 @@ impl<R: Read> Reader<R> {
 
     /// Reads fixed64 (little endian u64)
     pub fn read_fixed64(&mut self) -> Result<u64> {
-        self.len -= 8;
-        self.inner.read_u64::<LE>().map_err(|e| e.into())
+        self.pos += 8;
+        Ok(LE::read_u64(&self.inner[self.pos - 8 .. self.pos]))
     }
 
     /// Reads fixed32 (little endian u32)
     pub fn read_fixed32(&mut self) -> Result<u32> {
-        self.len -= 4;
-        self.inner.read_u32::<LE>().map_err(|e| e.into())
+        self.pos += 4;
+        Ok(LE::read_u32(&self.inner[self.pos - 4 .. self.pos]))
     }
 
     /// Reads sfixed64 (little endian i64)
     pub fn read_sfixed64(&mut self) -> Result<i64> {
-        self.len -= 8;
-        self.inner.read_i64::<LE>().map_err(|e| e.into())
+        self.pos += 8;
+        Ok(LE::read_i64(&self.inner[self.pos - 8 .. self.pos]))
     }
 
     /// Reads sfixed32 (little endian i32)
     pub fn read_sfixed32(&mut self) -> Result<i32> {
-        self.len -= 4;
-        self.inner.read_i32::<LE>().map_err(|e| e.into())
+        self.pos += 4;
+        Ok(LE::read_i32(&self.inner[self.pos - 4 .. self.pos]))
     }
 
     /// Reads float (little endian f32)
     pub fn read_float(&mut self) -> Result<f32> {
-        self.len -= 4;
-        self.inner.read_f32::<LE>().map_err(|e| e.into())
+        self.pos += 4;
+        Ok(LE::read_f32(&self.inner[self.pos - 4 .. self.pos]))
     }
 
     /// Reads double (little endian f64)
     pub fn read_double(&mut self) -> Result<f64> {
-        self.len -= 8;
-        self.inner.read_f64::<LE>().map_err(|e| e.into())
+        self.pos += 8;
+        Ok(LE::read_f64(&self.inner[self.pos - 8 .. self.pos]))
     }
 
     /// Reads bool (varint, check if == 0)
@@ -138,19 +143,16 @@ impl<R: Read> Reader<R> {
     }
 
     /// Reads bytes (Vec<u8>)
-    pub fn read_bytes(&mut self) -> Result<Vec<u8>> {
+    pub fn read_bytes(&mut self) -> Result<&'a [u8]> {
         let len = self.read_varint()? as usize;
-        self.len -= len;
-        let mut vec = Vec::with_capacity(len);
-        unsafe { vec.set_len(len); }
-        self.inner.read_exact(&mut vec[..])?;
-        Ok(vec)
+        self.pos += len;
+        Ok(&self.inner[self.pos - len .. self.pos])
     }
 
     /// Reads string (String)
-    pub fn read_string(&mut self) -> Result<String> {
+    pub fn read_str(&mut self) -> Result<&'a str> {
         let vec = self.read_bytes()?;
-        String::from_utf8(vec).map_err(|e| e.into())
+        ::std::str::from_utf8(vec).map_err(|e| e.into())
     }
 
     /// Reads packed repeated field (Vec<M>)
@@ -160,12 +162,12 @@ impl<R: Read> Reader<R> {
     pub fn read_packed_repeated_field<M, F: FnMut(&mut Self) -> Result<M>>(&mut self, mut read: F) -> Result<Vec<M>> {
         let len = self.read_varint()? as usize;
         let cur_len = self.len;
-        self.len = len;
+        self.len = self.pos + len;
         let mut v = Vec::new();
         while !self.is_eof() {
             v.push(read(self)?);
         }
-        self.len = cur_len - len;
+        self.len = cur_len;
         Ok(v)
     }
 
@@ -173,9 +175,10 @@ impl<R: Read> Reader<R> {
     pub fn read_message<M: MessageRead>(&mut self) -> Result<M> {
         let len = self.read_varint()? as usize;
         let cur_len = self.len;
-        self.len = len;
+        self.len = self.pos + len;
         let msg = M::from_reader(self)?;
-        self.len = cur_len - len;
+        self.pos = self.len; // probably not necessary ...
+        self.len = cur_len;
         Ok(msg)
     }
 
@@ -183,21 +186,11 @@ impl<R: Read> Reader<R> {
     pub fn read_unknown(&mut self, tag_value: u32) -> Result<()> {
         match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => { self.read_varint()?; },
-            WIRE_TYPE_FIXED64 => {
-                self.len -= 8;
-                self.inner.read_exact(&mut [0; 8])?;
-            }
-            WIRE_TYPE_FIXED32 => {
-                self.len -= 4;
-                self.inner.read_exact(&mut [0; 4])?;
-            }
+            WIRE_TYPE_FIXED64 => self.pos += 8,
+            WIRE_TYPE_FIXED32 => self.pos += 4,
             WIRE_TYPE_LENGTH_DELIMITED => {
                 let len = self.read_varint()? as usize;
-                if len == 0 { return Ok(()); }
-                self.len -= len;
-                let mut buf = Vec::with_capacity(len);
-                unsafe { buf.set_len(len); }
-                self.inner.read_exact(&mut buf)?;
+                self.pos += len;
             },
             WIRE_TYPE_START_GROUP | 
                 WIRE_TYPE_END_GROUP => { return Err(ErrorKind::Deprecated("group").into()); },
@@ -211,21 +204,21 @@ impl<R: Read> Reader<R> {
         self.len
     }
 
-    /// Gets the inner reader
-    pub fn inner(&mut self) -> &mut R {
-        &mut self.inner
-    }
+//     /// Gets the inner reader
+//     pub fn inner(&mut self) -> &mut R {
+//         &mut self.inner
+//     }
 
     /// Checks if `self.len == 0`
     pub fn is_eof(&self) -> bool {
-        self.len == 0
+        self.pos == self.len
     }
 }
 
 #[test]
 fn test_varint() {
-    let data: &[u8] = &[0x96, 0x01];
-    let mut r = Reader::from_reader(data, data.len());
+    let data = [0x96, 0x01];
+    let mut r = Reader::from_bytes(&data[..]);
     assert_eq!(150, r.read_varint().unwrap());
     assert!(r.is_eof());
 }

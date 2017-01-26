@@ -15,9 +15,7 @@ fn $name(){
         let mut w = Writer::new(&mut buf);
         w.$write(v).unwrap();
     }
-    let len = buf.len();
-    let mut buf = &*buf;
-    let mut r = Reader::from_reader(&mut buf, len);
+    let mut r = Reader::from_bytes(&*buf);
     assert_eq!(v, r.$read().unwrap());
 }
     );
@@ -45,10 +43,8 @@ fn wr_bytes(){
         let mut w = Writer::new(&mut buf);
         w.write_bytes(v).unwrap();
     }
-    let len = buf.len();
-    let mut buf = &*buf;
-    let mut r = Reader::from_reader(&mut buf, len);
-    assert_eq!(v, &*r.read_bytes().unwrap());
+    let mut r = Reader::from_bytes(&*buf);
+    assert_eq!(v, r.read_bytes().unwrap());
 }
 
 #[test]
@@ -59,10 +55,8 @@ fn wr_string(){
         let mut w = Writer::new(&mut buf);
         w.write_string(v).unwrap();
     }
-    let len = buf.len();
-    let mut buf = &*buf;
-    let mut r = Reader::from_reader(&mut buf, len);
-    assert_eq!(v, &*r.read_string().unwrap());
+    let mut r = Reader::from_bytes(&buf);
+    assert_eq!(v, r.read_str().unwrap());
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -91,9 +85,7 @@ fn wr_enum(){
         let mut w = Writer::new(&mut buf);
         w.write_enum(v as i32).unwrap();
     }
-    let len = buf.len();
-    let mut buf = &*buf;
-    let mut r = Reader::from_reader(&mut buf, len);
+    let mut r = Reader::from_bytes(&buf);
     assert_eq!(v, r.read_enum().unwrap());
 }
 
@@ -104,7 +96,7 @@ struct TestMessage {
 }
 
 impl MessageRead for TestMessage {
-    fn from_reader<R: Read>(mut r: &mut Reader<R>) -> Result<Self> {
+    fn from_reader(mut r: &mut Reader) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag() {
@@ -143,9 +135,7 @@ fn wr_message(){
         let mut w = Writer::new(&mut buf);
         w.write_message(&v).unwrap();
     }
-    let len = buf.len();
-    let mut buf_read = &*buf;
-    let mut r = Reader::from_reader(&mut buf_read, len);
+    let mut r = Reader::from_bytes(&buf);
     assert_eq!(v, r.read_message().unwrap());
 
     // test get_size!
@@ -160,9 +150,6 @@ fn wr_packed_uint32(){
         let mut w = Writer::new(&mut buf);
         w.write_packed_repeated_field(&v, |r, m| r.write_uint32(*m), &|m| sizeof_uint32(*m)).unwrap();
     }
-    let len = buf.len();
-    let mut buf = &*buf;
-    let mut r = Reader::from_reader(&mut buf, len);
+    let mut r = Reader::from_bytes(&buf);
     assert_eq!(v, &*r.read_packed_repeated_field(|r| r.read_uint32()).unwrap());
 }
-
