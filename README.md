@@ -73,7 +73,7 @@ If you want to build anything serious, I strongly advise against using quick-pro
   - No need to install anything on your machine but rust
   - No trait objects: faster/simpler parser
   - Dead simple generated modules: 
-    - a struct with public fields
+    - ~~a struct with public fields~~ (rust-protobuf switched to public fields in 1.1.0)
     - an implementation of Message(Read/Write), which means just one match loop for reader
     - close to 10x smaller modules in practice
     - modifying the generated code if needed
