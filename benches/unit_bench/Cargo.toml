@@ -1,0 +1,11 @@
+[project]
+name = "perftest_bench"
+version = "0.0.0"
+authors = ["Johann Tuffe <tafia973@gmail.com>"]
+
+[dependencies.quick-protobuf]
+path = "../../"
+
+[lib]
+name = "quick_protobuf_perftest_benches"
+path = "lib.rs"
