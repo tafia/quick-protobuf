@@ -4,11 +4,11 @@ These tests are copied and adapted from [rust-protobuf](https://github.com/stepa
 
 ## Setup
 
-You can either run the tests as-is or manually regenerate the rust files following rust-protobuf guidelines or using pb-rs for quick-xml.
+You can either run the tests as-is or manually regenerate the rust files following rust-protobuf guidelines or using pb-rs for quick-protobuf.
 
 ## Results
 
-quick-protobuf is generally faster (up to 80% faster) than rust-protobuf.
+quick-protobuf is generally faster than rust-protobuf.
 
 ```
          labels   rust-protobuf  quick-protobuf

@@ -7,18 +7,7 @@ use std::path::Path;
 use std::fs::File;
 
 use errors::Result;
-// use reader::Reader;
 use writer::Writer;
-
-// /// A trait to handle deserialization based on parsed `Field`s
-// pub trait MessageRead<'a>: Sized {
-// 
-//     /// Creates `Self` from a `Reader`
-//     ///
-//     /// This method is generally automatically implemented when generating code
-//     /// out of .proto file
-//     fn from_reader(r: &mut Reader, bytes: &'a[u8]) -> Result<Self>;
-// }
 
 /// A trait to handle deserialization based on parsed `Field`s
 pub trait MessageWrite: Sized {

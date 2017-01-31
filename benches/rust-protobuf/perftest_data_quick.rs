@@ -78,7 +78,7 @@ impl TestRepeatedPackedInt32 {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.values = r.read_packed_repeated_field(bytes, |r, bytes| r.read_int32(bytes))?,
+                Ok(10) => msg.values = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }

@@ -171,7 +171,7 @@ impl<'a> Field<'a> {
             }
             Frequency::Repeated => {
                 if self.packed() {
-                    writeln!(w, "Ok({}) => msg.{} = r.read_packed_repeated_field(bytes, |r, bytes| r.{})?,",
+                    writeln!(w, "Ok({}) => msg.{} = r.read_packed(bytes, |r, bytes| r.{})?,",
                              self.tag(msgs), self.name, self.read_fn(msgs))
                 } else {
                     writeln!(w, "Ok({}) => msg.{}.push(r.{}?),",
@@ -203,7 +203,7 @@ impl<'a> Field<'a> {
             }
             Frequency::Repeated => {
                 if self.packed() {
-                    writeln!(w, "Ok({}) => msg.{} = r.read_packed_repeated_field(bytes, |r, bytes| r.{})?,",
+                    writeln!(w, "Ok({}) => msg.{} = r.read_packed(bytes, |r, bytes| r.{})?,",
                              self.tag(msgs), self.name, self.read_fn(msgs))
                 } else {
                     writeln!(w, "Ok({}) => msg.{}.push(Cow::Borrowed(r.{}?)),",
@@ -429,11 +429,6 @@ impl<'a> Message<'a> {
         } else {
             writeln!(w, "impl {} {{", self.name)?;
         }
-//         if self.has_lifetime(msgs) {
-//             writeln!(w, "impl<'a> MessageRead<'a> for {}<'a> {{", self.name)?;
-//         } else {
-//             writeln!(w, "impl<'a> MessageRead<'a> for {} {{", self.name)?;
-//         }
         self.write_from_reader(w, msgs)?;
         writeln!(w, "}}")?;
 
@@ -619,7 +614,6 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "use std::io::{{Write}};")?;
         writeln!(w, "use std::borrow::Cow;")?;
         writeln!(w, "use quick_protobuf::{{MessageWrite, Reader, Writer, Result}};")?;
-//         writeln!(w, "use quick_protobuf::{{MessageRead, MessageWrite, Reader, Writer, Result}};")?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
 
         for m in &self.enums {

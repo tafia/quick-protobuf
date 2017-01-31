@@ -1,7 +1,6 @@
 //! A module to manage protobuf deserialization
 
 use errors::{Result, ErrorKind};
-// use message::MessageRead;
 
 use byteorder::LittleEndian as LE;
 use byteorder::ByteOrder;
@@ -39,16 +38,17 @@ impl Reader {
     pub fn read_varint(&mut self, bytes: &[u8]) -> Result<u64> {
         let mut r: u64 = 0;
         let mut i = 0;
-        for (j, b) in bytes.iter().skip(self.start).take(9).cloned().enumerate() {
+        for b in bytes.iter().skip(self.start).take(9).cloned() {
+            self.start += 1;
             r |= ((b & 0x7f) as u64) << i;
             if b < 0x80 {
-                self.start += j + 1;
                 return Ok(r);
             }
             i += 7;
         }
-        self.start += 9;
-        let res = match bytes[self.start] {
+        let b = bytes[self.start];
+        self.start += 1;
+        let res = match b {
             0 => Ok(r),
             1 => {
                 r |= 1 << 63;
@@ -56,7 +56,6 @@ impl Reader {
             }
             _ => Err(ErrorKind::Varint.into()), // we have only one spare bit to fit into
         };
-        self.start += 1;
         res
     }
 
@@ -167,7 +166,7 @@ impl Reader {
     ///
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
-    pub fn read_packed_repeated_field<'a, M, F>(&mut self, bytes: &'a[u8], mut read: F) -> Result<Vec<M>>
+    pub fn read_packed<'a, M, F>(&mut self, bytes: &'a[u8], mut read: F) -> Result<Vec<M>>
         where F: FnMut(&mut Reader, &'a[u8]) -> Result<M>,
     {
         self.read_len(bytes, |r, b| {
