@@ -14,3 +14,5 @@ build: false
 test_script:
   - cargo build
   - cargo test
+  - cd benches/unit_bench
+  - sh generate_test.sh
