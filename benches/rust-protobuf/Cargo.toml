@@ -5,7 +5,7 @@ authors = ["Stepan Koltsov <stepan.koltsov@gmail.com>",
            "Johann Tuffe <tafia973@gmail.com>"]
 
 [dependencies.protobuf]
-version = "1.1.0"
+version = "1.2.1"
 
 [dependencies.quick-protobuf]
 path = "../../"
