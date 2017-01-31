@@ -7,15 +7,24 @@ mod perftest_data;
 
 use test::{Bencher, black_box};
 use perftest_data::*;
+
 use std::cmp::min;
+use std::borrow::Cow;
+use std::fs::File;
+use std::io::Read;
 
 use quick_protobuf::{Reader, Writer};
-use quick_protobuf::message::{MessageRead, MessageWrite};
+use quick_protobuf::message::{MessageWrite};
 
 #[bench]
 fn read_file(b: &mut Bencher) {
     b.iter(|| {
-        let _ = black_box(::perftest_data::PerftestData::from_file("benches/rust-protobuf/perftest_data.pbbin").unwrap());
+        let mut f = File::open("benches/rust-protobuf/perftest_data.pbbin").unwrap();
+        let len = f.metadata().unwrap().len() as usize;
+        let mut bytes = Vec::with_capacity(len);
+        f.read_to_end(&mut bytes).unwrap();
+        let mut reader = Reader::from_bytes(&bytes);
+        let _ = black_box(::perftest_data::PerftestData::from_reader(&mut reader, &bytes).unwrap());
     })
 }
 
@@ -43,12 +52,10 @@ fn $read(b: &mut Bencher) {
             i.write_message(&mut w).unwrap();
         }
     }
-    let len = buf.len();
     b.iter(|| {
-        let mut buf = &*buf;
-        let mut r = Reader::from_reader(&mut buf, len);
+        let mut r = Reader::from_bytes(&buf);
         while !r.is_eof() {
-            let _ = black_box($m::from_reader(&mut r).unwrap());
+            let _ = black_box($m::from_reader(&mut r, &buf).unwrap());
         }
     })
 }
@@ -129,8 +136,8 @@ fn generate_optional_messages() -> Vec<TestOptionalMessages> {
 
 perfbench!(generate_optional_messages, TestOptionalMessages, write_optional_messages, read_optional_messages);
 
-fn generate_strings() -> Vec<TestStrings> {
-    let mut s = "hello world from quick-protobuf!!!".split('_').cycle().map(|s| s.to_string());
+fn generate_strings() -> Vec<TestStrings<'static>> {
+    let mut s = "hello world from quick-protobuf!!!".split('_').cycle().map(|s| Cow::Borrowed(s));
     (1..100).map(|_| TestStrings { 
         s1: s.by_ref().next(),
         s2: s.by_ref().next(),
@@ -140,28 +147,28 @@ fn generate_strings() -> Vec<TestStrings> {
 
 perfbench!(generate_strings, TestStrings, write_strings, read_strings);
 
-fn generate_small_bytes() -> Vec<TestBytes> {
+fn generate_small_bytes() -> Vec<TestBytes<'static>> {
     let mut s = "hello world from quick-protobuf!!!".split('_').cycle()
-        .map(|s| s.as_bytes().to_vec());
+        .map(|s| Cow::Borrowed(s.as_bytes()));
     (1..800).map(|_| TestBytes { b1: s.by_ref().next() })
         .collect()
 }
 
 perfbench!(generate_small_bytes, TestBytes, write_small_bytes, read_small_bytes);
 
-fn generate_large_bytes() -> Vec<TestBytes> {
+fn generate_large_bytes() -> Vec<TestBytes<'static>> {
     let mut s = "hello world from quick-protobuf!!!".split('_').cycle().map(|s| s.as_bytes());
     (1..30).map(|_| TestBytes { 
-        b1: Some(s.by_ref().take(500).fold(Vec::new(), |mut cur, nxt| {
+        b1: Some(Cow::Owned(s.by_ref().take(500).fold(Vec::new(), |mut cur, nxt| {
                 cur.extend_from_slice(nxt);
                 cur 
-            }))
+            })))
     }).collect()
 }
 
 perfbench!(generate_large_bytes, TestBytes, write_large_bytes, read_large_bytes);
 
-fn generate_all() -> Vec<PerftestData> {
+fn generate_all() -> Vec<PerftestData<'static>> {
     vec![PerftestData {
         test1: generate_test1(),
         test_repeated_bool: generate_repeated_bool(),
