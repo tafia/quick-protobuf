@@ -20,7 +20,7 @@ fn read_file(b: &mut Bencher) {
 }
 
 macro_rules! perfbench {
-    ($gen: ident, $write:ident, $read:ident) => {
+    ($gen: ident, $m:ident, $write:ident, $read:ident) => {
 #[bench]
 fn $write(b: &mut Bencher) {
     let v = $gen();
@@ -48,7 +48,7 @@ fn $read(b: &mut Bencher) {
         let mut buf = &*buf;
         let mut r = Reader::from_reader(&mut buf, len);
         while !r.is_eof() {
-            let _ = black_box(Test1::from_reader(&mut r).unwrap());
+            let _ = black_box($m::from_reader(&mut r).unwrap());
         }
     })
 }
@@ -57,25 +57,25 @@ fn $read(b: &mut Bencher) {
 
 fn generate_test1() -> Vec<Test1> {
     (0..500).map(|i| Test1 { value: Some(i) })
-        .chain((0..100).map(|_| Test1 { value: None }))
+        .chain((0..200).map(|_| Test1 { value: None }))
         .collect()
 }
 
-perfbench!(generate_test1, write_test1, read_test1);
+perfbench!(generate_test1, Test1, write_test1, read_test1);
 
 fn generate_repeated_bool() -> Vec<TestRepeatedBool> {
     (1..10).map(|j| TestRepeatedBool { values: (0..100).map(|i| i % j == 0).collect() })
         .collect()
 }
 
-perfbench!(generate_repeated_bool, write_repeated_bool, read_repeated_bool);
+perfbench!(generate_repeated_bool, TestRepeatedBool, write_repeated_bool, read_repeated_bool);
 
 fn generate_repeated_packed_int32() -> Vec<TestRepeatedPackedInt32> {
-    (1..400).map(|j| TestRepeatedPackedInt32 { values: (0..1000).map(|i| i * j).collect() })
+    (1..40).map(|j| TestRepeatedPackedInt32 { values: (0..100).map(|i| i * j).collect() })
         .collect()
 }
 
-perfbench!(generate_repeated_packed_int32, write_repeated_packed_int32, read_repeated_packed_int32);
+perfbench!(generate_repeated_packed_int32, TestRepeatedPackedInt32, write_repeated_packed_int32, read_repeated_packed_int32);
 
 fn generate_repeated_messages() -> Vec<TestRepeatedMessages> {
     let mut messages = Vec::new();
@@ -85,7 +85,7 @@ fn generate_repeated_messages() -> Vec<TestRepeatedMessages> {
         messages3: vec![],
     });
 
-    for _ in 0..100 {
+    for _ in 0..10 {
         let i1 = min(messages.len() % 3, messages.len() - 1);
         let i2 = min(messages.len() % 6, messages.len() - 1);
         let i3 = min(messages.len() % 9, messages.len() - 1);
@@ -101,7 +101,7 @@ fn generate_repeated_messages() -> Vec<TestRepeatedMessages> {
     messages
 }
 
-perfbench!(generate_repeated_messages, write_repeated_messages, read_repeated_messages);
+perfbench!(generate_repeated_messages, TestRepeatedMessages, write_repeated_messages, read_repeated_messages);
 
 fn generate_optional_messages() -> Vec<TestOptionalMessages> {
     let mut messages = Vec::new();
@@ -111,7 +111,7 @@ fn generate_optional_messages() -> Vec<TestOptionalMessages> {
         message3: None,
     });
 
-    for _ in 0..60 {
+    for _ in 0..10 {
         let i1 = min(messages.len() % 3, messages.len() - 1);
         let i2 = min(messages.len() % 6, messages.len() - 1);
         let i3 = min(messages.len() % 9, messages.len() - 1);
@@ -127,7 +127,7 @@ fn generate_optional_messages() -> Vec<TestOptionalMessages> {
     messages
 }
 
-perfbench!(generate_optional_messages, write_optional_messages, read_optional_messages);
+perfbench!(generate_optional_messages, TestOptionalMessages, write_optional_messages, read_optional_messages);
 
 fn generate_strings() -> Vec<TestStrings> {
     let mut s = "hello world from quick-protobuf!!!".split('_').cycle().map(|s| s.to_string());
@@ -138,7 +138,7 @@ fn generate_strings() -> Vec<TestStrings> {
     }).collect()
 }
 
-perfbench!(generate_strings, write_strings, read_strings);
+perfbench!(generate_strings, TestStrings, write_strings, read_strings);
 
 fn generate_small_bytes() -> Vec<TestBytes> {
     let mut s = "hello world from quick-protobuf!!!".split('_').cycle()
@@ -147,11 +147,11 @@ fn generate_small_bytes() -> Vec<TestBytes> {
         .collect()
 }
 
-perfbench!(generate_small_bytes, write_small_bytes, read_small_bytes);
+perfbench!(generate_small_bytes, TestBytes, write_small_bytes, read_small_bytes);
 
 fn generate_large_bytes() -> Vec<TestBytes> {
     let mut s = "hello world from quick-protobuf!!!".split('_').cycle().map(|s| s.as_bytes());
-    (1..300).map(|_| TestBytes { 
+    (1..30).map(|_| TestBytes { 
         b1: Some(s.by_ref().take(500).fold(Vec::new(), |mut cur, nxt| {
                 cur.extend_from_slice(nxt);
                 cur 
@@ -159,7 +159,7 @@ fn generate_large_bytes() -> Vec<TestBytes> {
     }).collect()
 }
 
-perfbench!(generate_large_bytes, write_large_bytes, read_large_bytes);
+perfbench!(generate_large_bytes, TestBytes, write_large_bytes, read_large_bytes);
 
 fn generate_all() -> Vec<PerftestData> {
     vec![PerftestData {
@@ -174,4 +174,4 @@ fn generate_all() -> Vec<PerftestData> {
     }]
 }
 
-perfbench!(generate_all, write_all, read_all);
+perfbench!(generate_all, PerftestData, write_all, read_all);
