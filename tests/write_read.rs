@@ -1,7 +1,8 @@
 extern crate quick_protobuf;
 
-use std::io::{Read, Write};
-use quick_protobuf::{Reader, MessageRead, Writer, MessageWrite, Result};
+use std::io::{Write};
+use quick_protobuf::{Reader, Writer, MessageWrite, Result};
+// use quick_protobuf::{Reader, MessageRead, Writer, MessageWrite, Result};
 use quick_protobuf::sizeofs::*;
 
 macro_rules! write_read_primitive {
@@ -16,7 +17,7 @@ fn $name(){
         w.$write(v).unwrap();
     }
     let mut r = Reader::from_bytes(&*buf);
-    assert_eq!(v, r.$read().unwrap());
+    assert_eq!(v, r.$read(&buf).unwrap());
 }
     );
 }
@@ -44,7 +45,7 @@ fn wr_bytes(){
         w.write_bytes(v).unwrap();
     }
     let mut r = Reader::from_bytes(&*buf);
-    assert_eq!(v, r.read_bytes().unwrap());
+    assert_eq!(v, r.read_bytes(&buf).unwrap());
 }
 
 #[test]
@@ -56,7 +57,7 @@ fn wr_string(){
         w.write_string(v).unwrap();
     }
     let mut r = Reader::from_bytes(&buf);
-    assert_eq!(v, r.read_str().unwrap());
+    assert_eq!(v, r.read_string(&buf).unwrap());
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Copy)]
@@ -86,7 +87,7 @@ fn wr_enum(){
         w.write_enum(v as i32).unwrap();
     }
     let mut r = Reader::from_bytes(&buf);
-    assert_eq!(v, r.read_enum().unwrap());
+    assert_eq!(v, r.read_enum(&buf).unwrap());
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Default)]
@@ -95,14 +96,15 @@ struct TestMessage {
     val: Vec<i64>,
 }
 
-impl MessageRead for TestMessage {
-    fn from_reader(mut r: &mut Reader) -> Result<Self> {
-        let mut msg = Self::default();
+// impl MessageRead for TestMessage {
+impl TestMessage {
+    fn from_reader(r: &mut Reader, bytes: &[u8]) -> Result<TestMessage> {
+        let mut msg = TestMessage::default();
         while !r.is_eof() {
-            match r.next_tag() {
-                Ok(10) => msg.id = Some(r.read_uint32()?),
-                Ok(18) => msg.val.push(r.read_sint64()?),
-                Ok(t) => { r.read_unknown(t)?; }
+            match r.next_tag(bytes) {
+                Ok(10) => msg.id = Some(r.read_uint32(bytes)?),
+                Ok(18) => msg.val.push(r.read_sint64(bytes)?),
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -136,7 +138,63 @@ fn wr_message(){
         w.write_message(&v).unwrap();
     }
     let mut r = Reader::from_bytes(&buf);
-    assert_eq!(v, r.read_message().unwrap());
+    assert_eq!(v, r.read_message(&buf, TestMessage::from_reader).unwrap());
+
+    // test get_size!
+    assert_eq!(buf.len(), sizeof_varint(8) + v.get_size());
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Default)]
+struct TestMessageBorrow<'a> {
+    id: Option<u32>,
+    val: Vec<&'a str>,
+}
+
+impl<'a> TestMessageBorrow<'a> {
+    fn from_reader(r: &mut Reader, bytes: &'a[u8]) -> Result<TestMessageBorrow<'a>> {
+        let mut msg = TestMessageBorrow::default();
+        while !r.is_eof() {
+            match r.next_tag(bytes) {
+                Ok(10) => msg.id = Some(r.read_uint32(bytes)?),
+                Ok(18) => msg.val.push(r.read_string(bytes)?),
+                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Err(e) => return Err(e),
+            }
+            println!("{:?}", msg);
+        }
+        Ok(msg)
+    }
+}
+
+impl<'a> MessageWrite for TestMessageBorrow<'a> {
+    fn get_size(&self) -> usize {
+        self.id.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m))
+        + self.val.iter().map(|m| 1 + sizeof_var_length(m.len())).sum::<usize>()
+    }
+
+    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
+        if let Some(ref s) = self.id { r.write_uint32_with_tag(10, *s)?; }
+        for s in &self.val { r.write_string_with_tag(18, *s)?; }
+        Ok(())
+    }
+}
+
+#[test]
+fn wr_message_borrow(){
+
+    let test = "eajhawbdkjblncljbdskjbclas";
+
+    let v = TestMessageBorrow {
+        id: Some(63),
+        val: vec![&test[0..2], &test[3..7], &test[7..10]],
+    };
+    let mut buf = Vec::new();
+    {
+        let mut w = Writer::new(&mut buf);
+        w.write_message(&v).unwrap();
+    }
+    let mut r = Reader::from_bytes(&buf);
+    assert_eq!(v, r.read_message(&buf, TestMessageBorrow::from_reader).unwrap());
 
     // test get_size!
     assert_eq!(buf.len(), sizeof_varint(8) + v.get_size());
@@ -151,5 +209,5 @@ fn wr_packed_uint32(){
         w.write_packed_repeated_field(&v, |r, m| r.write_uint32(*m), &|m| sizeof_uint32(*m)).unwrap();
     }
     let mut r = Reader::from_bytes(&buf);
-    assert_eq!(v, &*r.read_packed_repeated_field(|r| r.read_uint32()).unwrap());
+    assert_eq!(v, r.read_packed_repeated_field(&buf, |r, b| r.read_uint32(b)).unwrap());
 }
