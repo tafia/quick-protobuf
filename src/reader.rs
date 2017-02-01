@@ -38,8 +38,8 @@ impl<R: Read> Reader<R> {
         let mut r: u64 = 0;
         let mut i = 0;
         for _ in 0..9 {
-            self.len -= 1;
             let b = self.inner.read_u8()?;
+            self.len -= 1;
             r |= ((b & 0x7f) as u64) << i;
             if b < 0x80 {
                 return Ok(r);
