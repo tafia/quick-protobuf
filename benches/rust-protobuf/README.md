@@ -15,50 +15,50 @@ quick-protobuf is generally faster than rust-protobuf.
                         ns/iter         ns/iter        %
 
 test1
-          write              51              19     62.7
-           read             108              35     67.6
-    read no vec              88              30     65.9
-     read reuse              88                       NA
+          write              60              23     61.7
+           read             124              28     77.4
+    read no vec             106              20     81.1
+     read reuse             106                       NA
 
 test_repeated_bool
-          write              58              32     44.8
-           read             161              71     55.9
-    read no vec             137              63     54.0
-     read reuse             123                       NA
-
-test_repeated_packed_int32
-          write              88              56     36.4
-           read             229             126     45.0
-    read no vec             194              98     49.5
-     read reuse             158                       NA
-
-test_repeated_messages
-          write             180             164      8.9
-           read            1112             742     33.3
-    read no vec             417             291     30.2
-     read reuse             296                       NA
-
-test_optional_messages
-          write             189             151     20.1
-           read             504             279     44.6
-    read no vec             377             219     41.9
-     read reuse             293                       NA
-
-test_strings
-          write              99              62     37.4
-           read             335             200     40.3
-    read no vec             204             135     33.8
-     read reuse             151                       NA
-
-test_small_bytearrays
-          write             788             602     23.6
-           read             543             454     16.4
-    read no vec             157             120     23.6
+          write              60              31     48.3
+           read             161              43     73.3
+    read no vec             134              34     74.6
      read reuse             120                       NA
 
+test_repeated_packed_int32
+          write              88              52     40.9
+           read             216             108     50.0
+    read no vec             188              84     55.3
+     read reuse             152                       NA
+
+test_repeated_messages
+          write             173             152     12.1
+           read            1092             811     25.7
+    read no vec             440             283     35.7
+     read reuse             292                       NA
+
+test_optional_messages
+          write             179             159     11.2
+           read             498             275     44.8
+    read no vec             364             208     42.9
+     read reuse             283                       NA
+
+test_strings
+          write             111              60     45.9
+           read             319             121     62.1
+    read no vec             206              82     60.2
+     read reuse             156                       NA
+
+test_small_bytearrays
+          write             564             484     14.2
+           read             498              27     94.6
+    read no vec             212              18     91.5
+     read reuse             121                       NA
+
 test_large_bytearrays
-          write           93661           86088      8.1
-           read           38295           30259     21.0
-    read no vec            7324            6958      5.0
-     read reuse            6102                       NA
+          write           54619           76974    -40.9
+           read           15462             152     99.0
+    read no vec            6677              26     99.6
+     read reuse            6195                       NA
 ```

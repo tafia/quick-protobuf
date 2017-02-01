@@ -6,7 +6,6 @@ extern crate time;
 use std::default::Default;
 use std::fs::File;
 use std::path::Path;
-use std::io::Read;
 
 use rand::Rng;
 use rand::StdRng;
@@ -16,10 +15,8 @@ use protobuf::Message;
 use protobuf::MessageStatic;
 use perftest_data::PerftestData;
 
-use quick_protobuf::{Reader, Writer};
+use quick_protobuf::{BytesReader, Reader, Writer, MessageWrite};
 use quick_protobuf::Result as QuickResult;
-use quick_protobuf::message::{MessageWrite};
-// use quick_protobuf::message::{MessageRead, MessageWrite};
 use perftest_data_quick::PerftestData as QuickPerftestData;
 
 mod perftest_data;
@@ -105,7 +102,7 @@ impl TestRunner {
 
     fn quick_run_test<M, F>(&self, data: &[M], read: F) -> [u64; 4]
         where M: MessageWrite + Clone + PartialEq + ::std::fmt::Debug,
-              F: Copy + FnMut(&mut Reader, &[u8]) -> QuickResult<M>,
+              F: Copy + FnMut(&mut BytesReader, &[u8]) -> QuickResult<M>,
     {
 
         let mut b = [0; 4];
@@ -130,7 +127,7 @@ impl TestRunner {
 
         let (ns, read_data) = measure(random_data.len() as u64, || {
             let mut r = Vec::new();
-            let mut reader = Reader::from_bytes(&buf);
+            let mut reader = BytesReader::from_bytes(&buf);
             while !reader.is_eof() {
                 r.push(reader.read_message(&buf, read).unwrap());
             }
@@ -141,7 +138,7 @@ impl TestRunner {
         assert_eq!(random_data, &*read_data);
 
         b[2] = measure(random_data.len() as u64, || {
-            let mut reader = Reader::from_bytes(&buf);
+            let mut reader = BytesReader::from_bytes(&buf);
             while !reader.is_eof() {
                 let _ = reader.read_message(&buf, read).unwrap();
             }
@@ -152,7 +149,7 @@ impl TestRunner {
 
     fn quick_test<M, F>(&mut self, data: &[M], read: F) -> [u64; 4]
         where M: MessageWrite + Clone + PartialEq + ::std::fmt::Debug,
-              F: Copy + FnMut(&mut Reader, &[u8]) -> QuickResult<M>,
+              F: Copy + FnMut(&mut BytesReader, &[u8]) -> QuickResult<M>,
     {
         let b = self.quick_run_test(data, read);
         self.any_matched = true;
@@ -184,7 +181,7 @@ impl TestRunner {
 
         let (ns, read_data) = measure(random_data.len() as u64, || {
             let mut r = Vec::new();
-            let mut reader = Reader::from_bytes(&buf);
+            let mut reader = BytesReader::from_bytes(&buf);
             while !reader.is_eof() {
                 r.push(reader.read_message(&buf, perftest_data_quick::TestStrings::from_reader).unwrap());
             }
@@ -195,7 +192,7 @@ impl TestRunner {
         assert_eq!(random_data, &*read_data);
 
         b[2] = measure(random_data.len() as u64, || {
-            let mut reader = Reader::from_bytes(&buf);
+            let mut reader = BytesReader::from_bytes(&buf);
             while !reader.is_eof() {
                 let _ = reader.read_message(&buf, perftest_data_quick::TestStrings::from_reader).unwrap();
             }
@@ -229,7 +226,7 @@ impl TestRunner {
 
         let (ns, read_data) = measure(random_data.len() as u64, || {
             let mut r = Vec::new();
-            let mut reader = Reader::from_bytes(&buf);
+            let mut reader = BytesReader::from_bytes(&buf);
             while !reader.is_eof() {
                 r.push(reader.read_message(&buf, perftest_data_quick::TestBytes::from_reader).unwrap());
             }
@@ -240,7 +237,7 @@ impl TestRunner {
         assert_eq!(random_data, &*read_data);
 
         b[2] = measure(random_data.len() as u64, || {
-            let mut reader = Reader::from_bytes(&buf);
+            let mut reader = BytesReader::from_bytes(&buf);
             while !reader.is_eof() {
                 let _ = reader.read_message(&buf, perftest_data_quick::TestBytes::from_reader).unwrap();
             }
@@ -287,11 +284,9 @@ fn main() {
 
     let mut is = File::open(&Path::new("perftest_data.pbbin")).unwrap();
     let test_data = protobuf::parse_from_reader::<PerftestData>(&mut is).unwrap();
-    let mut f = File::open(&Path::new("perftest_data.pbbin")).unwrap();
-    let mut data = Vec::with_capacity(f.metadata().unwrap().len() as usize);
-    f.read_to_end(&mut data).unwrap();
-    let mut reader = Reader::from_bytes(&data);
-    let test_data_quick = QuickPerftestData::from_reader(&mut reader, &data).unwrap();
+
+    let mut reader = Reader::from_file("perftest_data.pbbin").unwrap();
+    let test_data_quick = reader.read(QuickPerftestData::from_reader).unwrap();
 
     let a = runner.test(test_data.get_test1());
     let b = runner.quick_test(&test_data_quick.test1, perftest_data_quick::Test1::from_reader);
@@ -324,18 +319,6 @@ fn main() {
     let a = runner.test(test_data.get_test_large_bytearrays());
     let b = runner.quick_run_test_bytes(&test_data_quick.test_large_bytearrays);
     print_results("test_large_bytearrays", &a, &b, false);
-//
-//     let a = runner.test(test_data.get_test_strings());
-//     let b = runner.quick_test(&test_data_quick.test_strings, perftest_data_quick::TestStrings::from_reader);
-//     print_results("test_strings", &a, &b, false);
-// 
-//     let a = runner.test(test_data.get_test_small_bytearrays());
-//     let b = runner.quick_test(&test_data_quick.test_small_bytearrays, perftest_data_quick::TestBytes::from_reader);
-//     print_results("test_small_bytearrays", &a, &b, false);
-// 
-//     let a = runner.test(test_data.get_test_large_bytearrays());
-//     let b = runner.quick_test(&test_data_quick.test_large_bytearrays, perftest_data_quick::TestBytes::from_reader);
-//     print_results("test_large_bytearrays", &a, &b, false);
 
     runner.check();
 }
