@@ -28,11 +28,9 @@ lazy_static! {
 #[bench]
 fn read_varint(b: &mut Bencher) {
     b.iter(|| {
-        let buf_len = BUFFER.len();
-        let mut buf: &[u8] = &*BUFFER;
-        let mut reader = Reader::from_reader(&mut buf, buf_len);
+        let mut reader = Reader::from_bytes(&BUFFER);
         for _ in 0..LEN {
-            let _ = black_box(reader.read_varint().unwrap());
+            let _ = black_box(reader.read_varint(&BUFFER).unwrap());
         }
         assert!(reader.is_eof());
     })
@@ -41,13 +39,10 @@ fn read_varint(b: &mut Bencher) {
 #[bench]
 fn read_varint_and_is_eof(b: &mut Bencher) {
     b.iter(|| {
-        let buf_len = BUFFER.len();
-        let mut buf: &[u8] = &*BUFFER;
-        let mut reader = Reader::from_reader(&mut buf, buf_len);
+        let mut reader = Reader::from_bytes(&BUFFER);
         for _ in 0..LEN {
             assert!(!reader.is_eof());
-            let _ = black_box(reader.read_varint().unwrap());
+            let _ = black_box(reader.read_varint(&BUFFER).unwrap());
         }
-        assert!(reader.is_eof());
     })
 }
