@@ -1,7 +1,7 @@
 extern crate quick_protobuf;
 
 use std::io::{Write};
-use quick_protobuf::{Reader, Writer, MessageWrite, Result};
+use quick_protobuf::{BytesReader, Writer, MessageWrite, Result};
 use quick_protobuf::sizeofs::*;
 
 macro_rules! write_read_primitive {
@@ -15,7 +15,7 @@ fn $name(){
         let mut w = Writer::new(&mut buf);
         w.$write(v).unwrap();
     }
-    let mut r = Reader::from_bytes(&*buf);
+    let mut r = BytesReader::from_bytes(&*buf);
     assert_eq!(v, r.$read(&buf).unwrap());
 }
     );
@@ -43,7 +43,7 @@ fn wr_bytes(){
         let mut w = Writer::new(&mut buf);
         w.write_bytes(v).unwrap();
     }
-    let mut r = Reader::from_bytes(&*buf);
+    let mut r = BytesReader::from_bytes(&*buf);
     assert_eq!(v, r.read_bytes(&buf).unwrap());
 }
 
@@ -55,7 +55,7 @@ fn wr_string(){
         let mut w = Writer::new(&mut buf);
         w.write_string(v).unwrap();
     }
-    let mut r = Reader::from_bytes(&buf);
+    let mut r = BytesReader::from_bytes(&buf);
     assert_eq!(v, r.read_string(&buf).unwrap());
 }
 
@@ -85,7 +85,7 @@ fn wr_enum(){
         let mut w = Writer::new(&mut buf);
         w.write_enum(v as i32).unwrap();
     }
-    let mut r = Reader::from_bytes(&buf);
+    let mut r = BytesReader::from_bytes(&buf);
     assert_eq!(v, r.read_enum(&buf).unwrap());
 }
 
@@ -97,7 +97,7 @@ struct TestMessage {
 
 // impl MessageRead for TestMessage {
 impl TestMessage {
-    fn from_reader(r: &mut Reader, bytes: &[u8]) -> Result<TestMessage> {
+    fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<TestMessage> {
         let mut msg = TestMessage::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -136,7 +136,7 @@ fn wr_message(){
         let mut w = Writer::new(&mut buf);
         w.write_message(&v).unwrap();
     }
-    let mut r = Reader::from_bytes(&buf);
+    let mut r = BytesReader::from_bytes(&buf);
     assert_eq!(v, r.read_message(&buf, TestMessage::from_reader).unwrap());
 
     // test get_size!
@@ -150,7 +150,7 @@ struct TestMessageBorrow<'a> {
 }
 
 impl<'a> TestMessageBorrow<'a> {
-    fn from_reader(r: &mut Reader, bytes: &'a[u8]) -> Result<TestMessageBorrow<'a>> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a[u8]) -> Result<TestMessageBorrow<'a>> {
         let mut msg = TestMessageBorrow::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -192,7 +192,7 @@ fn wr_message_borrow(){
         let mut w = Writer::new(&mut buf);
         w.write_message(&v).unwrap();
     }
-    let mut r = Reader::from_bytes(&buf);
+    let mut r = BytesReader::from_bytes(&buf);
     assert_eq!(v, r.read_message(&buf, TestMessageBorrow::from_reader).unwrap());
 
     // test get_size!
@@ -207,6 +207,6 @@ fn wr_packed_uint32(){
         let mut w = Writer::new(&mut buf);
         w.write_packed_repeated_field(&v, |r, m| r.write_uint32(*m), &|m| sizeof_uint32(*m)).unwrap();
     }
-    let mut r = Reader::from_bytes(&buf);
+    let mut r = BytesReader::from_bytes(&buf);
     assert_eq!(v, r.read_packed(&buf, |r, b| r.read_uint32(b)).unwrap());
 }

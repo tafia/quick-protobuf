@@ -1,5 +1,9 @@
 //! A module to manage protobuf deserialization
 
+use std::io::Read;
+use std::path::Path;
+use std::fs::File;
+
 use errors::{Result, ErrorKind};
 
 use byteorder::LittleEndian as LE;
@@ -14,16 +18,16 @@ const WIRE_TYPE_FIXED32: u8 = 5;
 
 /// A struct to read protocol binary files
 #[derive(Debug, Clone, PartialEq)]
-pub struct Reader {
+pub struct BytesReader {
     start: usize,
     end: usize,
 }
 
-impl Reader {
+impl BytesReader {
 
     /// Creates a new reader from chunks of data
-    pub fn from_bytes(bytes: &[u8]) -> Reader {
-        Reader {
+    pub fn from_bytes(bytes: &[u8]) -> BytesReader {
+        BytesReader {
             start: 0,
             end: bytes.len()
         }
@@ -213,28 +217,18 @@ impl Reader {
     /// Reads bool (varint, check if == 0)
     #[inline]
     pub fn read_bool(&mut self, bytes: &[u8]) -> Result<bool> {
-//         let b = self.read_u8(bytes);
-//         if b & 0x80 != 0 {
-//             // discards extra bytes
-//             for _ in 0..9 {
-//                 if self.read_u8(bytes) & 0x80 == 0 { return Ok(true); }
-//             }
-//             // cannot read more than 10 bytes
-//             Err(ErrorKind::Varint.into())
-//         } else {
-//             Ok(b != 0)
-//         }
         self.read_varint32(bytes).map(|i| i != 0)
     }
 
     /// Reads enum, encoded as i32
+    #[inline]
     pub fn read_enum<E: From<i32>>(&mut self, bytes: &[u8]) -> Result<E> {
         self.read_int32(bytes).map(|e| e.into())
     }
 
     #[inline(always)]
     fn read_len<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<M>
-        where F: FnMut(&mut Reader, &'a[u8]) -> Result<M>,
+        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M>,
     {
         let len = self.read_varint32(bytes)? as usize;
         let cur_end = self.end;
@@ -246,11 +240,13 @@ impl Reader {
     }
 
     /// Reads bytes (Vec<u8>)
+    #[inline]
     pub fn read_bytes<'a>(&mut self, bytes: &'a[u8]) -> Result<&'a[u8]> {
         self.read_len(bytes, |r, b| Ok(&b[r.start..r.end]))
     }
 
     /// Reads string (String)
+    #[inline]
     pub fn read_string<'a>(&mut self, bytes: &'a[u8]) -> Result<&'a str> {
         self.read_len(bytes, |r, b| ::std::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into()))
     }
@@ -261,7 +257,7 @@ impl Reader {
     /// fields behaves like an iterator, yielding their tag everytime
     #[inline]
     pub fn read_packed<'a, M, F>(&mut self, bytes: &'a[u8], mut read: F) -> Result<Vec<M>>
-        where F: FnMut(&mut Reader, &'a[u8]) -> Result<M>,
+        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M>,
     {
         self.read_len(bytes, |r, b| {
             let mut v = Vec::new();
@@ -275,7 +271,7 @@ impl Reader {
     /// Reads a nested message
     #[inline]
     pub fn read_message<'a, M, F>(&mut self, bytes: &'a[u8], read: F) -> Result<M>
-        where F: FnMut(&mut Reader, &'a[u8]) -> Result<M> 
+        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M> 
     {
         self.read_len(bytes, read)
     }
@@ -311,10 +307,53 @@ impl Reader {
     }
 }
 
+/// A struct to read protobuf data
+///
+/// Contrary to `BytesReader`, this struct will own the buffer
+pub struct Reader {
+    buf: Vec<u8>,
+    reader: BytesReader,
+}
+
+impl Reader {
+
+    /// Creates a new `Reader`
+    pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {
+        let mut buf = Vec::with_capacity(capacity);
+        unsafe { buf.set_len(capacity); }
+        buf.shrink_to_fit();
+        r.read_exact(&mut buf)?;
+        let reader = BytesReader {
+            start: 0,
+            end: capacity,
+        };
+        Ok(Reader {
+            buf: buf,
+            reader: reader,
+        })
+    }
+
+    /// Creates a new `Reader` out of a file path
+    pub fn from_file<P: AsRef<Path>>(src: P) -> Result<Reader> {
+        let len = src.as_ref().metadata().unwrap().len() as usize;
+        let f = File::open(src)?;
+        Reader::from_reader(f, len)
+    }
+
+    /// Run a `BytesReader` dependent function
+    #[inline]
+    pub fn read<'a, M, F>(&'a mut self, mut read: F) -> Result<M>
+        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M> 
+    {
+        read(&mut self.reader, &self.buf)
+    }
+
+}
+
 #[test]
 fn test_varint() {
     let data = [0x96, 0x01];
-    let mut r = Reader::from_bytes(&data[..]);
+    let mut r = BytesReader::from_bytes(&data[..]);
     assert_eq!(150, r.read_varint32(&data[..]).unwrap());
     assert!(r.is_eof());
 }

@@ -5,7 +5,7 @@
 
 use std::io::{Write};
 use std::borrow::Cow;
-use quick_protobuf::{MessageWrite, Reader, Writer, Result};
+use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -14,7 +14,7 @@ pub struct Test1 {
 }
 
 impl Test1 {
-    pub fn from_reader(r: &mut Reader, bytes: &[u8]) -> Result<Self> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -44,7 +44,7 @@ pub struct TestRepeatedBool {
 }
 
 impl TestRepeatedBool {
-    pub fn from_reader(r: &mut Reader, bytes: &[u8]) -> Result<Self> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -74,7 +74,7 @@ pub struct TestRepeatedPackedInt32 {
 }
 
 impl TestRepeatedPackedInt32 {
-    pub fn from_reader(r: &mut Reader, bytes: &[u8]) -> Result<Self> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -106,7 +106,7 @@ pub struct TestRepeatedMessages {
 }
 
 impl TestRepeatedMessages {
-    pub fn from_reader(r: &mut Reader, bytes: &[u8]) -> Result<Self> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -144,7 +144,7 @@ pub struct TestOptionalMessages {
 }
 
 impl TestOptionalMessages {
-    pub fn from_reader(r: &mut Reader, bytes: &[u8]) -> Result<Self> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -182,7 +182,7 @@ pub struct TestStrings<'a> {
 }
 
 impl<'a> TestStrings<'a> {
-    pub fn from_reader(r: &mut Reader, bytes: &'a [u8]) -> Result<Self> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -218,7 +218,7 @@ pub struct TestBytes<'a> {
 }
 
 impl<'a> TestBytes<'a> {
-    pub fn from_reader(r: &mut Reader, bytes: &'a [u8]) -> Result<Self> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -255,7 +255,7 @@ pub struct PerftestData<'a> {
 }
 
 impl<'a> PerftestData<'a> {
-    pub fn from_reader(r: &mut Reader, bytes: &'a [u8]) -> Result<Self> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {

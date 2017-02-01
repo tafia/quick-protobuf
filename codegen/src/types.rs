@@ -453,9 +453,9 @@ impl<'a> Message<'a> {
 
     fn write_from_reader<W: Write>(&self, w: &mut W, msgs: &[Message]) -> IoResult<()> {
         if self.has_lifetime(msgs) {
-            writeln!(w, "    pub fn from_reader(r: &mut Reader, bytes: &'a [u8]) -> Result<Self> {{")?;
+            writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
         } else {
-            writeln!(w, "    pub fn from_reader(r: &mut Reader, bytes: &[u8]) -> Result<Self> {{")?;
+            writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {{")?;
         }
         writeln!(w, "        let mut msg = Self::default();")?;
         writeln!(w, "        while !r.is_eof() {{")?;
@@ -613,7 +613,7 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "")?;
         writeln!(w, "use std::io::{{Write}};")?;
         writeln!(w, "use std::borrow::Cow;")?;
-        writeln!(w, "use quick_protobuf::{{MessageWrite, Reader, Writer, Result}};")?;
+        writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
 
         for m in &self.enums {

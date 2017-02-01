@@ -5,26 +5,20 @@ extern crate test;
 
 mod perftest_data;
 
-use test::{Bencher, black_box};
-use perftest_data::*;
-
 use std::cmp::min;
 use std::borrow::Cow;
-use std::fs::File;
-use std::io::Read;
 
-use quick_protobuf::{Reader, Writer};
+use perftest_data::*;
+
+use test::{Bencher, black_box};
+use quick_protobuf::{BytesReader, Reader, Writer};
 use quick_protobuf::message::{MessageWrite};
 
 #[bench]
 fn read_file(b: &mut Bencher) {
     b.iter(|| {
-        let mut f = File::open("benches/rust-protobuf/perftest_data.pbbin").unwrap();
-        let len = f.metadata().unwrap().len() as usize;
-        let mut bytes = Vec::with_capacity(len);
-        f.read_to_end(&mut bytes).unwrap();
-        let mut reader = Reader::from_bytes(&bytes);
-        let _ = black_box(::perftest_data::PerftestData::from_reader(&mut reader, &bytes).unwrap());
+        let mut reader = Reader::from_file("benches/rust-protobuf/perftest_data.pbbin").unwrap();
+        reader.read(PerftestData::from_reader).unwrap().test1.len()
     })
 }
 
@@ -53,7 +47,7 @@ fn $read(b: &mut Bencher) {
         }
     }
     b.iter(|| {
-        let mut r = Reader::from_bytes(&buf);
+        let mut r = BytesReader::from_bytes(&buf);
         while !r.is_eof() {
             let _ = black_box($m::from_reader(&mut r, &buf).unwrap());
         }

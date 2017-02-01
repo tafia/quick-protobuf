@@ -16,10 +16,8 @@ pub mod message;
 pub mod reader;
 pub mod writer;
 pub mod sizeofs;
-// pub mod packed;
 
 pub use errors::Result;
 pub use message::{MessageWrite};
-// pub use message::{MessageRead, MessageWrite};
-pub use reader::Reader;
+pub use reader::{Reader, BytesReader};
 pub use writer::Writer;
