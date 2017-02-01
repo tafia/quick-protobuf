@@ -35,10 +35,12 @@ impl Reader {
     }
 
     /// Reads the next varint encoded u64
+    #[inline]
     pub fn read_varint(&mut self, bytes: &[u8]) -> Result<u64> {
         let mut r: u64 = 0;
         let mut i = 0;
-        for b in bytes.iter().skip(self.start).take(9).cloned() {
+        for _ in 0..9 {
+            let b = bytes[self.start];
             self.start += 1;
             r |= ((b & 0x7f) as u64) << i;
             if b < 0x80 {
