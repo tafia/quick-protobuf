@@ -8,7 +8,7 @@ extern crate lazy_static;
 
 use test::{Bencher, black_box};
 
-use quick_protobuf::{Reader, Writer};
+use quick_protobuf::{BytesReader, Writer};
 
 const LEN: i32 = 10_000;
 
@@ -26,28 +26,34 @@ lazy_static! {
 }
 
 #[bench]
-fn read_varint(b: &mut Bencher) {
+fn read_varint32(b: &mut Bencher) {
     b.iter(|| {
-        let buf_len = BUFFER.len();
-        let mut buf: &[u8] = &*BUFFER;
-        let mut reader = Reader::from_reader(&mut buf, buf_len);
+        let mut reader = BytesReader::from_bytes(&BUFFER);
         for _ in 0..LEN {
-            let _ = black_box(reader.read_varint().unwrap());
+            let _ = black_box(reader.read_varint32(&BUFFER).unwrap());
         }
         assert!(reader.is_eof());
     })
 }
 
 #[bench]
-fn read_varint_and_is_eof(b: &mut Bencher) {
+fn read_varint64(b: &mut Bencher) {
     b.iter(|| {
-        let buf_len = BUFFER.len();
-        let mut buf: &[u8] = &*BUFFER;
-        let mut reader = Reader::from_reader(&mut buf, buf_len);
+        let mut reader = BytesReader::from_bytes(&BUFFER);
         for _ in 0..LEN {
-            assert!(!reader.is_eof());
-            let _ = black_box(reader.read_varint().unwrap());
+            let _ = black_box(reader.read_varint64(&BUFFER).unwrap());
         }
         assert!(reader.is_eof());
+    })
+}
+
+#[bench]
+fn read_varint64_and_is_eof(b: &mut Bencher) {
+    b.iter(|| {
+        let mut reader = BytesReader::from_bytes(&BUFFER);
+        for _ in 0..LEN {
+            assert!(!reader.is_eof());
+            let _ = black_box(reader.read_varint64(&BUFFER).unwrap());
+        }
     })
 }

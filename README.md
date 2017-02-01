@@ -1,97 +1,110 @@
 # quick-protobuf
 
-A pure Rust library to deserialize protobuf files.
-
-Simple codegen. No need of protoc. Fast.
+A pure Rust library to deserialize [protobuf](https://developers.google.com/protocol-buffers) files.
 
 [Documentation](https://docs.rs/quick-protobuf)
 
-# Getting started
+## Description
 
-1. Convert your .proto files into rust modules using included pb-rs crate
+This library intends to provide a simple yet fast (minimal allocations) protobuf parser implementation.
 
-    ```sh
-    git clone https://github.com/tafia/quick-protobuf
-    cd quick-protobuf/codegen
+It provides both:
+- [**pb-rs**](codegen), a code generation tool: 
+  - each `.proto` file will generate a minimal rust module (one function to read, one to write, and one to compute the size of the messages)
+  - each message will generate a rust struct where:
+    - `bytes` fields are converted to `Cow::Borrowed([u8])`
+    - `string` fields are converted to `Cow::Borrowed(str)`
+    - `repeated` fields are converted to `Vec`
+    - all other fields are converted into the matching rust primitive type
+  - no need to use google `protoc` tool to generate the modules
+- **quick-protobuf**, a protobuf file parser: 
+  - this is the crate that you will typically refer to in your library. The generated modules will assume it has been imported.
+  - it acts like an event parser, the logic to convert it into struct is handle by `pb-rs`
 
-    # generate a /my/proto/path/my_file.rs module to import into your project
-    cargo run /my/proto/path/my_file.proto
-    ```
+## Example: protobuf_example project
 
-2. Import quick-protobuf into you crate
+1. Use `pb-rs` binary, located into `codegen` directory to automatically generate a foo_bar.rs module from a foo_bar.proto proto file
 
-    ```toml
-    # Cargo.toml
-    [dependencies]
-    quick-protobuf = "0.1.0"
-    ```
+```sh
+git clone https://github.com/tafia/quick-protobuf
+cd quick-protobuf/codegen
+cargo run ../../protobuf_example/foo_bar.proto
+cd ../../protobuf_example
+```
 
-3. Use the generated module
+2. Add a dependency to quick-protobuf
 
-    ```rust
-    // main.rs or lib.rs
-    extern crate quick_protobuf;
+```toml
+# Cargo.toml
+[dependencies]
+quick-protobuf = "0.1.0"
+```
 
-    mod my_file; // generated with protorust_codegen
+3. Have fun
 
-    use std::io::Write;
-    use quick_protobuf::{MessageRead, MessageWrite, Writer, Result};
-    use my_file::Foo;
+```rust
+// main.rs or lib.rs
+extern crate quick_protobuf;
 
-    fn main() {
-        run("/path/to/my/binary/file.bin").unwrap();
-    }
+mod foo_bar; // (see 1.)
 
-    fn run(p: &str) -> Result<()> {
-        // Foo implements Message trait, thus we can directly deserialize .bin files
-        let mut msg = Foo::from_file(p)?;
-        println!("Deserialized msg: {:#?}", msg);
+use quick_protobuf::Reader;
 
-        // Make some chanegs on msg
-        msg.repeated_field_1.clear();
+// We will suppose here that Foo and Bar are two messages defined in the .proto file and converted into rust structs
+// FooBar is the root message defined like this:
+// message FooBar {
+//     repeated Foo foos = 1;
+//     repeated Bar bars = 2;
+// }
+use foo_bar::{FooBar};
 
-        // Write down updated message using any `Write` ...
-        let mut buf = Vec::with_capacity(msg.get_size());
-        {
-            let mut writer = Writer::new(&mut buf);
-            writer.write_message(&msg)?;
-        }
-        
-        Ok(())
-    }
-    ```
+fn main() {
+    // create a reader, which will parse the protobuf binary file and pop events
+    // this reader will read the entire file into an internal buffer
+    let mut reader = Reader::from_file("/path/to/binary/protobuf.bin")
+        .expect("Cannot read input file");
+    
+    // use the generated module fns with the reader to convert your data into rust structs
+    let foobar = reader.read(FooBar::from_reader).expect("Cannot read FooBar message");
 
-# Why not [rust-protobuf](https://github.com/stepancheg/rust-protobuf)
+    println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
+}
+```
+
+## Why not [rust-protobuf](https://github.com/stepancheg/rust-protobuf)
 
 This library is an alternative to the widely used [rust-protobuf](https://github.com/stepancheg/rust-protobuf).
 If you want to build anything serious, I strongly advise against using quick-protobuf which is very immature for the moment.
 
-
-## Pros / Cons
+### Pros / Cons
 
 - Pros
   - No need to install anything on your machine but rust
   - No trait objects: faster/simpler parser
-  - Dead simple generated modules: 
-    - a struct with public fields
-    - an implementation of Message(Read/Write), which means just one match loop for reader
-    - close to 10x smaller modules in practice
-    - modifying the generated code if needed
-      while not necessarily advised is totally fine as the code is easy to reason about
-  - Easier on memory (no trait objects, no storage of unknown fields)
+  - Very simple generated modules (~10x smaller)
+  - Less allocations (bytes and string are converted respectively to Cow::Borrowed([u8]) and Cow::Borrowed(str))
 
 - Cons
-  - Very immature library at the moment: [many missing functionalities](https://github.com/tafia/quick-protobuf/issues/12), very poor test coverage, very poor documentation
-  - Not a drop-in replacement of [rust-protobuf], in particular, you have to handle `Option`s unwrapping yourself
-  - probably many other corner cases I overlooked
+  - Very immature library at the moment, [many missing functionalities](https://github.com/tafia/quick-protobuf/issues/12)
+  - Not a drop-in replacement of [rust-protobuf]
+    - you have to handle `Option`s unwrapping yourself
+    - you may need to handle `Cow` as well is you want to modify it
+  - Very little tests in comparison
 
-## Codegen
+### Codegen
 
 Have a look at the different generated modules for the same .proto file:
 - [rust-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data.rs): 2322 loc
 - [quick-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data_quick.rs): 300 loc
 
-## Benchmarks
+### Benchmarks
 
 The only implemented benchmarks are the [adaptation from rust-protobuf perftest](benches/rust-protobuf).
 
+## Contribution
+
+Any help is welcomed! (Pull requests of course, bug report, missing functionality etc...)
+
+## Licence
+
+MIT
