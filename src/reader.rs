@@ -34,7 +34,7 @@ impl<R: Read> Reader<R> {
     }
 
     /// Reads the next varint encoded u64
-    fn read_varint(&mut self) -> Result<u64> {
+    pub fn read_varint(&mut self) -> Result<u64> {
         let mut r: u64 = 0;
         let mut i = 0;
         for _ in 0..9 {
