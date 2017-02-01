@@ -26,23 +26,34 @@ lazy_static! {
 }
 
 #[bench]
-fn read_varint(b: &mut Bencher) {
+fn read_varint32(b: &mut Bencher) {
     b.iter(|| {
         let mut reader = Reader::from_bytes(&BUFFER);
         for _ in 0..LEN {
-            let _ = black_box(reader.read_varint(&BUFFER).unwrap());
+            let _ = black_box(reader.read_varint32(&BUFFER).unwrap());
         }
         assert!(reader.is_eof());
     })
 }
 
 #[bench]
-fn read_varint_and_is_eof(b: &mut Bencher) {
+fn read_varint64(b: &mut Bencher) {
+    b.iter(|| {
+        let mut reader = Reader::from_bytes(&BUFFER);
+        for _ in 0..LEN {
+            let _ = black_box(reader.read_varint64(&BUFFER).unwrap());
+        }
+        assert!(reader.is_eof());
+    })
+}
+
+#[bench]
+fn read_varint64_and_is_eof(b: &mut Bencher) {
     b.iter(|| {
         let mut reader = Reader::from_bytes(&BUFFER);
         for _ in 0..LEN {
             assert!(!reader.is_eof());
-            let _ = black_box(reader.read_varint(&BUFFER).unwrap());
+            let _ = black_box(reader.read_varint64(&BUFFER).unwrap());
         }
     })
 }
