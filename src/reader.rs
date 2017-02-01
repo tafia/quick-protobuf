@@ -1,4 +1,11 @@
 //! A module to manage protobuf deserialization
+//!
+//! There are actually two main *readers*
+//! - a `BytesReader` which parses data from a `&[u8]`
+//! - a `Reader` which is a wrapper on `BytesReader` which has its own buffer. It provides
+//! convenient functions to the user suche as `from_file`
+//!
+//! It is advised, for convenience to directly work with a `Reader`.
 
 use std::io::Read;
 use std::path::Path;
@@ -17,6 +24,42 @@ const WIRE_TYPE_END_GROUP: u8 = 4;
 const WIRE_TYPE_FIXED32: u8 = 5;
 
 /// A struct to read protocol binary files
+///
+/// # Examples
+///
+/// ```rust
+/// # mod foo_bar {
+/// #     use quick_protobuf::{BytesReader, Result};
+/// #     pub struct Foo {}
+/// #     pub struct Bar {}
+/// #     pub struct FooBar { pub foos: Vec<Foo>, pub bars: Vec<Bar>, }
+/// #     impl FooBar {
+/// #         pub fn from_reader(_: &mut BytesReader, _: &[u8]) -> Result<Self> {
+/// #              Ok(FooBar { foos: vec![], bars: vec![] })
+/// #         }
+/// #     }
+/// # }
+///
+/// // FooBar is a message generated from a proto file
+/// // in parcicular it contains a `from_reader` function
+/// use foo_bar::FooBar;
+/// use quick_protobuf::BytesReader;
+///
+/// fn main() {
+///     // bytes is a buffer on the data we want to deserialize
+///     // typically bytes is read from a `Read`:
+///     // r.read_to_end(&mut bytes).expect("cannot read bytes");
+///     let mut bytes: Vec<u8>;
+///     # bytes = vec![];
+///
+///     // we can build a bytes reader directly out of the bytes
+///     let mut reader = BytesReader::from_bytes(&bytes);
+///
+///     // now using the generated module decoding is as easy as:
+///     let foobar = FooBar::from_reader(&mut reader, &bytes).expect("Cannot read FooBar");
+///     println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq)]
 pub struct BytesReader {
     start: usize,
@@ -309,7 +352,38 @@ impl BytesReader {
 
 /// A struct to read protobuf data
 ///
-/// Contrary to `BytesReader`, this struct will own the buffer
+/// Contrary to `BytesReader`, this struct will own a buffer
+///
+/// # Examples
+///
+/// ```rust,should_panic
+/// # mod foo_bar {
+/// #     use quick_protobuf::{BytesReader, Result};
+/// #     pub struct Foo {}
+/// #     pub struct Bar {}
+/// #     pub struct FooBar { pub foos: Vec<Foo>, pub bars: Vec<Bar>, }
+/// #     impl FooBar {
+/// #         pub fn from_reader(_: &mut BytesReader, _: &[u8]) -> Result<Self> {
+/// #              Ok(FooBar { foos: vec![], bars: vec![] })
+/// #         }
+/// #     }
+/// # }
+///
+/// // FooBar is a message generated from a proto file
+/// // in parcicular it contains a `from_reader` function
+/// use foo_bar::FooBar;
+/// use quick_protobuf::Reader;
+///
+/// fn main() {
+///     // read an entire file into memory
+///     let mut reader = Reader::from_file("/myproject/resources/my_file.bin")
+///         .expect("Cannot read binary encoded file");
+///
+///     // now using the generated module decoding is as easy as:
+///     let foobar = reader.read(FooBar::from_reader).expect("Cannot read FooBar");
+///     println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
+/// }
+/// ```
 pub struct Reader {
     buf: Vec<u8>,
     reader: BytesReader,

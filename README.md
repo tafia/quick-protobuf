@@ -1,6 +1,6 @@
 # quick-protobuf
 
-A pure Rust library to deserialize [protobuf](https://developers.google.com/protocol-buffers) files.
+A pure Rust library to serialize/deserialize [protobuf](https://developers.google.com/protocol-buffers) files.
 
 [Documentation](https://docs.rs/quick-protobuf)
 
@@ -50,7 +50,9 @@ mod foo_bar; // (see 1.)
 
 use quick_protobuf::Reader;
 
-// We will suppose here that Foo and Bar are two messages defined in the .proto file and converted into rust structs
+// We will suppose here that Foo and Bar are two messages defined in the .proto file
+// and converted into rust structs
+//
 // FooBar is the root message defined like this:
 // message FooBar {
 //     repeated Foo foos = 1;
