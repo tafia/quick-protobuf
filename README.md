@@ -37,7 +37,7 @@ cd ../../protobuf_example
 ```toml
 # Cargo.toml
 [dependencies]
-quick-protobuf = "0.1.0"
+quick-protobuf = "0.2.0"
 ```
 
  - 3. Have fun
