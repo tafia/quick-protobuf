@@ -23,7 +23,7 @@ It provides both:
 
 ## Example: protobuf_example project
 
-1. Use `pb-rs` binary, located into `codegen` directory to automatically generate a foo_bar.rs module from a foo_bar.proto proto file
+ - 1. Use `pb-rs` binary, located into `codegen` directory to automatically generate a foo_bar.rs module from a foo_bar.proto proto file
 
 ```sh
 git clone https://github.com/tafia/quick-protobuf
@@ -32,7 +32,7 @@ cargo run ../../protobuf_example/foo_bar.proto
 cd ../../protobuf_example
 ```
 
-2. Add a dependency to quick-protobuf
+ - 2. Add a dependency to quick-protobuf
 
 ```toml
 # Cargo.toml
@@ -40,7 +40,7 @@ cd ../../protobuf_example
 quick-protobuf = "0.1.0"
 ```
 
-3. Have fun
+ - 3. Have fun
 
 ```rust
 // main.rs or lib.rs
