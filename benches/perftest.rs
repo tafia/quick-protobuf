@@ -15,7 +15,7 @@ use quick_protobuf::message::{MessageRead, MessageWrite};
 #[bench]
 fn read_file(b: &mut Bencher) {
     b.iter(|| {
-        let _ = black_box(::perftest_data::PerftestData::from_file("../rust-protobuf/perftest_data.pbbin").unwrap());
+        let _ = black_box(::perftest_data::PerftestData::from_file("benches/rust-protobuf/perftest_data.pbbin").unwrap());
     })
 }
 
