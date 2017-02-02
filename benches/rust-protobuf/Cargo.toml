@@ -4,16 +4,11 @@ version = "0.0.0"
 authors = ["Stepan Koltsov <stepan.koltsov@gmail.com>",
            "Johann Tuffe <tafia973@gmail.com>"]
 
-[dependencies.protobuf]
-version = "1.2.1"
-
-[dependencies.quick-protobuf]
-path = "../../"
-
-[dependencies.time]
-git = "https://github.com/rust-lang/time"
-
-[dependencies.rand]
+[dependencies]
+protobuf = "1.2.1"
+quick-protobuf = { path = "../../" }
+time = { git = "https://github.com/rust-lang/time" }
+rand = "0.3.15"
 
 [[bin]]
 
