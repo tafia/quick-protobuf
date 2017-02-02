@@ -118,7 +118,6 @@ pub enum FooEnum {
     SECOND_VALUE = 2,
 }
 
-
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct BarMessage {                                 // all fields are owned: no lifetime parameter
     pub b_required_int32: i32,
@@ -142,42 +141,43 @@ pub struct FooMessage<'a> {                             // has borrowed fields: 
     pub f_float: Option<f32>,
     pub f_bytes: Option<Cow<'a, [u8]>>,                 // bytes  -> Cow<[u8]>
     pub f_string: Option<Cow<'a, str>>                  // string -> Cow<str>
-    pub f_self_message: Option<Box<FooMessage<'a>>>,    // cycle reference -> Boxed message
+    pub f_self_message: Option<Box<FooMessage<'a>>>,    // reference cycle -> Boxed message
     pub f_bar_message: Option<BarMessage>,
-    pub f_repeated_int32: Vec<i32>,
-    pub f_repeated_packed_int32: Vec<i32>,              // repeated: Vec
+    pub f_repeated_int32: Vec<i32>,                     // repeated: Vec
+    pub f_repeated_packed_int32: Vec<i32>,              // repeated packed: Vec
 }
 ```
 
-## Why not [rust-protobuf](https://github.com/stepancheg/rust-protobuf)
+## Why not rust-protobuf
 
 This library is an alternative to the widely used [rust-protobuf](https://github.com/stepancheg/rust-protobuf).
-If you want to build anything serious, I strongly advise against using quick-protobuf which is very immature for the moment.
 
-### Pros / Cons
+#### Pros / Cons
 
 - Pros
   - No need to install anything on your machine but rust
   - No trait objects: faster/simpler parser
   - Very simple generated modules (~10x smaller)
-  - Less allocations (bytes and string are converted respectively to Cow::Borrowed([u8]) and Cow::Borrowed(str))
+  - Less allocations (bytes and string are converted respectively to `Cow<[u8]>` and `Cow<str>`)
 
 - Cons
   - Very immature library at the moment, [many missing functionalities](https://github.com/tafia/quick-protobuf/issues/12)
-  - Not a drop-in replacement of [rust-protobuf]
+  - Not a drop-in replacement of rust-protobuf
     - you have to handle `Option`s unwrapping yourself
-    - you may need to handle `Cow` as well is you want to modify it
+    - you may need to handle `Cow` as well if you want to modify it
   - Very little tests in comparison
 
-### Codegen
+#### Codegen
 
 Have a look at the different generated modules for the same .proto file:
 - [rust-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data.rs): 2322 loc
 - [quick-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data_quick.rs): 300 loc
 
-### Benchmarks
+#### Benchmarks
 
 The only implemented benchmarks are the [adaptation from rust-protobuf perftest](benches/rust-protobuf).
+
+They show that quick-protobuf is, at the time of writing and on these specific benches much faster.
 
 ## Contribution
 

@@ -13,7 +13,6 @@ use byteorder::LittleEndian as LE;
 /// # Examples
 ///
 /// ```rust
-///
 /// // an automatically generated module which is in a separate file in general
 /// mod foo_bar {
 ///     # use quick_protobuf::{MessageWrite, Writer, Result};
