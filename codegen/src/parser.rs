@@ -17,76 +17,98 @@ named!(block_comment<()>, do_parse!(tag!("/*") >> take_until_and_consume!("*/") 
 /// word break: multispace or comment
 named!(br<()>, alt!(map!(multispace, |_| ()) | comment | block_comment));
 
-named!(syntax<Syntax>, do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >>
-    proto: alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } |
-                tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >> (proto)));
+named!(syntax<Syntax>, 
+       do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >> 
+                 proto: alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } | 
+                             tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >> 
+                 (proto) ));
 
-named!(default_value<&str>, do_parse!(
-    tag!("[") >> many0!(br) >> tag!("default") >> many0!(br) >> tag!("=") >> many0!(br) >> 
-    default: word >> many0!(br) >> tag!("]") >>
-    (default)));
+named!(reserved_nums<Vec<i32>>, 
+       do_parse!(tag!("reserved") >> many1!(br) >> 
+                 nums: many1!(do_parse!(num: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >>
+                                        many0!(alt!(br | tag!(",") => { |_| () })) >> (num))) >>
+                (nums) ));
+                              
+named!(reserved_names<Vec<&str>>, 
+       do_parse!(tag!("reserved") >> many1!(br) >> 
+                 names: many1!(do_parse!(tag!("\"") >> name: word >> tag!("\"") >>
+                                        many0!(alt!(br | tag!(",") => { |_| () })) >> (name))) >>
+                (names) ));
+                              
 
-named!(deprecated<bool>, do_parse!(
-    tag!("[") >> many0!(br) >> tag!("deprecated") >> many0!(br) >> tag!("=") >> many0!(br) >> 
-    deprecated: map_res!(word, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
-    (deprecated)));
+named!(default_value<&str>, 
+       do_parse!(tag!("[") >> many0!(br) >> tag!("default") >> many0!(br) >> tag!("=") >> many0!(br) >> 
+                 default: word >> many0!(br) >> tag!("]") >>
+                 (default) ));
 
-named!(packed<bool>, do_parse!(
-    tag!("[") >> many0!(br) >> tag!("packed") >> many0!(br) >> tag!("=") >> many0!(br) >> 
-    packed: map_res!(word, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
-    (packed)));
+named!(deprecated<bool>, 
+       do_parse!(tag!("[") >> many0!(br) >> tag!("deprecated") >> many0!(br) >> tag!("=") >> many0!(br) >> 
+                 deprecated: map_res!(word, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
+                 (deprecated) ));
+
+named!(packed<bool>, 
+       do_parse!(tag!("[") >> many0!(br) >> tag!("packed") >> many0!(br) >> tag!("=") >> many0!(br) >> 
+                 packed: map_res!(word, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
+                 (packed) ));
 
 named!(frequency<Frequency>,
        alt!(tag!("optional") => { |_| Frequency::Optional } |
             tag!("repeated") => { |_| Frequency::Repeated } |
             tag!("required") => { |_| Frequency::Required } ));
 
-named!(message_field<Field>, do_parse!(
-    frequency: opt!(frequency) >> many1!(br) >>
-    typ: word >> many1!(br) >>
-    name: word >> many0!(br) >>
-    tag!("=") >> many0!(br) >>
-    number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
-    default: opt!(default_value) >> many0!(br) >> 
-    deprecated: opt!(deprecated) >> many0!(br) >> 
-    packed: opt!(packed) >> many0!(br) >> tag!(";") >> many0!(br) >>
-    (Field {
-       name: name,
-       frequency: frequency.unwrap_or(Frequency::Optional),
-       typ: typ,
-       number: number,
-       default: default,
-       packed: packed,
-       boxed: false,
-       deprecated: deprecated.unwrap_or(false),
-    })));
+named!(message_field<Field>, 
+       do_parse!(frequency: opt!(frequency) >> many1!(br) >>
+                 typ: word >> many1!(br) >>
+                 name: word >> many0!(br) >>
+                 tag!("=") >> many0!(br) >>
+                 number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
+                 default: opt!(default_value) >> many0!(br) >> 
+                 deprecated: opt!(deprecated) >> many0!(br) >> 
+                 packed: opt!(packed) >> many0!(br) >> tag!(";") >> many0!(br) >>
+                 (Field {
+                    name: name,
+                    frequency: frequency.unwrap_or(Frequency::Optional),
+                    typ: typ,
+                    number: number,
+                    default: default,
+                    packed: packed,
+                    boxed: false,
+                    deprecated: deprecated.unwrap_or(false),
+                 }) ));
 
-named!(message<Message>, do_parse!(
-    tag!("message") >> many0!(br) >> 
-    name: word >> many0!(br) >> 
-    tag!("{") >> many0!(br) >>
-    fields: many0!(message_field) >> 
-    tag!("}") >> many0!(br) >>
-    (Message { name: name, fields: fields })));
+named!(message<Message>, 
+       do_parse!(tag!("message") >> many0!(br) >> 
+                 name: word >> many0!(br) >> 
+                 tag!("{") >> many0!(br) >>
+                 reserved_nums: opt!(reserved_nums) >> many0!(br) >>
+                 reserved_names: opt!(reserved_names) >> many0!(br) >>
+                 fields: many0!(message_field) >> 
+                 tag!("}") >> many0!(br) >>
+                 (Message { 
+                     name: name, 
+                     fields: fields, 
+                     reserved_nums: reserved_nums,
+                     reserved_names: reserved_names,
+                 }) ));
 
-named!(enum_field<(&str, i32)>, do_parse!(
-    name: word >> many0!(br) >>
-    tag!("=") >> many0!(br) >>
-    number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >>
-    tag!(";") >> many0!(br) >>
-    ((name, number))));
+named!(enum_field<(&str, i32)>, 
+       do_parse!(name: word >> many0!(br) >>
+                 tag!("=") >> many0!(br) >>
+                 number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >>
+                 tag!(";") >> many0!(br) >>
+                 ((name, number))));
     
-named!(enumerator<Enumerator>, do_parse!(
-    tag!("enum") >> many1!(br) >>
-    name: word >> many0!(br) >>
-    tag!("{") >> many0!(br) >>
-    fields: many0!(enum_field) >> 
-    tag!("}") >> many0!(br) >>
-    (Enumerator { name: name, fields: fields })));
+named!(enumerator<Enumerator>, 
+       do_parse!(tag!("enum") >> many1!(br) >>
+                 name: word >> many0!(br) >>
+                 tag!("{") >> many0!(br) >>
+                 fields: many0!(enum_field) >> 
+                 tag!("}") >> many0!(br) >>
+                 (Enumerator { name: name, fields: fields })));
 
-named!(ignore<()>, do_parse!(
-    alt!(tag!("package") | tag!("option") | tag!("import")) >> many1!(br) >> 
-    take_until_and_consume!(";") >> many0!(br) >> ()));
+named!(ignore<()>, 
+       do_parse!(alt!(tag!("package") | tag!("option") | tag!("import")) >> many1!(br) >> 
+                 take_until_and_consume!(";") >> many0!(br) >> ()));
 
 named!(service_ignore<()>, do_parse!(tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{") >>
                                      take_until_and_consume!("}") >> many0!(br) >> ()));
