@@ -2,6 +2,7 @@
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
 
 use std::io::{Write};
 use std::borrow::Cow;
@@ -27,6 +28,36 @@ impl From<i32> for FooEnum {
             2 => FooEnum::SECOND_VALUE,
             _ => Self::default(),
         }
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct BarMessage {
+    pub b_required_int32: i32,
+}
+
+impl BarMessage {
+    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+        let mut msg = Self::default();
+        while !r.is_eof() {
+            match r.next_tag(bytes) {
+                Ok(8) => msg.b_required_int32 = r.read_int32(bytes)?,
+                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(msg)
+    }
+}
+
+impl MessageWrite for BarMessage {
+    fn get_size(&self) -> usize {
+        1 + sizeof_int32(self.b_required_int32)
+    }
+
+    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
+        r.write_int32_with_tag(8, self.b_required_int32)?;
+        Ok(())
     }
 }
 
@@ -97,12 +128,12 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + self.f_sint64.as_ref().map_or(0, |m| 1 + sizeof_sint64(*m))
         + self.f_bool.as_ref().map_or(0, |m| 1 + sizeof_bool(*m))
         + self.f_FooEnum.as_ref().map_or(0, |m| 1 + sizeof_enum(*m as i32))
-        + self.f_fixed64.as_ref().map_or(0, |m| 1 + 8)
-        + self.f_sfixed64.as_ref().map_or(0, |m| 1 + 8)
-        + self.f_fixed32.as_ref().map_or(0, |m| 1 + 4)
-        + self.f_sfixed32.as_ref().map_or(0, |m| 1 + 4)
-        + self.f_double.as_ref().map_or(0, |m| 1 + 8)
-        + self.f_float.as_ref().map_or(0, |m| 1 + 4)
+        + self.f_fixed64.as_ref().map_or(0, |_| 1 + 8)
+        + self.f_sfixed64.as_ref().map_or(0, |_| 1 + 8)
+        + self.f_fixed32.as_ref().map_or(0, |_| 1 + 4)
+        + self.f_sfixed32.as_ref().map_or(0, |_| 1 + 4)
+        + self.f_double.as_ref().map_or(0, |_| 1 + 8)
+        + self.f_float.as_ref().map_or(0, |_| 1 + 4)
         + self.f_bytes.as_ref().map_or(0, |m| 1 + sizeof_var_length(m.len()))
         + self.f_string.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.len()))
         + self.f_self_message.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
@@ -132,36 +163,6 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_bar_message { r.write_message_with_tag(146, s)?; }
         for s in &self.f_repeated_int32 { r.write_int32_with_tag(152, *s)? }
         r.write_packed_repeated_field_with_tag(162, &self.f_repeated_packed_int32, |r, m| r.write_int32(*m), &|m| sizeof_int32(*m))?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Default, PartialEq, Clone)]
-pub struct BarMessage {
-    pub b_required_int32: i32,
-}
-
-impl BarMessage {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
-        let mut msg = Self::default();
-        while !r.is_eof() {
-            match r.next_tag(bytes) {
-                Ok(8) => msg.b_required_int32 = r.read_int32(bytes)?,
-                Ok(t) => { r.read_unknown(bytes, t)?; }
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(msg)
-    }
-}
-
-impl MessageWrite for BarMessage {
-    fn get_size(&self) -> usize {
-        1 + sizeof_int32(self.b_required_int32)
-    }
-
-    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
-        r.write_int32_with_tag(8, self.b_required_int32)?;
         Ok(())
     }
 }

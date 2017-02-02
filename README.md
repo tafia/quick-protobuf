@@ -73,9 +73,15 @@ fn main() {
 }
 ```
 
+## Examples directory
+
+You can find basic examples in the [examples](examples) directory.
+- [codegen_example](examples/codegen_example.rs): A basic write/read loop on all datatypes
+
 ## Message <-> struct
 
 #### Proto definition
+
 ```
 enum FooEnum {
     FIRST_VALUE = 1;

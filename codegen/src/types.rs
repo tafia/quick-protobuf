@@ -72,6 +72,13 @@ impl<'a> Field<'a> {
         self.get_type(msgs) == "enum"
     }
 
+    fn is_fixed_size(&self, msgs: &[Message]) -> bool {
+        match self.wire_type_num_non_packed(msgs) {
+            1 | 5 => true,
+            _ => false,
+        }
+    }
+
     fn is_cow(&self) -> bool {
         self.typ == "bytes" || self.typ == "string"
     }
@@ -231,7 +238,11 @@ impl<'a> Field<'a> {
             Frequency::Optional => {
                 match self.default {
                     None => {
-                        write!(w, "self.{}.as_ref().map_or(0, |m| ", self.name)?;
+                        if self.is_fixed_size(msgs) {
+                            write!(w, "self.{}.as_ref().map_or(0, |_| ", self.name)?;
+                        } else {
+                            write!(w, "self.{}.as_ref().map_or(0, |m| ", self.name)?;
+                        }
                         self.write_inner_get_size(w, msgs, "m", "*")?;
                         writeln!(w, ")")?;
                     }
@@ -610,6 +621,7 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "")?;
         writeln!(w, "#![allow(non_snake_case)]")?;
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
+        writeln!(w, "#![allow(non_camel_case_types)]")?;
         writeln!(w, "")?;
         writeln!(w, "use std::io::{{Write}};")?;
         writeln!(w, "use std::borrow::Cow;")?;
