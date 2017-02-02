@@ -73,6 +73,82 @@ fn main() {
 }
 ```
 
+## Message <-> struct
+
+#### Proto definition
+```
+enum FooEnum {
+    FIRST_VALUE = 1;
+    SECOND_VALUE = 2;
+}
+    
+message BarMessage {
+    required int32 b_required_int32 = 1;
+}
+
+message FooMessage {
+    optional int32 f_int32 = 1;
+    optional int64 f_int64 = 2;
+    optional uint32 f_uint32 = 3;
+    optional uint64 f_uint64 = 4;
+    optional sint32 f_sint32 = 5;
+    optional sint64 f_sint64 = 6;
+    optional bool f_bool = 7;
+    optional FooEnum f_FooEnum = 8;
+    optional fixed64 f_fixed64 = 9;
+    optional sfixed64 f_sfixed64 = 10;
+    optional fixed32 f_fixed32 = 11;
+    optional sfixed32 f_sfixed32 = 12;
+    optional double f_double = 13;
+    optional float f_float = 14;
+    optional bytes f_bytes = 15;
+    optional string f_string = 16;
+    optional FooMessage f_self_message = 17;
+    optional BarMessage f_bar_message = 18;
+    repeated int32 f_repeated_int32 = 19;
+    repeated int32 f_repeated_packed_int32 = 20 [ packed = true ];
+}
+```
+
+#### Generated structs
+```rust
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum FooEnum {
+    FIRST_VALUE = 1,
+    SECOND_VALUE = 2,
+}
+
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct BarMessage {                                 // all fields are owned: no lifetime parameter
+    pub b_required_int32: i32,
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct FooMessage<'a> {                             // has borrowed fields: lifetime parameter
+    pub f_int32: Option<i32>,
+    pub f_int64: Option<i64>,
+    pub f_uint32: Option<u32>,
+    pub f_uint64: Option<u64>,
+    pub f_sint32: Option<i32>,
+    pub f_sint64: Option<i64>,
+    pub f_bool: Option<bool>,
+    pub f_FooEnum: Option<FooEnum>,
+    pub f_fixed64: Option<u64>,
+    pub f_sfixed64: Option<i64>,
+    pub f_fixed32: Option<u32>,
+    pub f_sfixed32: Option<i32>,
+    pub f_double: Option<f64>,
+    pub f_float: Option<f32>,
+    pub f_bytes: Option<Cow<'a, [u8]>>,                 // bytes  -> Cow<[u8]>
+    pub f_string: Option<Cow<'a, str>>                  // string -> Cow<str>
+    pub f_self_message: Option<Box<FooMessage<'a>>>,    // cycle reference -> Boxed message
+    pub f_bar_message: Option<BarMessage>,
+    pub f_repeated_int32: Vec<i32>,
+    pub f_repeated_packed_int32: Vec<i32>,              // repeated: Vec
+}
+```
+
 ## Why not [rust-protobuf](https://github.com/stepancheg/rust-protobuf)
 
 This library is an alternative to the widely used [rust-protobuf](https://github.com/stepancheg/rust-protobuf).
