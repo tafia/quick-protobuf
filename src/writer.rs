@@ -13,6 +13,7 @@ use byteorder::LittleEndian as LE;
 /// # Examples
 ///
 /// ```rust
+///
 /// // an automatically generated module which is in a separate file in general
 /// mod foo_bar {
 ///     # use quick_protobuf::{MessageWrite, Writer, Result};
@@ -33,15 +34,14 @@ use byteorder::LittleEndian as LE;
 /// // FooBar is a message generated from a proto file
 /// // in parcicular it contains a `write_message` function
 /// use foo_bar::{FooBar, Foo, Bar};
-/// use std::fs::File;
 /// use std::borrow::Cow;
-/// use quick_protobuf::{MessageWrite, Writer};
+/// use quick_protobuf::Writer;
 ///
 /// fn main() {
-///     // let's say we want to write to a file
-///     let mut file: File; 
-///     # let mut file = Vec::new();
-///     let mut writer = Writer::new(&mut file);
+///     // let mut r = File::create("...").expect("Cannot create file");
+///     // for the sake of example, we'll use a simpler struct which impl `Write`
+///     let mut r = Vec::new();
+///     let mut writer = Writer::new(&mut r);
 ///
 ///     // manually generates a FooBar for the example
 ///     let foobar = FooBar {
