@@ -9,6 +9,9 @@
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
 ## master
+- docs: add examples, more details about message to struct conversion
+- refactor: update dependencies
+- fix: remove some warning on codegen fixed size types + non camel names
 
 ## 0.2.0
 - feat: do not allocate for bytes and string field types
