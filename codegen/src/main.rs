@@ -1,8 +1,11 @@
 #[macro_use]
 extern crate nom;
+#[macro_use]
+extern crate error_chain;
 
 mod parser;
 mod types;
+mod errors;
 
 use std::env;
 use std::path::PathBuf;
