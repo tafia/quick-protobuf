@@ -21,6 +21,12 @@ pub enum Syntax {
     Proto3,
 }
 
+impl Default for Syntax {
+    fn default() -> Syntax {
+        Syntax::Proto2
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Frequency {
     Optional,
@@ -587,21 +593,12 @@ impl Enumerator {
     }
 }
 
-#[derive(Debug)]
-pub enum MessageOrEnum {
-    Msg(Message),
-    Enum(Enumerator),
-    Ignore,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FileDescriptor {
     pub import_paths: Vec<PathBuf>,
+    pub package: Option<String>,
     pub syntax: Syntax,
-    pub message_and_enums: Vec<MessageOrEnum>,
-    /// contains all messages from this file and the imports
     pub messages: Vec<Message>,
-    /// contains all messages from this file and the imports
     pub enums: Vec<Enumerator>,
 }
 
@@ -609,7 +606,7 @@ impl FileDescriptor {
 
     pub fn write_proto<P: AsRef<Path>>(in_file: P, out_file: P) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&in_file)?;
-        desc.fetch_messages_and_enums(in_file.as_ref())?;
+        desc.fetch_imports(in_file.as_ref())?;
         desc.break_cycles();
         desc.sanity_checks(in_file.as_ref())?;
         desc.set_defaults();
@@ -735,22 +732,12 @@ impl FileDescriptor {
         Ok(())
     }
 
-    /// Splits messages and enums from message_and_enums and resolve imports
-    fn fetch_messages_and_enums(&mut self, in_file: &Path) -> Result<()> {
-
-        for m in self.message_and_enums.drain(..) {
-            match m {
-                MessageOrEnum::Msg(m) => self.messages.push(m),
-                MessageOrEnum::Enum(e) => self.enums.push(e),
-                _ => (),
-            }
-        }
-
-        // resolve imports
+    /// Get messages and enums from imports
+    fn fetch_imports(&mut self, in_file: &Path) -> Result<()> {
         for p in &self.import_paths {
             let import_path = get_imported_path(&in_file, p);
             let mut f = FileDescriptor::read_proto(&import_path)?;
-            f.fetch_messages_and_enums(&import_path)?;
+            f.fetch_imports(&import_path)?;
             self.messages.extend(f.messages.drain(..).map(|mut m| {
                 m.imported = true;
                 m
@@ -760,7 +747,6 @@ impl FileDescriptor {
                 e
             }));
         }
-
         Ok(())
     }
 
