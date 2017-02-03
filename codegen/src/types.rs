@@ -1,4 +1,6 @@
-use std::io::Write;
+use std::io::{Read, Write, BufReader, BufWriter};
+use std::path::{Path, Component};
+use std::fs::File;
 
 use errors::{Result, ErrorKind};
 use parser::file_descriptor;
@@ -598,6 +600,7 @@ pub enum MessageOrEnum<'a> {
 
 #[derive(Debug)]
 pub struct FileDescriptor<'a> {
+    pub imports: Vec<&'a Path>,
     pub syntax: Syntax,
     pub message_and_enums: Vec<MessageOrEnum<'a>>,
     pub messages: Vec<Message<'a>>,
@@ -606,14 +609,44 @@ pub struct FileDescriptor<'a> {
 
 impl<'a> FileDescriptor<'a> {
 
-    pub fn from_bytes(b: &'a [u8]) -> Result<FileDescriptor<'a>> {
+    pub fn write_proto<P: AsRef<Path>>(in_file: P, out_file: P) -> Result<()> {
+        let mut data = Vec::new();
+        {
+            let f = File::open(&in_file)?;
+            let mut reader = BufReader::new(f);
+            reader.read_to_end(&mut data)?;
+        }
+
+        let desc = FileDescriptor::from_bytes(&data)?;
+        desc.sanity_checks(in_file.as_ref())?;
+
+        let name = in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
+        let mut w = BufWriter::new(File::create(out_file)?);
+        desc.write(&mut w, name)?;
+        Ok(())
+    }
+
+    fn from_bytes(b: &'a [u8]) -> Result<FileDescriptor<'a>> {
         let mut f = file_descriptor(b).to_result()?;
         f.break_cycles();
         f.set_defaults();
-        for m in &f.messages {
+        Ok(f)
+    }
+
+    fn sanity_checks(&self, file: &Path) -> Result<()> {
+        for i in &self.imports {
+            // search if the corresponding file exists
+            if !i.is_file() {
+                if !file.parent().map_or_else(|| i.exists(), |p| p.join(i).exists()) {
+                    return Err(ErrorKind::InvalidImport(
+                            format!("File {} not found", i.display())).into());
+                }
+            }
+        }
+        for m in &self.messages {
             m.sanity_checks()?;
         }
-        Ok(f)
+        Ok(())
     }
 
     fn set_defaults(&mut self) {
@@ -649,6 +682,8 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
 
+        self.write_imports(w)?;
+
         for m in &self.enums {
             writeln!(w, "")?;
             m.write_definition(w)?;
@@ -670,6 +705,34 @@ impl<'a> FileDescriptor<'a> {
             println!("Wrote messages impl write");
         }
         println!("Wrote messages");
+        Ok(())
+    }
+
+    fn write_imports<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.imports.is_empty() {
+            return Ok(());
+        }
+
+        writeln!(w, "")?;
+        
+        for i in &self.imports {
+            write!(w, "use super::")?;
+            for c in i.components() {
+                match c {
+                    Component::RootDir | Component::Prefix(_) => return Err(ErrorKind::InvalidImport(
+                            "Cannot import from absolute path".to_string()).into()),
+                    Component::CurDir => continue,
+                    Component::ParentDir => { write!(w, "super::")?; },
+                    Component::Normal(path) => {
+                        if path.to_str().map_or(false, |s| s.contains('.')) {
+                            writeln!(w, "{}::*;", Path::new(path).file_stem().unwrap().to_string_lossy())?;
+                        } else {
+                            write!(w, "{}::", path.to_string_lossy())?;
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
     }
 

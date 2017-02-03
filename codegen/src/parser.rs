@@ -1,10 +1,12 @@
 use std::str;
+use std::path::Path;
+
 use types::{Frequency, Field, Message, Enumerator, MessageOrEnum, FileDescriptor, Syntax};
 use nom::{multispace, digit};
 
 fn is_word(b: u8) -> bool {
     match b {
-        b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' => true,
+        b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' | b'.' => true,
         _ => false
     }
 }
@@ -18,9 +20,10 @@ named!(block_comment<()>, do_parse!(tag!("/*") >> take_until_and_consume!("*/") 
 named!(br<()>, alt!(map!(multispace, |_| ()) | comment | block_comment));
 
 named!(syntax<Syntax>, 
-       do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >> 
+       do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >> many0!(br) >>
                  proto: alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } | 
                              tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >> 
+                 many0!(br) >> tag!(";") >>
                  (proto) ));
 
 named!(reserved_nums<Vec<i32>>, 
@@ -87,6 +90,8 @@ named!(message<Message>,
                  (Message { 
                      name: name, 
                      fields: fields, 
+//                      reserved_nums: None,
+//                      reserved_names: None,
                      reserved_nums: reserved_nums,
                      reserved_names: reserved_names,
                  }) ));
@@ -106,8 +111,14 @@ named!(enumerator<Enumerator>,
                  tag!("}") >> many0!(br) >>
                  (Enumerator { name: name, fields: fields })));
 
+named!(import<&Path>,
+       do_parse!(tag!("import")>> many1!(br) >> tag!("\"") >> 
+                 path: map!(map_res!(take_until!("\""), str::from_utf8), Path::new) >> tag!("\"") >> 
+                 many0!(br) >> tag!(";") >> many0!(br) >>
+                 (path) ));
+
 named!(ignore<()>, 
-       do_parse!(alt!(tag!("package") | tag!("option") | tag!("import")) >> many1!(br) >> 
+       do_parse!(alt!(tag!("package") | tag!("option")) >> many1!(br) >> 
                  take_until_and_consume!(";") >> many0!(br) >> ()));
 
 named!(service_ignore<()>, do_parse!(tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{") >>
@@ -119,15 +130,18 @@ named!(message_or_enum<MessageOrEnum>, alt!(
          ignore => { |_| MessageOrEnum::Ignore } |
          service_ignore => { |_| MessageOrEnum::Ignore } ));
 
-named!(pub file_descriptor<FileDescriptor>, do_parse!(
-    many0!(br) >> syntax: opt!(syntax) >> many0!(br) >>
-    message_and_enums: many0!(message_or_enum) >>
-    (FileDescriptor {
-        syntax: syntax.unwrap_or(Syntax::Proto2),
-        message_and_enums: message_and_enums,
-        messages: Vec::new(),
-        enums: Vec::new(),
-    })));
+named!(pub file_descriptor<FileDescriptor>, 
+       do_parse!(many0!(br) >> 
+                 syntax: opt!(syntax) >> many0!(br) >>
+                 imports: many0!(import) >> many0!(br) >>
+                 message_and_enums: many0!(message_or_enum) >>
+                 (FileDescriptor {
+                     imports: imports,
+                     syntax: syntax.unwrap_or(Syntax::Proto2),
+                     message_and_enums: message_and_enums,
+                     messages: Vec::new(),
+                     enums: Vec::new(),
+                 })));
 
 #[test]
 fn test_message() {
@@ -177,4 +191,19 @@ option optimize_for = SPEED;
         ::nom::IResult::Done(_, _) => (),
         e => panic!("Expecting done {:?}", e),
     }
+}
+
+#[test]
+fn test_import() {
+    let msg = r#"syntax = "proto3";
+
+import "test_import_nested_imported_pb.proto";
+
+message ContainsImportedNested {
+    optional ContainerForNested.NestedMessage m = 1;
+    optional ContainerForNested.NestedEnum e = 2;
+}
+"#;
+    let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
+    assert_eq!(vec![Path::new("test_import_nested_imported_pb.proto")], desc.imports);
 }

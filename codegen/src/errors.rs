@@ -13,5 +13,10 @@ error_chain! {
             display("message checks errored: {}", desc)
             cause("proto definition might be invalid or something got wrong in the parsing")
         }
+        InvalidImport(desc: String) {
+            description("import is not supported")
+            display("cannot convert protobuf import into module import: {}", desc)
+            cause("import definition might be invalid, some characters may not be supported")
+        }
     }
 }
