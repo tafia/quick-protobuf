@@ -677,7 +677,9 @@ impl FileDescriptor {
         writeln!(w, "#![allow(non_camel_case_types)]")?;
         writeln!(w, "")?;
         writeln!(w, "use std::io::{{Write}};")?;
-        writeln!(w, "use std::borrow::Cow;")?;
+        if self.messages.iter().any(|m| m.has_lifetime(&self.messages)) {
+            writeln!(w, "use std::borrow::Cow;")?;
+        }
         writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
 
