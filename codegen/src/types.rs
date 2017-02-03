@@ -87,6 +87,33 @@ impl Field {
         }
     }
 
+    fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
+        match self.default {
+            None => false,
+            Some(ref d) => match &*self.rust_type(msgs) {
+                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
+                "bool" => *d != "false",
+                "Cow<'a, str>" => *d != "\"\"",
+                "Cow<'a, [u8]>" => *d != "[]",
+                t => match enums.iter().find(|e| e.name == self.typ) {
+                    Some(e) => t != e.fields[0].0,
+                    None => false, // Messages are regular defaults
+                }
+            } 
+        }
+    }
+
+    fn has_lifetime(&self, msgs: &[Message]) -> bool {
+        // borrow bytes and string
+        if self.is_cow() { return true; }
+
+        // borrow messages that have lifetime (ie they have at least one borrowed field)
+        match msgs.iter().find(|m| m.name == self.typ) {
+            Some(ref m) if m.has_lifetime(msgs) => true,
+            _ => false,
+        }
+    }
+
     fn rust_type(&self, msgs: &[Message]) -> String {
         match &*self.typ {
             "int32" | "sint32" | "sfixed32" => "i32".to_string(),
@@ -375,33 +402,6 @@ impl Field {
         }
         Ok(())
     }
-
-    fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
-        match self.default {
-            None => false,
-            Some(ref d) => match &*self.rust_type(msgs) {
-                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
-                "bool" => *d != "false",
-                "Cow<'a, str>" => *d != "\"\"",
-                "Cow<'a, [u8]>" => *d != "[]",
-                t => match enums.iter().find(|e| e.name == self.typ) {
-                    Some(e) => t != e.fields[0].0,
-                    None => false, // Messages are regular defaults
-                }
-            } 
-        }
-    }
-
-    fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        // borrow bytes and string
-        if self.is_cow() { return true; }
-
-        // borrow messages that have lifetime (ie they have at least one borrowed field)
-        match msgs.iter().find(|m| m.name == self.typ) {
-            Some(ref m) if m.has_lifetime(msgs) => true,
-            _ => false,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -420,7 +420,7 @@ impl Message {
     }
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        self.fields.iter().any(|f| f.has_lifetime(msgs))
+        self.fields.iter().any(|f| f.typ != self.name && f.has_lifetime(msgs))
     }
 
     fn write_definition<W: Write>(&self, w: &mut W, enums: &[Enumerator], msgs: &[Message]) -> Result<()> {
