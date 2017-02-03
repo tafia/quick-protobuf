@@ -157,7 +157,7 @@ named!(pub file_descriptor<FileDescriptor>,
                match event {
                    Event::Syntax(s) => desc.syntax = s,
                    Event::Import(i) => desc.import_paths.push(i),
-                   Event::Package(p) => desc.package = Some(p),
+                   Event::Package(p) => desc.package = p.split('.').map(|s| s.to_string()).collect(),
                    Event::Message(m) => desc.messages.push(m),
                    Event::Enum(e) => desc.enums.push(e),
                    Event::Ignore => (),
@@ -166,81 +166,84 @@ named!(pub file_descriptor<FileDescriptor>,
            desc
        }));
 
-#[test]
-fn test_message() {
-    let msg = r#"message ReferenceData 
-{
-    repeated ScenarioInfo  scenarioSet = 1;
-    repeated CalculatedObjectInfo calculatedObjectSet = 2;  
-    repeated RiskFactorList riskFactorListSet = 3;
-    repeated RiskMaturityInfo riskMaturitySet = 4;
-    repeated IndicatorInfo indicatorSet = 5;
-    repeated RiskStrikeInfo riskStrikeSet = 6;
-    repeated FreeProjectionList freeProjectionListSet = 7;
-    repeated ValidationProperty ValidationSet = 8;
-    repeated CalcProperties calcPropertiesSet = 9;
-    repeated MaturityInfo maturitySet = 10;
-}"#;
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_message() {
+        let msg = r#"message ReferenceData 
+    {
+        repeated ScenarioInfo  scenarioSet = 1;
+        repeated CalculatedObjectInfo calculatedObjectSet = 2;  
+        repeated RiskFactorList riskFactorListSet = 3;
+        repeated RiskMaturityInfo riskMaturitySet = 4;
+        repeated IndicatorInfo indicatorSet = 5;
+        repeated RiskStrikeInfo riskStrikeSet = 6;
+        repeated FreeProjectionList freeProjectionListSet = 7;
+        repeated ValidationProperty ValidationSet = 8;
+        repeated CalcProperties calcPropertiesSet = 9;
+        repeated MaturityInfo maturitySet = 10;
+    }"#;
 
-    let mess = message(msg.as_bytes());
-    if let ::nom::IResult::Done(_, mess) = mess {
-        assert_eq!(10, mess.fields.len());
+        let mess = message(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(10, mess.fields.len());
+        }
     }
-}
 
-#[test]
-fn test_enum() {
-    let msg = r#"enum PairingStatus {
-            DEALPAIRED        = 0;
-            INVENTORYORPHAN   = 1;
-            CALCULATEDORPHAN  = 2;
-            CANCELED          = 3;
-}"#;
+    #[test]
+    fn test_enum() {
+        let msg = r#"enum PairingStatus {
+                DEALPAIRED        = 0;
+                INVENTORYORPHAN   = 1;
+                CALCULATEDORPHAN  = 2;
+                CANCELED          = 3;
+    }"#;
 
-    let mess = enumerator(msg.as_bytes());
-    if let ::nom::IResult::Done(_, mess) = mess {
-        assert_eq!(4, mess.fields.len());
+        let mess = enumerator(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(4, mess.fields.len());
+        }
     }
-}
 
-#[test]
-fn test_ignore() {
-    let msg = r#"package com.test.v0;
+    #[test]
+    fn test_ignore() {
+        let msg = r#"package com.test.v0;
 
-option optimize_for = SPEED;
-"#;
+    option optimize_for = SPEED;
+    "#;
 
-    match ignore(msg.as_bytes()) {
-        ::nom::IResult::Done(_, _) => (),
-        e => panic!("Expecting done {:?}", e),
+        match ignore(msg.as_bytes()) {
+            ::nom::IResult::Done(_, _) => (),
+            e => panic!("Expecting done {:?}", e),
+        }
     }
-}
 
-#[test]
-fn test_import() {
-    let msg = r#"syntax = "proto3";
+    #[test]
+    fn test_import() {
+        let msg = r#"syntax = "proto3";
 
-import "test_import_nested_imported_pb.proto";
+    import "test_import_nested_imported_pb.proto";
 
-message ContainsImportedNested {
-    optional ContainerForNested.NestedMessage m = 1;
-    optional ContainerForNested.NestedEnum e = 2;
-}
-"#;
-    let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
-    assert_eq!(vec![Path::new("test_import_nested_imported_pb.proto")], desc.import_paths);
-}
+    message ContainsImportedNested {
+        optional ContainerForNested.NestedMessage m = 1;
+        optional ContainerForNested.NestedEnum e = 2;
+    }
+    "#;
+        let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
+        assert_eq!(vec![Path::new("test_import_nested_imported_pb.proto")], desc.import_paths);
+    }
 
-#[test]
-fn test_package() {
-    let msg = r#"
-    package foo.bar;
+    #[test]
+    fn test_package() {
+        let msg = r#"
+        package foo.bar;
 
-message ContainsImportedNested {
-    optional ContainerForNested.NestedMessage m = 1;
-    optional ContainerForNested.NestedEnum e = 2;
-}
-"#;
-    let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
-    assert_eq!(Some("foo.bar".to_string()), desc.package);
+    message ContainsImportedNested {
+        optional ContainerForNested.NestedMessage m = 1;
+        optional ContainerForNested.NestedEnum e = 2;
+    }
+    "#;
+        let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
+        assert_eq!(Some("foo.bar".to_string()), desc.package);
+    }
 }
