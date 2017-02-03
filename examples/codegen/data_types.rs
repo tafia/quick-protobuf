@@ -85,7 +85,7 @@ pub struct FooMessage<'a> {
     pub f_bar_message: Option<BarMessage>,
     pub f_repeated_int32: Vec<i32>,
     pub f_repeated_packed_int32: Vec<i32>,
-    pub f_imported: Option<ImportedMessage>,
+    pub f_imported: Option<a::b::ImportedMessage>,
 }
 
 impl<'a> FooMessage<'a> {
@@ -113,7 +113,7 @@ impl<'a> FooMessage<'a> {
                 Ok(146) => msg.f_bar_message = Some(r.read_message(bytes, BarMessage::from_reader)?),
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
                 Ok(162) => msg.f_repeated_packed_int32 = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
-                Ok(170) => msg.f_imported = Some(r.read_message(bytes, ImportedMessage::from_reader)?),
+                Ok(170) => msg.f_imported = Some(r.read_message(bytes, a::b::ImportedMessage::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }

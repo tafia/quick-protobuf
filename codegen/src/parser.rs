@@ -1,7 +1,7 @@
 use std::str;
 use std::path::{Path, PathBuf};
 
-use types::{Frequency, Field, Message, Enumerator, MessageOrEnum, FileDescriptor, Syntax};
+use types::{Frequency, Field, Message, Enumerator, FileDescriptor, Syntax};
 use nom::{multispace, digit};
 
 fn is_word(b: u8) -> bool {
@@ -26,6 +26,16 @@ named!(syntax<Syntax>,
                              tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >> 
                  many0!(br) >> tag!(";") >>
                  (proto) ));
+
+named!(import<PathBuf>,
+       do_parse!(tag!("import")>> many1!(br) >> tag!("\"") >> 
+                 path: map!(map_res!(take_until!("\""), str::from_utf8), |s| Path::new(s).into()) >> tag!("\"") >> 
+                 many0!(br) >> tag!(";") >>
+                 (path) ));
+
+named!(package<String>,
+       do_parse!(tag!("package") >> many1!(br) >> package: word >> many0!(br) >> tag!(";") >>
+                 (package) ));
 
 named!(reserved_nums<Vec<i32>>, 
        do_parse!(tag!("reserved") >> many1!(br) >> 
@@ -88,7 +98,7 @@ named!(message<Message>,
                  reserved_nums: opt!(reserved_nums) >> many0!(br) >>
                  reserved_names: opt!(reserved_names) >> many0!(br) >>
                  fields: many0!(message_field) >> 
-                 tag!("}") >> many0!(br) >>
+                 tag!("}") >>
                  (Message { 
                      name: name, 
                      fields: fields, 
@@ -105,110 +115,135 @@ named!(enum_field<(String, i32)>,
                  ((name, number))));
     
 named!(enumerator<Enumerator>, 
-       do_parse!(tag!("enum") >> many1!(br) >>
-                 name: word >> many0!(br) >>
-                 tag!("{") >> many0!(br) >>
-                 fields: many0!(enum_field) >> 
-                 tag!("}") >> many0!(br) >>
+       do_parse!(tag!("enum") >> many1!(br) >> name: word >> many0!(br) >>
+                 tag!("{") >> many0!(br) >> fields: many0!(enum_field) >> many0!(br) >> tag!("}") >>
                  (Enumerator { 
                      name: name, 
                      fields: fields,
                      imported: false,
                  })));
 
-named!(import<PathBuf>,
-       do_parse!(tag!("import")>> many1!(br) >> tag!("\"") >> 
-                 path: map!(map_res!(take_until!("\""), str::from_utf8), |s| Path::new(s).into()) >> tag!("\"") >> 
-                 many0!(br) >> tag!(";") >> many0!(br) >>
-                 (path) ));
-
 named!(ignore<()>, 
        do_parse!(alt!(tag!("package") | tag!("option")) >> many1!(br) >> 
-                 take_until_and_consume!(";") >> many0!(br) >> ()));
+                 take_until_and_consume!(";") >> ()));
 
-named!(service_ignore<()>, do_parse!(tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{") >>
-                                     take_until_and_consume!("}") >> many0!(br) >> ()));
+named!(service_ignore<()>, 
+       do_parse!(tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{") >>
+                 take_until_and_consume!("}") >> ()));
 
-named!(message_or_enum<MessageOrEnum>, alt!(
-         message => { |m| MessageOrEnum::Msg(m) } | 
-         enumerator => { |e| MessageOrEnum::Enum(e) } |
-         ignore => { |_| MessageOrEnum::Ignore } |
-         service_ignore => { |_| MessageOrEnum::Ignore } ));
+enum Event {
+    Syntax(Syntax),
+    Import(PathBuf),
+    Package(String),
+    Message(Message),
+    Enum(Enumerator),
+    Ignore
+}
+
+named!(event<Event>,
+       alt!(syntax => { |s| Event::Syntax(s) } |
+            import => { |i| Event::Import(i) } |
+            package => { |p| Event::Package(p) } |
+            message => { |m| Event::Message(m) } | 
+            enumerator => { |e| Event::Enum(e) } |
+            ignore => { |_| Event::Ignore } |
+            service_ignore => { |_| Event::Ignore } |
+            br => { |_| Event::Ignore }));
 
 named!(pub file_descriptor<FileDescriptor>, 
-       do_parse!(many0!(br) >> 
-                 syntax: opt!(syntax) >> many0!(br) >>
-                 imports: many0!(import) >> many0!(br) >>
-                 message_and_enums: many0!(message_or_enum) >>
-                 (FileDescriptor {
-                     import_paths: imports,
-                     syntax: syntax.unwrap_or(Syntax::Proto2),
-                     message_and_enums: message_and_enums,
-                     messages: Vec::new(),
-                     enums: Vec::new(),
-                 })));
+       map!(many0!(event), |events: Vec<Event>| {
+           let mut desc = FileDescriptor::default();
+           for event in events {
+               match event {
+                   Event::Syntax(s) => desc.syntax = s,
+                   Event::Import(i) => desc.import_paths.push(i),
+                   Event::Package(p) => desc.package = p.split('.').map(|s| s.to_string()).collect(),
+                   Event::Message(m) => desc.messages.push(m),
+                   Event::Enum(e) => desc.enums.push(e),
+                   Event::Ignore => (),
+               }
+           }
+           desc
+       }));
 
-#[test]
-fn test_message() {
-    let msg = r#"message ReferenceData 
-{
-    repeated ScenarioInfo  scenarioSet = 1;
-    repeated CalculatedObjectInfo calculatedObjectSet = 2;  
-    repeated RiskFactorList riskFactorListSet = 3;
-    repeated RiskMaturityInfo riskMaturitySet = 4;
-    repeated IndicatorInfo indicatorSet = 5;
-    repeated RiskStrikeInfo riskStrikeSet = 6;
-    repeated FreeProjectionList freeProjectionListSet = 7;
-    repeated ValidationProperty ValidationSet = 8;
-    repeated CalcProperties calcPropertiesSet = 9;
-    repeated MaturityInfo maturitySet = 10;
-}"#;
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_message() {
+        let msg = r#"message ReferenceData 
+    {
+        repeated ScenarioInfo  scenarioSet = 1;
+        repeated CalculatedObjectInfo calculatedObjectSet = 2;  
+        repeated RiskFactorList riskFactorListSet = 3;
+        repeated RiskMaturityInfo riskMaturitySet = 4;
+        repeated IndicatorInfo indicatorSet = 5;
+        repeated RiskStrikeInfo riskStrikeSet = 6;
+        repeated FreeProjectionList freeProjectionListSet = 7;
+        repeated ValidationProperty ValidationSet = 8;
+        repeated CalcProperties calcPropertiesSet = 9;
+        repeated MaturityInfo maturitySet = 10;
+    }"#;
 
-    let mess = message(msg.as_bytes());
-    if let ::nom::IResult::Done(_, mess) = mess {
-        assert_eq!(10, mess.fields.len());
+        let mess = message(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(10, mess.fields.len());
+        }
     }
-}
 
-#[test]
-fn test_enum() {
-    let msg = r#"enum PairingStatus {
-            DEALPAIRED        = 0;
-            INVENTORYORPHAN   = 1;
-            CALCULATEDORPHAN  = 2;
-            CANCELED          = 3;
-}"#;
+    #[test]
+    fn test_enum() {
+        let msg = r#"enum PairingStatus {
+                DEALPAIRED        = 0;
+                INVENTORYORPHAN   = 1;
+                CALCULATEDORPHAN  = 2;
+                CANCELED          = 3;
+    }"#;
 
-    let mess = enumerator(msg.as_bytes());
-    if let ::nom::IResult::Done(_, mess) = mess {
-        assert_eq!(4, mess.fields.len());
+        let mess = enumerator(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(4, mess.fields.len());
+        }
     }
-}
 
-#[test]
-fn test_ignore() {
-    let msg = r#"package com.test.v0;
+    #[test]
+    fn test_ignore() {
+        let msg = r#"package com.test.v0;
 
-option optimize_for = SPEED;
-"#;
+    option optimize_for = SPEED;
+    "#;
 
-    match ignore(msg.as_bytes()) {
-        ::nom::IResult::Done(_, _) => (),
-        e => panic!("Expecting done {:?}", e),
+        match ignore(msg.as_bytes()) {
+            ::nom::IResult::Done(_, _) => (),
+            e => panic!("Expecting done {:?}", e),
+        }
     }
-}
 
-#[test]
-fn test_import() {
-    let msg = r#"syntax = "proto3";
+    #[test]
+    fn test_import() {
+        let msg = r#"syntax = "proto3";
 
-import "test_import_nested_imported_pb.proto";
+    import "test_import_nested_imported_pb.proto";
 
-message ContainsImportedNested {
-    optional ContainerForNested.NestedMessage m = 1;
-    optional ContainerForNested.NestedEnum e = 2;
-}
-"#;
-    let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
-    assert_eq!(vec![Path::new("test_import_nested_imported_pb.proto")], desc.imports);
+    message ContainsImportedNested {
+        optional ContainerForNested.NestedMessage m = 1;
+        optional ContainerForNested.NestedEnum e = 2;
+    }
+    "#;
+        let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
+        assert_eq!(vec![Path::new("test_import_nested_imported_pb.proto")], desc.import_paths);
+    }
+
+    #[test]
+    fn test_package() {
+        let msg = r#"
+        package foo.bar;
+
+    message ContainsImportedNested {
+        optional ContainerForNested.NestedMessage m = 1;
+        optional ContainerForNested.NestedEnum e = 2;
+    }
+    "#;
+        let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
+        assert_eq!(Some("foo.bar".to_string()), desc.package);
+    }
 }

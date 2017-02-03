@@ -21,6 +21,12 @@ pub enum Syntax {
     Proto3,
 }
 
+impl Default for Syntax {
+    fn default() -> Syntax {
+        Syntax::Proto2
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Frequency {
     Optional,
@@ -125,9 +131,9 @@ impl Field {
             "string" => "Cow<'a, str>".to_string(),
             "bytes" => "Cow<'a, [u8]>".to_string(),
             t => msgs.iter().find(|m| m.name == t).map_or(t.to_string(), |m| if m.has_lifetime(msgs) {
-                format!("{}<'a>", t.to_string())
+                format!("{}<'a>", t.replace(".", "::"))
             } else {
-                t.to_string()
+                t.replace(".", "::")
             })
         }
     }
@@ -163,7 +169,7 @@ impl Field {
 
     fn read_fn(&self, msgs: &[Message]) -> String {
         if self.is_message(msgs) {
-            format!("read_message(bytes, {}::from_reader)", self.typ)
+            format!("read_message(bytes, {}::from_reader)", self.typ.replace(".", "::"))
         } else {
             format!("read_{}(bytes)", self.get_type(msgs))
         }
@@ -587,21 +593,12 @@ impl Enumerator {
     }
 }
 
-#[derive(Debug)]
-pub enum MessageOrEnum {
-    Msg(Message),
-    Enum(Enumerator),
-    Ignore,
-}
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct FileDescriptor {
     pub import_paths: Vec<PathBuf>,
+    pub package: Vec<String>,
     pub syntax: Syntax,
-    pub message_and_enums: Vec<MessageOrEnum>,
-    /// contains all messages from this file and the imports
     pub messages: Vec<Message>,
-    /// contains all messages from this file and the imports
     pub enums: Vec<Enumerator>,
 }
 
@@ -609,7 +606,7 @@ impl FileDescriptor {
 
     pub fn write_proto<P: AsRef<Path>>(in_file: P, out_file: P) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&in_file)?;
-        desc.fetch_messages_and_enums(in_file.as_ref())?;
+        desc.fetch_imports(in_file.as_ref())?;
         desc.break_cycles();
         desc.sanity_checks(in_file.as_ref())?;
         desc.set_defaults();
@@ -648,119 +645,37 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn set_defaults(&mut self) {
-        // if proto3, then changes several defaults
-        if let Syntax::Proto3 = self.syntax {
-            for m in &mut self.messages {
-                for f in &mut m.fields {
-                    if f.packed.is_none() { 
-                        if let Frequency::Repeated = f.frequency { 
-                            f.packed = Some(true); 
-                        }
-                    }
-                    if f.default.is_none() && f.is_numeric() { 
-                        f.default = Some("0".to_string());
-                    }
-                }
-            }
-        }
-    }
-
-    pub fn write<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
-        
-        println!("Found {} messages, and {} enums", self.messages.len(), self.enums.len());
-
-        writeln!(w, "//! Automatically generated rust module for '{}' file", filename)?;
-        writeln!(w, "")?;
-        writeln!(w, "#![allow(non_snake_case)]")?;
-        writeln!(w, "#![allow(non_upper_case_globals)]")?;
-        writeln!(w, "#![allow(non_camel_case_types)]")?;
-        writeln!(w, "")?;
-        writeln!(w, "use std::io::{{Write}};")?;
-        if self.messages.iter().any(|m| m.has_lifetime(&self.messages)) {
-            writeln!(w, "use std::borrow::Cow;")?;
-        }
-        writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
-        writeln!(w, "use quick_protobuf::sizeofs::*;")?;
-
-        self.write_imports(w)?;
-
-        for m in self.enums.iter().filter(|e| !e.imported) {
-            println!("Writing enum {}", m.name);
-            writeln!(w, "")?;
-            m.write_definition(w)?;
-            writeln!(w, "")?;
-            m.write_impl_default(w)?;
-            writeln!(w, "")?;
-            m.write_from_i32(w)?;
-        }
-        for m in self.messages.iter().filter(|m| !m.imported) {
-            println!("Writing message {}", m.name);
-            writeln!(w, "")?;
-            m.write_definition(w, &self.enums, &self.messages)?;
-            writeln!(w, "")?;
-            m.write_impl_message_read(w, &self.enums, &self.messages)?;
-            writeln!(w, "")?;
-            m.write_impl_message_write(w, &self.messages)?;
-        }
-        println!("Done processing {}", filename);
-        Ok(())
-    }
-
-    fn write_imports<W: Write>(&self, w: &mut W) -> Result<()> {
-        if self.import_paths.is_empty() {
-            return Ok(());
-        }
-
-        writeln!(w, "")?;
-        
-        for i in &self.import_paths {
-            write!(w, "use super::")?;
-            for c in i.components() {
-                match c {
-                    Component::RootDir | Component::Prefix(_) => return Err(ErrorKind::InvalidImport(
-                            "Cannot import from absolute path".to_string()).into()),
-                    Component::CurDir => continue,
-                    Component::ParentDir => { write!(w, "super::")?; },
-                    Component::Normal(path) => {
-                        if path.to_str().map_or(false, |s| s.contains('.')) {
-                            writeln!(w, "{}::*;", Path::new(path).file_stem().unwrap().to_string_lossy())?;
-                        } else {
-                            write!(w, "{}::", path.to_string_lossy())?;
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Splits messages and enums from message_and_enums and resolve imports
-    fn fetch_messages_and_enums(&mut self, in_file: &Path) -> Result<()> {
-
-        for m in self.message_and_enums.drain(..) {
-            match m {
-                MessageOrEnum::Msg(m) => self.messages.push(m),
-                MessageOrEnum::Enum(e) => self.enums.push(e),
-                _ => (),
-            }
-        }
-
-        // resolve imports
+    /// Get messages and enums from imports
+    fn fetch_imports(&mut self, in_file: &Path) -> Result<()> {
         for p in &self.import_paths {
             let import_path = get_imported_path(&in_file, p);
             let mut f = FileDescriptor::read_proto(&import_path)?;
-            f.fetch_messages_and_enums(&import_path)?;
-            self.messages.extend(f.messages.drain(..).map(|mut m| {
-                m.imported = true;
-                m
-            }));
-            self.enums.extend(f.enums.drain(..).map(|mut e| {
-                e.imported = true;
-                e
-            }));
-        }
+            f.fetch_imports(&import_path)?;
 
+            // if the proto has a packge then the names will be prefixed
+            if f.package.is_empty() {
+                self.messages.extend(f.messages.drain(..).map(|mut m| {
+                    m.imported = true;
+                    m
+                }));
+                self.enums.extend(f.enums.drain(..).map(|mut e| {
+                    e.imported = true;
+                    e
+                }));
+            } else {
+                let name_prefix = f.package.join(".");
+                self.messages.extend(f.messages.drain(..).map(|mut m| {
+                    m.name = format!("{}.{}", name_prefix, m.name);
+                    m.imported = true;
+                    m
+                }));
+                self.enums.extend(f.enums.drain(..).map(|mut e| {
+                    e.name = format!("{}.{}", name_prefix, e.name);
+                    e.imported = true;
+                    e
+                }));
+            }
+        }
         Ok(())
     }
 
@@ -795,6 +710,122 @@ impl FileDescriptor {
                 }
             }
         }
+    }
+
+    fn set_defaults(&mut self) {
+        // if proto3, then changes several defaults
+        if let Syntax::Proto3 = self.syntax {
+            for m in &mut self.messages {
+                for f in &mut m.fields {
+                    if f.packed.is_none() { 
+                        if let Frequency::Repeated = f.frequency { 
+                            f.packed = Some(true); 
+                        }
+                    }
+                    if f.default.is_none() && f.is_numeric() { 
+                        f.default = Some("0".to_string());
+                    }
+                }
+            }
+        }
+    }
+
+    fn write<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
+        println!("Found {} messages, and {} enums", self.messages.len(), self.enums.len());
+        self.write_headers(w, filename)?;
+        self.write_package_start(w)?;
+        self.write_uses(w)?;
+        self.write_imports(w)?;
+        self.write_enums(w)?;
+        self.write_messages(w)?;
+        self.write_package_end(w)?;
+        println!("Done processing {}", filename);
+        Ok(())
+    }
+
+    fn write_headers<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
+        writeln!(w, "//! Automatically generated rust module for '{}' file", filename)?;
+        writeln!(w, "")?;
+        writeln!(w, "#![allow(non_snake_case)]")?;
+        writeln!(w, "#![allow(non_upper_case_globals)]")?;
+        writeln!(w, "#![allow(non_camel_case_types)]")?;
+        writeln!(w, "")?;
+        Ok(())
+    }
+
+    fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
+        writeln!(w, "use std::io::{{Write}};")?;
+        if self.messages.iter().any(|m| m.has_lifetime(&self.messages)) {
+            writeln!(w, "use std::borrow::Cow;")?;
+        }
+        writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
+        writeln!(w, "use quick_protobuf::sizeofs::*;")?;
+        Ok(())
+    }
+
+    fn write_imports<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.import_paths.is_empty() {
+            return Ok(());
+        }
+        writeln!(w, "")?;
+        for i in &self.import_paths {
+            write!(w, "use super::")?;
+            for c in i.components() {
+                match c {
+                    Component::RootDir | Component::Prefix(_) => return Err(ErrorKind::InvalidImport(
+                            "Cannot import from absolute path".to_string()).into()),
+                    Component::CurDir => continue,
+                    Component::ParentDir => { write!(w, "super::")?; },
+                    Component::Normal(path) => {
+                        if path.to_str().map_or(false, |s| s.contains('.')) {
+                            writeln!(w, "{}::*;", Path::new(path).file_stem().unwrap().to_string_lossy())?;
+                        } else {
+                            write!(w, "{}::", path.to_string_lossy())?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
+        for p in &self.package { writeln!(w, "pub mod {} {{", p)?; }
+        if !self.package.is_empty() { writeln!(w, "")?; }
+        Ok(())
+    }
+
+    fn write_package_end<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.package.is_empty() { return Ok(()); }
+        writeln!(w, "")?;
+        for _ in &self.package { writeln!(w, "}}")?; }
+        Ok(())
+    }
+
+    fn write_enums<W: Write>(&self, w: &mut W) -> Result<()> {
+        for m in self.enums.iter().filter(|e| !e.imported) {
+            println!("Writing enum {}", m.name);
+            writeln!(w, "")?;
+            m.write_definition(w)?;
+            writeln!(w, "")?;
+            m.write_impl_default(w)?;
+            writeln!(w, "")?;
+            m.write_from_i32(w)?;
+        }
+        Ok(())
+    }
+
+    fn write_messages<W: Write>(&self, w: &mut W) -> Result<()> {
+        for m in self.messages.iter().filter(|m| !m.imported) {
+            println!("Writing message {}", m.name);
+            writeln!(w, "")?;
+            m.write_definition(w, &self.enums, &self.messages)?;
+            writeln!(w, "")?;
+            m.write_impl_message_read(w, &self.enums, &self.messages)?;
+            writeln!(w, "")?;
+            m.write_impl_message_write(w, &self.messages)?;
+        }
+        Ok(())
     }
 }
 
