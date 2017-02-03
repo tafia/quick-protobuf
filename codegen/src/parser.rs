@@ -94,6 +94,7 @@ named!(message<Message>,
                      fields: fields, 
                      reserved_nums: reserved_nums,
                      reserved_names: reserved_names,
+                     imported: false,
                  }) ));
 
 named!(enum_field<(String, i32)>, 
@@ -109,7 +110,11 @@ named!(enumerator<Enumerator>,
                  tag!("{") >> many0!(br) >>
                  fields: many0!(enum_field) >> 
                  tag!("}") >> many0!(br) >>
-                 (Enumerator { name: name, fields: fields })));
+                 (Enumerator { 
+                     name: name, 
+                     fields: fields,
+                     imported: false,
+                 })));
 
 named!(import<PathBuf>,
        do_parse!(tag!("import")>> many1!(br) >> tag!("\"") >> 
@@ -141,7 +146,6 @@ named!(pub file_descriptor<FileDescriptor>,
                      message_and_enums: message_and_enums,
                      messages: Vec::new(),
                      enums: Vec::new(),
-                     imports: Vec::new(),
                  })));
 
 #[test]
