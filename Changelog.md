@@ -13,6 +13,7 @@
 - refactor: update dependencies
 - fix: remove some warning on codegen fixed size types + non camel names
 - feat: break codegen when reserved fields conflict
+- feat: support imports in proto files
 
 ## 0.2.0
 - feat: do not allocate for bytes and string field types

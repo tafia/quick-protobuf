@@ -9,8 +9,6 @@ mod errors;
 
 use std::env;
 use std::path::PathBuf;
-use std::fs::File;
-use std::io::{Read, BufReader, BufWriter};
 use types::FileDescriptor;
 
 fn main() {
@@ -35,18 +33,8 @@ fn main() {
 
     let out_file = in_file.with_extension("rs");
 
-    let mut data = Vec::with_capacity(in_file.metadata()
-                                     .expect("Cannot get input file length")
-                                     .len() as usize);
-    let parsed_file = {
-        let f = File::open(&in_file).expect(&usage);
-        let mut reader = BufReader::new(f);
-        reader.read_to_end(&mut data).expect("Cannot read input file");
-        FileDescriptor::from_bytes(&data).expect("Cannot parse protobuf messages")
-    };
-
-    let name = in_file.file_name().and_then(|e| e.to_str()).unwrap();
-    let mut w = BufWriter::new(File::create(out_file).expect("Cannot create output file"));
-    parsed_file.write(&mut w, name).expect("Cannot write rust module");
+    FileDescriptor::write_proto(&in_file, &out_file)
+        .expect(&format!("Could not convert {} into {}", 
+                         in_file.display(), out_file.display()));
 
 }

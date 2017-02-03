@@ -1,4 +1,6 @@
-use std::io::Write;
+use std::io::{Read, Write, BufReader, BufWriter};
+use std::path::{Path, PathBuf, Component};
+use std::fs::File;
 
 use errors::{Result, ErrorKind};
 use parser::file_descriptor;
@@ -27,24 +29,24 @@ pub enum Frequency {
 }
 
 #[derive(Debug, Clone)]
-pub struct Field<'a> {
-    pub name: &'a str,
+pub struct Field {
+    pub name: String,
     pub frequency: Frequency,
-    pub typ: &'a str,
+    pub typ: String,
     pub number: i32,
-    pub default: Option<&'a str>,
+    pub default: Option<String>,
     pub packed: Option<bool>,
     pub boxed: bool,
     pub deprecated: bool,
 }
 
-impl<'a> Field<'a> {
+impl Field {
     fn packed(&self) -> bool {
         self.packed.unwrap_or(false)
     }
 
     fn is_numeric(&self) -> bool {
-        match self.typ {
+        match &*self.typ {
             "int32" | "sint32" | "sfixed32" |
             "int64" | "sint64" | "sfixed64" |
             "uint32" | "fixed32" |
@@ -79,11 +81,41 @@ impl<'a> Field<'a> {
     }
 
     fn is_cow(&self) -> bool {
-        self.typ == "bytes" || self.typ == "string"
+        match &*self.typ {
+            "bytes" | "string" => true,
+            _ => false,
+        }
+    }
+
+    fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
+        match self.default {
+            None => false,
+            Some(ref d) => match &*self.rust_type(msgs) {
+                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
+                "bool" => *d != "false",
+                "Cow<'a, str>" => *d != "\"\"",
+                "Cow<'a, [u8]>" => *d != "[]",
+                t => match enums.iter().find(|e| e.name == self.typ) {
+                    Some(e) => t != e.fields[0].0,
+                    None => false, // Messages are regular defaults
+                }
+            } 
+        }
+    }
+
+    fn has_lifetime(&self, msgs: &[Message]) -> bool {
+        // borrow bytes and string
+        if self.is_cow() { return true; }
+
+        // borrow messages that have lifetime (ie they have at least one borrowed field)
+        match msgs.iter().find(|m| m.name == self.typ) {
+            Some(ref m) if m.has_lifetime(msgs) => true,
+            _ => false,
+        }
     }
 
     fn rust_type(&self, msgs: &[Message]) -> String {
-        match self.typ {
+        match &*self.typ {
             "int32" | "sint32" | "sfixed32" => "i32".to_string(),
             "int64" | "sint64" | "sfixed64" => "i64".to_string(),
             "uint32" | "fixed32" => "u32".to_string(),
@@ -109,7 +141,7 @@ impl<'a> Field<'a> {
     }
 
     fn wire_type_num_non_packed(&self, msgs: &[Message]) -> u32 {
-        match self.typ {
+        match &*self.typ {
             "int32" | "sint32" | "int64" | "sint64" | 
                 "uint32" | "uint64" | "bool" | "enum" => 0,
             "fixed64" | "sfixed64" | "double" => 1,
@@ -120,11 +152,11 @@ impl<'a> Field<'a> {
     }
 
     fn get_type(&self, msgs: &[Message]) -> &str {
-        match self.typ {
+        match &*self.typ {
             "int32" | "sint32" | "int64" | "sint64" | 
                 "uint32" | "uint64" | "bool" | "fixed64" | 
                 "sfixed64" | "double" | "fixed32" | "sfixed32" | 
-                "float" | "bytes" | "string" => self.typ,
+                "float" | "bytes" | "string" => &self.typ,
             _ => if self.is_message(msgs) { "message" } else { "enum" },
         }
     }
@@ -238,7 +270,7 @@ impl<'a> Field<'a> {
                 writeln!(w, "")?;
             }
             Frequency::Optional => {
-                match self.default {
+                match self.default.as_ref() {
                     None => {
                         if self.is_fixed_size(msgs) {
                             write!(w, "self.{}.as_ref().map_or(0, |_| ", self.name)?;
@@ -332,7 +364,7 @@ impl<'a> Field<'a> {
                 } else { 
                     "*" 
                 };
-                match self.default {
+                match self.default.as_ref() {
                     None => {
                         writeln!(w, "        if let Some(ref s) = self.{} {{ r.write_{}_with_tag({}, {}s{})?; }}", 
                                  self.name, get_type, tag, r, as_enum)?;
@@ -370,46 +402,27 @@ impl<'a> Field<'a> {
         }
         Ok(())
     }
-
-    fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
-        match self.default {
-            None => false,
-            Some(ref d) => match &*self.rust_type(msgs) {
-                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
-                "bool" => *d != "false",
-                "Cow<'a, str>" => *d != "\"\"",
-                "Cow<'a, [u8]>" => *d != "[]",
-                t => match enums.iter().find(|e| e.name == self.typ) {
-                    Some(e) => t != e.fields[0].0,
-                    None => false, // Messages are regular defaults
-                }
-            } 
-        }
-    }
-
-    fn is_borrowed(&self, msgs: &[Message]) -> bool {
-        // borrow bytes and string
-        if self.is_cow() { return true; }
-
-        // borrow messages that have lifetime (ie they have at least one borrowed field)
-        match msgs.iter().find(|m| m.name == self.typ) {
-            Some(ref m) if m.has_lifetime(msgs) => return true,
-            _ => (),
-        }
-
-        false
-    }
 }
 
 #[derive(Debug, Clone)]
-pub struct Message<'a> {
-    pub name: &'a str,
-    pub fields: Vec<Field<'a>>,
+pub struct Message {
+    pub name: String,
+    pub fields: Vec<Field>,
     pub reserved_nums: Option<Vec<i32>>,
-    pub reserved_names: Option<Vec<&'a str>>,
+    pub reserved_names: Option<Vec<String>>,
+    pub imported: bool,
 }
 
-impl<'a> Message<'a> {
+impl Message {
+
+    fn is_leaf(&self, leaf_messages: &[&str], msgs: &[Message]) -> bool {
+        self.fields.iter().all(|f| f.is_leaf(leaf_messages, msgs) || f.deprecated)
+    }
+
+    fn has_lifetime(&self, msgs: &[Message]) -> bool {
+        self.fields.iter().any(|f| f.typ != self.name && f.has_lifetime(msgs))
+    }
+
     fn write_definition<W: Write>(&self, w: &mut W, enums: &[Enumerator], msgs: &[Message]) -> Result<()> {
         if self.can_derive_default(enums, msgs) {
             writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
@@ -435,36 +448,9 @@ impl<'a> Message<'a> {
     fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[Enumerator], msgs: &[Message]) -> Result<()> {
         if self.has_lifetime(msgs) {
             writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
-        } else {
-            writeln!(w, "impl {} {{", self.name)?;
-        }
-        self.write_from_reader(w, msgs)?;
-        writeln!(w, "}}")?;
-
-        if !self.can_derive_default(enums, msgs) {
-//             writeln!(w, "")?;
-//             self.write_impl_default(w, msgs)?;
-        }
-        Ok(())
-    }
-
-    fn write_impl_message_write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        if self.has_lifetime(msgs) {
-            writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
-        } else {
-            writeln!(w, "impl MessageWrite for {} {{", self.name)?;
-        }
-        self.write_get_size(w, msgs)?;
-        writeln!(w, "")?;
-        self.write_write_message(w, msgs)?;
-        writeln!(w, "}}")?;
-        Ok(())
-    }
-
-    fn write_from_reader<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        if self.has_lifetime(msgs) {
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
         } else {
+            writeln!(w, "impl {} {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {{")?;
         }
         writeln!(w, "        let mut msg = Self::default();")?;
@@ -484,6 +470,25 @@ impl<'a> Message<'a> {
         writeln!(w, "        }}")?;
         writeln!(w, "        Ok(msg)")?;
         writeln!(w, "    }}")?;
+        writeln!(w, "}}")?;
+
+        if !self.can_derive_default(enums, msgs) {
+//             writeln!(w, "")?;
+//             self.write_impl_default(w, msgs)?;
+        }
+        Ok(())
+    }
+
+    fn write_impl_message_write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        if self.has_lifetime(msgs) {
+            writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
+        } else {
+            writeln!(w, "impl MessageWrite for {} {{", self.name)?;
+        }
+        self.write_get_size(w, msgs)?;
+        writeln!(w, "")?;
+        self.write_write_message(w, msgs)?;
+        writeln!(w, "}}")?;
         Ok(())
     }
 
@@ -525,14 +530,6 @@ impl<'a> Message<'a> {
 //         writeln!(w, "}}")
 //     }
 
-    fn is_leaf(&self, leaf_messages: &[&str], msgs: &[Message]) -> bool {
-        self.fields.iter().all(|f| f.is_leaf(leaf_messages, msgs) || f.deprecated)
-    }
-
-    fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        self.fields.iter().any(|f| f.typ != self.name && f.is_borrowed(msgs))
-    }
-
     fn sanity_checks(&self) -> Result<()> {
         // checks for reserved fields
         for f in &self.fields {
@@ -548,16 +545,17 @@ impl<'a> Message<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Enumerator<'a> {
-    pub name: &'a str,
-    pub fields: Vec<(&'a str, i32)>,
+pub struct Enumerator {
+    pub name: String,
+    pub fields: Vec<(String, i32)>,
+    pub imported: bool,
 }
 
-impl<'a> Enumerator<'a> {
+impl Enumerator {
     fn write_definition<W: Write>(&self, w: &mut W) -> Result<()> {
         writeln!(w, "#[derive(Debug, PartialEq, Eq, Clone, Copy)]")?;
         writeln!(w, "pub enum {} {{", self.name)?;
-        for &(f, number) in &self.fields {
+        for &(ref f, ref number) in &self.fields {
             writeln!(w, "    {} = {},", f, number)?;
         }
         writeln!(w, "}}")?;
@@ -578,7 +576,7 @@ impl<'a> Enumerator<'a> {
         writeln!(w, "impl From<i32> for {} {{", self.name)?;
         writeln!(w, "    fn from(i: i32) -> Self {{")?;
         writeln!(w, "        match i {{")?;
-        for &(f, number) in &self.fields {
+        for &(ref f, ref number) in &self.fields {
             writeln!(w, "            {} => {}::{},", number, self.name, f)?;
         }
         writeln!(w, "            _ => Self::default(),")?;
@@ -590,30 +588,64 @@ impl<'a> Enumerator<'a> {
 }
 
 #[derive(Debug)]
-pub enum MessageOrEnum<'a> {
-    Msg(Message<'a>),
-    Enum(Enumerator<'a>),
+pub enum MessageOrEnum {
+    Msg(Message),
+    Enum(Enumerator),
     Ignore,
 }
 
 #[derive(Debug)]
-pub struct FileDescriptor<'a> {
+pub struct FileDescriptor {
+    pub import_paths: Vec<PathBuf>,
     pub syntax: Syntax,
-    pub message_and_enums: Vec<MessageOrEnum<'a>>,
-    pub messages: Vec<Message<'a>>,
-    pub enums: Vec<Enumerator<'a>>,
+    pub message_and_enums: Vec<MessageOrEnum>,
+    /// contains all messages from this file and the imports
+    pub messages: Vec<Message>,
+    /// contains all messages from this file and the imports
+    pub enums: Vec<Enumerator>,
 }
 
-impl<'a> FileDescriptor<'a> {
+impl FileDescriptor {
 
-    pub fn from_bytes(b: &'a [u8]) -> Result<FileDescriptor<'a>> {
-        let mut f = file_descriptor(b).to_result()?;
-        f.break_cycles();
-        f.set_defaults();
-        for m in &f.messages {
+    pub fn write_proto<P: AsRef<Path>>(in_file: P, out_file: P) -> Result<()> {
+        let mut desc = FileDescriptor::read_proto(&in_file)?;
+        desc.fetch_messages_and_enums(in_file.as_ref())?;
+        desc.break_cycles();
+        desc.sanity_checks(in_file.as_ref())?;
+        desc.set_defaults();
+
+        let name = in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
+        let mut w = BufWriter::new(File::create(out_file)?);
+        desc.write(&mut w, name)?;
+        Ok(())
+    }
+
+    /// Opens a proto file, reads it and returns raw parsed data
+    fn read_proto<P: AsRef<Path>>(in_file: P) -> Result<FileDescriptor> {
+        let mut buf = Vec::new();
+        {
+            let f = File::open(&in_file)?;
+            let mut reader = BufReader::new(f);
+            reader.read_to_end(&mut buf)?;
+        }
+        let desc = file_descriptor(&buf).to_result()?;
+        Ok(desc)
+    }
+
+    fn sanity_checks(&self, file: &Path) -> Result<()> {
+        for i in &self.import_paths {
+            // search if the corresponding file exists
+            if i.is_file() {
+                if !get_imported_path(file, i).exists() {
+                    return Err(ErrorKind::InvalidImport(
+                            format!("File {} not found", i.display())).into());
+                }
+            }
+        }
+        for m in &self.messages {
             m.sanity_checks()?;
         }
-        Ok(f)
+        Ok(())
     }
 
     fn set_defaults(&mut self) {
@@ -627,7 +659,7 @@ impl<'a> FileDescriptor<'a> {
                         }
                     }
                     if f.default.is_none() && f.is_numeric() { 
-                        f.default = Some("0");
+                        f.default = Some("0".to_string());
                     }
                 }
             }
@@ -645,11 +677,16 @@ impl<'a> FileDescriptor<'a> {
         writeln!(w, "#![allow(non_camel_case_types)]")?;
         writeln!(w, "")?;
         writeln!(w, "use std::io::{{Write}};")?;
-        writeln!(w, "use std::borrow::Cow;")?;
+        if self.messages.iter().any(|m| m.has_lifetime(&self.messages)) {
+            writeln!(w, "use std::borrow::Cow;")?;
+        }
         writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
 
-        for m in &self.enums {
+        self.write_imports(w)?;
+
+        for m in self.enums.iter().filter(|e| !e.imported) {
+            println!("Writing enum {}", m.name);
             writeln!(w, "")?;
             m.write_definition(w)?;
             writeln!(w, "")?;
@@ -657,34 +694,77 @@ impl<'a> FileDescriptor<'a> {
             writeln!(w, "")?;
             m.write_from_i32(w)?;
         }
-        println!("Wrote enums");
-        for m in &self.messages {
+        for m in self.messages.iter().filter(|m| !m.imported) {
+            println!("Writing message {}", m.name);
             writeln!(w, "")?;
             m.write_definition(w, &self.enums, &self.messages)?;
-            println!("Wrote messages definitions");
             writeln!(w, "")?;
             m.write_impl_message_read(w, &self.enums, &self.messages)?;
-            println!("Wrote messages impl read");
             writeln!(w, "")?;
             m.write_impl_message_write(w, &self.messages)?;
-            println!("Wrote messages impl write");
         }
-        println!("Wrote messages");
+        println!("Done processing {}", filename);
+        Ok(())
+    }
+
+    fn write_imports<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.import_paths.is_empty() {
+            return Ok(());
+        }
+
+        writeln!(w, "")?;
+        
+        for i in &self.import_paths {
+            write!(w, "use super::")?;
+            for c in i.components() {
+                match c {
+                    Component::RootDir | Component::Prefix(_) => return Err(ErrorKind::InvalidImport(
+                            "Cannot import from absolute path".to_string()).into()),
+                    Component::CurDir => continue,
+                    Component::ParentDir => { write!(w, "super::")?; },
+                    Component::Normal(path) => {
+                        if path.to_str().map_or(false, |s| s.contains('.')) {
+                            writeln!(w, "{}::*;", Path::new(path).file_stem().unwrap().to_string_lossy())?;
+                        } else {
+                            write!(w, "{}::", path.to_string_lossy())?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Splits messages and enums from message_and_enums and resolve imports
+    fn fetch_messages_and_enums(&mut self, in_file: &Path) -> Result<()> {
+
+        for m in self.message_and_enums.drain(..) {
+            match m {
+                MessageOrEnum::Msg(m) => self.messages.push(m),
+                MessageOrEnum::Enum(e) => self.enums.push(e),
+                _ => (),
+            }
+        }
+
+        // resolve imports
+        for p in &self.import_paths {
+            let import_path = get_imported_path(&in_file, p);
+            let mut f = FileDescriptor::read_proto(&import_path)?;
+            f.fetch_messages_and_enums(&import_path)?;
+            self.messages.extend(f.messages.drain(..).map(|mut m| {
+                m.imported = true;
+                m
+            }));
+            self.enums.extend(f.enums.drain(..).map(|mut e| {
+                e.imported = true;
+                e
+            }));
+        }
+
         Ok(())
     }
 
     fn break_cycles(&mut self) {
-        let mut messages = Vec::new();
-        let mut enums = Vec::new();
-        for m in self.message_and_enums.drain(..) {
-            match m {
-                MessageOrEnum::Msg(m) => messages.push(m),
-                MessageOrEnum::Enum(e) => enums.push(e),
-                _ => (),
-            }
-        }
-        self.messages = messages;
-        self.enums = enums;
 
         let message_names = self.messages.iter().map(|m| m.name.to_string()).collect::<Vec<_>>();
 
@@ -716,4 +796,8 @@ impl<'a> FileDescriptor<'a> {
             }
         }
     }
+}
+
+fn get_imported_path<P: AsRef<Path>, Q: AsRef<Path>>(in_file: P, import: Q) -> PathBuf {
+    in_file.as_ref().parent().map_or_else(|| import.as_ref().into(), |p| p.join(import.as_ref()))
 }
