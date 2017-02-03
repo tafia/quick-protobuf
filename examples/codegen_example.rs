@@ -5,6 +5,7 @@ mod codegen;
 use std::borrow::Cow;
 
 use codegen::data_types::FooMessage;
+use codegen::data_types_import::ImportedMessage;
 use quick_protobuf::{BytesReader, Writer};
 
 fn main() {
@@ -16,6 +17,7 @@ fn main() {
         f_int32: Some(54), 
         f_string: Some(Cow::Borrowed("Hello world from example!")),
         f_bytes: Some(Cow::Borrowed(b"I see you!")),
+        f_imported: Some(ImportedMessage { i: Some(true) }),
         ..FooMessage::default()
     };
 

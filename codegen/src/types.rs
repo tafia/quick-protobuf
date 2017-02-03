@@ -1,5 +1,5 @@
 use std::io::{Read, Write, BufReader, BufWriter};
-use std::path::{Path, Component};
+use std::path::{Path, PathBuf, Component};
 use std::fs::File;
 
 use errors::{Result, ErrorKind};
@@ -29,24 +29,24 @@ pub enum Frequency {
 }
 
 #[derive(Debug, Clone)]
-pub struct Field<'a> {
-    pub name: &'a str,
+pub struct Field {
+    pub name: String,
     pub frequency: Frequency,
-    pub typ: &'a str,
+    pub typ: String,
     pub number: i32,
-    pub default: Option<&'a str>,
+    pub default: Option<String>,
     pub packed: Option<bool>,
     pub boxed: bool,
     pub deprecated: bool,
 }
 
-impl<'a> Field<'a> {
+impl Field {
     fn packed(&self) -> bool {
         self.packed.unwrap_or(false)
     }
 
     fn is_numeric(&self) -> bool {
-        match self.typ {
+        match &*self.typ {
             "int32" | "sint32" | "sfixed32" |
             "int64" | "sint64" | "sfixed64" |
             "uint32" | "fixed32" |
@@ -85,7 +85,7 @@ impl<'a> Field<'a> {
     }
 
     fn rust_type(&self, msgs: &[Message]) -> String {
-        match self.typ {
+        match &*self.typ {
             "int32" | "sint32" | "sfixed32" => "i32".to_string(),
             "int64" | "sint64" | "sfixed64" => "i64".to_string(),
             "uint32" | "fixed32" => "u32".to_string(),
@@ -95,7 +95,7 @@ impl<'a> Field<'a> {
             "string" => "Cow<'a, str>".to_string(),
             "bytes" => "Cow<'a, [u8]>".to_string(),
             t => msgs.iter().find(|m| m.name == t).map_or(t.to_string(), |m| if m.has_lifetime(msgs) {
-                format!("{}<'a>", t.to_string())
+                format!("{}", t.to_string())
             } else {
                 t.to_string()
             })
@@ -111,7 +111,7 @@ impl<'a> Field<'a> {
     }
 
     fn wire_type_num_non_packed(&self, msgs: &[Message]) -> u32 {
-        match self.typ {
+        match &*self.typ {
             "int32" | "sint32" | "int64" | "sint64" | 
                 "uint32" | "uint64" | "bool" | "enum" => 0,
             "fixed64" | "sfixed64" | "double" => 1,
@@ -122,11 +122,11 @@ impl<'a> Field<'a> {
     }
 
     fn get_type(&self, msgs: &[Message]) -> &str {
-        match self.typ {
+        match &*self.typ {
             "int32" | "sint32" | "int64" | "sint64" | 
                 "uint32" | "uint64" | "bool" | "fixed64" | 
                 "sfixed64" | "double" | "fixed32" | "sfixed32" | 
-                "float" | "bytes" | "string" => self.typ,
+                "float" | "bytes" | "string" => &self.typ,
             _ => if self.is_message(msgs) { "message" } else { "enum" },
         }
     }
@@ -240,7 +240,7 @@ impl<'a> Field<'a> {
                 writeln!(w, "")?;
             }
             Frequency::Optional => {
-                match self.default {
+                match self.default.as_ref() {
                     None => {
                         if self.is_fixed_size(msgs) {
                             write!(w, "self.{}.as_ref().map_or(0, |_| ", self.name)?;
@@ -334,7 +334,7 @@ impl<'a> Field<'a> {
                 } else { 
                     "*" 
                 };
-                match self.default {
+                match self.default.as_ref() {
                     None => {
                         writeln!(w, "        if let Some(ref s) = self.{} {{ r.write_{}_with_tag({}, {}s{})?; }}", 
                                  self.name, get_type, tag, r, as_enum)?;
@@ -404,14 +404,14 @@ impl<'a> Field<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Message<'a> {
-    pub name: &'a str,
-    pub fields: Vec<Field<'a>>,
+pub struct Message {
+    pub name: String,
+    pub fields: Vec<Field>,
     pub reserved_nums: Option<Vec<i32>>,
-    pub reserved_names: Option<Vec<&'a str>>,
+    pub reserved_names: Option<Vec<String>>,
 }
 
-impl<'a> Message<'a> {
+impl Message {
     fn write_definition<W: Write>(&self, w: &mut W, enums: &[Enumerator], msgs: &[Message]) -> Result<()> {
         if self.can_derive_default(enums, msgs) {
             writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
@@ -419,7 +419,7 @@ impl<'a> Message<'a> {
             writeln!(w, "#[derive(Debug, PartialEq, Clone)]")?;
         }
         if self.has_lifetime(msgs) {
-            writeln!(w, "pub struct {}<'a> {{", self.name)?;
+            writeln!(w, "pub struct {} {{", self.name)?;
         } else {
             writeln!(w, "pub struct {} {{", self.name)?;
         }
@@ -436,7 +436,7 @@ impl<'a> Message<'a> {
 
     fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[Enumerator], msgs: &[Message]) -> Result<()> {
         if self.has_lifetime(msgs) {
-            writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
+            writeln!(w, "impl {} {{", self.name)?;
         } else {
             writeln!(w, "impl {} {{", self.name)?;
         }
@@ -452,7 +452,7 @@ impl<'a> Message<'a> {
 
     fn write_impl_message_write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
         if self.has_lifetime(msgs) {
-            writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
+            writeln!(w, "impl MessageWrite for {} {{", self.name)?;
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
         }
@@ -550,16 +550,16 @@ impl<'a> Message<'a> {
 }
 
 #[derive(Debug, Clone)]
-pub struct Enumerator<'a> {
-    pub name: &'a str,
-    pub fields: Vec<(&'a str, i32)>,
+pub struct Enumerator {
+    pub name: String,
+    pub fields: Vec<(String, i32)>,
 }
 
-impl<'a> Enumerator<'a> {
+impl Enumerator {
     fn write_definition<W: Write>(&self, w: &mut W) -> Result<()> {
         writeln!(w, "#[derive(Debug, PartialEq, Eq, Clone, Copy)]")?;
         writeln!(w, "pub enum {} {{", self.name)?;
-        for &(f, number) in &self.fields {
+        for &(ref f, ref number) in &self.fields {
             writeln!(w, "    {} = {},", f, number)?;
         }
         writeln!(w, "}}")?;
@@ -580,7 +580,7 @@ impl<'a> Enumerator<'a> {
         writeln!(w, "impl From<i32> for {} {{", self.name)?;
         writeln!(w, "    fn from(i: i32) -> Self {{")?;
         writeln!(w, "        match i {{")?;
-        for &(f, number) in &self.fields {
+        for &(ref f, ref number) in &self.fields {
             writeln!(w, "            {} => {}::{},", number, self.name, f)?;
         }
         writeln!(w, "            _ => Self::default(),")?;
@@ -592,33 +592,39 @@ impl<'a> Enumerator<'a> {
 }
 
 #[derive(Debug)]
-pub enum MessageOrEnum<'a> {
-    Msg(Message<'a>),
-    Enum(Enumerator<'a>),
+pub enum MessageOrEnum {
+    Msg(Message),
+    Enum(Enumerator),
     Ignore,
 }
 
 #[derive(Debug)]
-pub struct FileDescriptor<'a> {
-    pub imports: Vec<&'a Path>,
+pub struct FileDescriptor {
+    pub import_paths: Vec<PathBuf>,
     pub syntax: Syntax,
-    pub message_and_enums: Vec<MessageOrEnum<'a>>,
-    pub messages: Vec<Message<'a>>,
-    pub enums: Vec<Enumerator<'a>>,
+    pub message_and_enums: Vec<MessageOrEnum>,
+    pub imports: Vec<FileDescriptor>,
+    /// contains all messages from this file and the imports
+    pub messages: Vec<Message>,
+    /// contains all messages from this file and the imports
+    pub enums: Vec<Enumerator>,
 }
 
-impl<'a> FileDescriptor<'a> {
+impl FileDescriptor {
 
     pub fn write_proto<P: AsRef<Path>>(in_file: P, out_file: P) -> Result<()> {
-        let mut data = Vec::new();
-        {
-            let f = File::open(&in_file)?;
-            let mut reader = BufReader::new(f);
-            reader.read_to_end(&mut data)?;
-        }
+        let mut desc = FileDescriptor::read_proto(&in_file)?;
 
-        let desc = FileDescriptor::from_bytes(&data)?;
+//         let mut import_data = Vec::new();
+//         for p in &desc.import_paths {
+//             let mut d = Vec::new();
+//             desc.imports.push(FileDescriptor::read_proto(in_file.as_ref().with_file_name(p), &mut d)?);
+//             import_data.push(d);
+//         }
+
+        desc.break_cycles();
         desc.sanity_checks(in_file.as_ref())?;
+        desc.set_defaults();
 
         let name = in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
         let mut w = BufWriter::new(File::create(out_file)?);
@@ -626,15 +632,20 @@ impl<'a> FileDescriptor<'a> {
         Ok(())
     }
 
-    fn from_bytes(b: &'a [u8]) -> Result<FileDescriptor<'a>> {
-        let mut f = file_descriptor(b).to_result()?;
-        f.break_cycles();
-        f.set_defaults();
-        Ok(f)
+    /// Opens a proto file, reads it and returns raw parsed data
+    fn read_proto<P: AsRef<Path>>(in_file: P) -> Result<FileDescriptor> {
+        let mut buf = Vec::new();
+        {
+            let f = File::open(&in_file)?;
+            let mut reader = BufReader::new(f);
+            reader.read_to_end(&mut buf)?;
+        }
+        let desc = file_descriptor(&buf).to_result()?;
+        Ok(desc)
     }
 
     fn sanity_checks(&self, file: &Path) -> Result<()> {
-        for i in &self.imports {
+        for i in &self.import_paths {
             // search if the corresponding file exists
             if !i.is_file() {
                 if !file.parent().map_or_else(|| i.exists(), |p| p.join(i).exists()) {
@@ -660,7 +671,7 @@ impl<'a> FileDescriptor<'a> {
                         }
                     }
                     if f.default.is_none() && f.is_numeric() { 
-                        f.default = Some("0");
+                        f.default = Some("0".to_string());
                     }
                 }
             }
@@ -709,13 +720,13 @@ impl<'a> FileDescriptor<'a> {
     }
 
     fn write_imports<W: Write>(&self, w: &mut W) -> Result<()> {
-        if self.imports.is_empty() {
+        if self.import_paths.is_empty() {
             return Ok(());
         }
 
         writeln!(w, "")?;
         
-        for i in &self.imports {
+        for i in &self.import_paths {
             write!(w, "use super::")?;
             for c in i.components() {
                 match c {
@@ -736,9 +747,11 @@ impl<'a> FileDescriptor<'a> {
         Ok(())
     }
 
-    fn break_cycles(&mut self) {
+    fn split_messages_and_enums(&mut self) {
+
         let mut messages = Vec::new();
         let mut enums = Vec::new();
+
         for m in self.message_and_enums.drain(..) {
             match m {
                 MessageOrEnum::Msg(m) => messages.push(m),
@@ -746,8 +759,13 @@ impl<'a> FileDescriptor<'a> {
                 _ => (),
             }
         }
+
         self.messages = messages;
         self.enums = enums;
+    }
+
+    fn break_cycles(&mut self) {
+        self.split_messages_and_enums();
 
         let message_names = self.messages.iter().map(|m| m.name.to_string()).collect::<Vec<_>>();
 

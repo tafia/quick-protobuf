@@ -113,7 +113,8 @@ impl<'a> FooMessage<'a> {
                 Ok(146) => msg.f_bar_message = Some(r.read_message(bytes, BarMessage::from_reader)?),
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
                 Ok(162) => msg.f_repeated_packed_int32 = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
-                Ok(168) => msg.f_imported = Some(r.read_enum(bytes)?),
+                Ok(168) => msg.f_imported = Some(r.read_message(bytes, ImportedMessage::from_reader)?),
+//                 Ok(168) => msg.f_imported = Some(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -144,7 +145,8 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + self.f_bar_message.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
         + self.f_repeated_int32.iter().map(|s| 2 + sizeof_int32(*s)).sum::<usize>()
         + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_var_length(self.f_repeated_packed_int32.iter().map(|s| sizeof_int32(*s)).sum::<usize>()) }
-        + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_enum(*m as i32))
+        + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
+//         + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_enum(*m as i32))
     }
 
     fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
@@ -168,7 +170,8 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_bar_message { r.write_message_with_tag(146, s)?; }
         for s in &self.f_repeated_int32 { r.write_int32_with_tag(152, *s)? }
         r.write_packed_repeated_field_with_tag(162, &self.f_repeated_packed_int32, |r, m| r.write_int32(*m), &|m| sizeof_int32(*m))?;
-        if let Some(ref s) = self.f_imported { r.write_enum_with_tag(168, *s as i32)?; }
+        if let Some(ref s) = self.f_imported { r.write_message_with_tag(168, s)?; }
+//         if let Some(ref s) = self.f_imported { r.write_enum_with_tag(168, *s as i32)?; }
         Ok(())
     }
 }
