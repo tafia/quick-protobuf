@@ -30,5 +30,5 @@ message FooMessage {
     optional BarMessage f_bar_message = 18;
     repeated int32 f_repeated_int32 = 19;
     repeated int32 f_repeated_packed_int32 = 20 [ packed = true ];
-    optional ImportedMessage f_imported = 21;
+    optional a.b.ImportedMessage f_imported = 21;
 }

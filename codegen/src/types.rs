@@ -131,9 +131,9 @@ impl Field {
             "string" => "Cow<'a, str>".to_string(),
             "bytes" => "Cow<'a, [u8]>".to_string(),
             t => msgs.iter().find(|m| m.name == t).map_or(t.to_string(), |m| if m.has_lifetime(msgs) {
-                format!("{}<'a>", t.to_string())
+                format!("{}<'a>", t.replace(".", "::"))
             } else {
-                t.to_string()
+                t.replace(".", "::")
             })
         }
     }
@@ -169,7 +169,7 @@ impl Field {
 
     fn read_fn(&self, msgs: &[Message]) -> String {
         if self.is_message(msgs) {
-            format!("read_message(bytes, {}::from_reader)", self.typ)
+            format!("read_message(bytes, {}::from_reader)", self.typ.replace(".", "::"))
         } else {
             format!("read_{}(bytes)", self.get_type(msgs))
         }
@@ -651,14 +651,30 @@ impl FileDescriptor {
             let import_path = get_imported_path(&in_file, p);
             let mut f = FileDescriptor::read_proto(&import_path)?;
             f.fetch_imports(&import_path)?;
-            self.messages.extend(f.messages.drain(..).map(|mut m| {
-                m.imported = true;
-                m
-            }));
-            self.enums.extend(f.enums.drain(..).map(|mut e| {
-                e.imported = true;
-                e
-            }));
+
+            // if the proto has a packge then the names will be prefixed
+            if f.package.is_empty() {
+                self.messages.extend(f.messages.drain(..).map(|mut m| {
+                    m.imported = true;
+                    m
+                }));
+                self.enums.extend(f.enums.drain(..).map(|mut e| {
+                    e.imported = true;
+                    e
+                }));
+            } else {
+                let name_prefix = f.package.join(".");
+                self.messages.extend(f.messages.drain(..).map(|mut m| {
+                    m.name = format!("{}.{}", name_prefix, m.name);
+                    m.imported = true;
+                    m
+                }));
+                self.enums.extend(f.enums.drain(..).map(|mut e| {
+                    e.name = format!("{}.{}", name_prefix, e.name);
+                    e.imported = true;
+                    e
+                }));
+            }
         }
         Ok(())
     }
@@ -717,8 +733,9 @@ impl FileDescriptor {
     fn write<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
         println!("Found {} messages, and {} enums", self.messages.len(), self.enums.len());
         self.write_headers(w, filename)?;
-        self.write_imports(w)?;
         self.write_package_start(w)?;
+        self.write_uses(w)?;
+        self.write_imports(w)?;
         self.write_enums(w)?;
         self.write_messages(w)?;
         self.write_package_end(w)?;
@@ -733,6 +750,10 @@ impl FileDescriptor {
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
         writeln!(w, "#![allow(non_camel_case_types)]")?;
         writeln!(w, "")?;
+        Ok(())
+    }
+
+    fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
         writeln!(w, "use std::io::{{Write}};")?;
         if self.messages.iter().any(|m| m.has_lifetime(&self.messages)) {
             writeln!(w, "use std::borrow::Cow;")?;
@@ -769,16 +790,15 @@ impl FileDescriptor {
     }
 
     fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
-        for p in &self.package {
-            writeln!(w, "pub mod {} {{", p)?;
-        }
+        for p in &self.package { writeln!(w, "pub mod {} {{", p)?; }
+        if !self.package.is_empty() { writeln!(w, "")?; }
         Ok(())
     }
 
     fn write_package_end<W: Write>(&self, w: &mut W) -> Result<()> {
-        for _ in &self.package {
-            writeln!(w, "}}")?;
-        }
+        if self.package.is_empty() { return Ok(()); }
+        writeln!(w, "")?;
+        for _ in &self.package { writeln!(w, "}}")?; }
         Ok(())
     }
 

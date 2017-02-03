@@ -4,6 +4,9 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
+pub mod a {
+pub mod b {
+
 use std::io::{Write};
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
@@ -36,4 +39,7 @@ impl MessageWrite for ImportedMessage {
         if let Some(ref s) = self.i { r.write_bool_with_tag(8, *s)?; }
         Ok(())
     }
+}
+
+}
 }
