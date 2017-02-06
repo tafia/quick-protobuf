@@ -154,6 +154,45 @@ pub struct FooMessage<'a> {                             // has borrowed fields: 
 }
 ```
 
+### Leverage rust module system
+
+#### Nested Messages
+```
+message A {
+    message B {
+        // ...
+    }
+}
+```
+
+As rust does not allow a struct and a module to share the same name, we use `mod_Name` for the nested messages.
+```rust
+pub struct A {
+    //...
+}
+
+pub mod mod_A {
+    pub struct B {
+        // ...
+    }
+}
+```
+
+#### Package
+
+```
+package a.b;
+```
+
+Here we could have used the same name, but for consistency with nested messages, modules are prefixed with `mod_` as well.
+```rust
+pub mod mod_a {
+    pub mod mod_b {
+        // ...
+    }
+}
+```
+
 ## Why not rust-protobuf
 
 This library is an alternative to the widely used [rust-protobuf](https://github.com/stepancheg/rust-protobuf).
