@@ -86,6 +86,7 @@ pub struct FooMessage<'a> {
     pub f_repeated_int32: Vec<i32>,
     pub f_repeated_packed_int32: Vec<i32>,
     pub f_imported: Option<mod_a::mod_b::ImportedMessage>,
+    pub f_baz: Option<BazMessage>,
     pub f_nested: Option<mod_BazMessage::Nested>,
 }
 
@@ -115,7 +116,8 @@ impl<'a> FooMessage<'a> {
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
                 Ok(162) => msg.f_repeated_packed_int32 = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
                 Ok(170) => msg.f_imported = Some(r.read_message(bytes, mod_a::mod_b::ImportedMessage::from_reader)?),
-                Ok(178) => msg.f_nested = Some(r.read_message(bytes, mod_BazMessage::Nested::from_reader)?),
+                Ok(178) => msg.f_baz = Some(r.read_message(bytes, BazMessage::from_reader)?),
+                Ok(186) => msg.f_nested = Some(r.read_message(bytes, mod_BazMessage::Nested::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -147,6 +149,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + self.f_repeated_int32.iter().map(|s| 2 + sizeof_int32(*s)).sum::<usize>()
         + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_var_length(self.f_repeated_packed_int32.iter().map(|s| sizeof_int32(*s)).sum::<usize>()) }
         + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
+        + self.f_baz.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
         + self.f_nested.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
     }
 
@@ -172,7 +175,8 @@ impl<'a> MessageWrite for FooMessage<'a> {
         for s in &self.f_repeated_int32 { r.write_int32_with_tag(152, *s)? }
         r.write_packed_repeated_field_with_tag(162, &self.f_repeated_packed_int32, |r, m| r.write_int32(*m), &|m| sizeof_int32(*m))?;
         if let Some(ref s) = self.f_imported { r.write_message_with_tag(170, s)?; }
-        if let Some(ref s) = self.f_nested { r.write_message_with_tag(178, s)?; }
+        if let Some(ref s) = self.f_baz { r.write_message_with_tag(178, s)?; }
+        if let Some(ref s) = self.f_nested { r.write_message_with_tag(186, s)?; }
         Ok(())
     }
 }

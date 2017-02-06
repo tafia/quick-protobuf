@@ -31,7 +31,8 @@ message FooMessage {
     repeated int32 f_repeated_int32 = 19;
     repeated int32 f_repeated_packed_int32 = 20 [ packed = true ];
     optional a.b.ImportedMessage f_imported = 21;
-    optional BazMessage.Nested f_nested = 22;
+    optional BazMessage f_baz = 22;
+    optional BazMessage.Nested f_nested = 23;
 }
 
 message BazMessage {

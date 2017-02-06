@@ -4,8 +4,12 @@ mod codegen;
 
 use std::borrow::Cow;
 
-use codegen::data_types::FooMessage;
+use codegen::data_types::{self, FooMessage};
+
+// Imported fields contain package a.b, which is translated into
+// mod_a::mod_b rust module
 use codegen::data_types_import::mod_a::mod_b::ImportedMessage;
+
 use quick_protobuf::{BytesReader, Writer};
 
 fn main() {
@@ -14,10 +18,23 @@ fn main() {
     //
     // For the example we will leverage the `Default` derive of all messages
     let message = FooMessage {
+
+        // Regular field work as expected, optional leverages on rust Option<>
         f_int32: Some(54), 
+        
+        // strings are borrowed (Cow)
         f_string: Some(Cow::Borrowed("Hello world from example!")),
+
+        // bytes too
         f_bytes: Some(Cow::Borrowed(b"I see you!")),
+
+        // imported fields work as expected
         f_imported: Some(ImportedMessage { i: Some(true) }),
+
+        // nested messages are encapsulated into a rust module mod_Message
+        f_nested: Some(data_types::mod_BazMessage::Nested { f_nested: 2 }),
+
+        // Each message implements Default ... which makes it much easier
         ..FooMessage::default()
     };
 
