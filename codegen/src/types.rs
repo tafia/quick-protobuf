@@ -63,16 +63,22 @@ impl Field {
     }
 
     /// searches if the message must be boxed
-    fn is_leaf(&self, leaf_messages: &[&str], msgs: &[Message]) -> bool {
+    fn is_leaf(&self, leaf_messages: &[String], msgs: &[Message]) -> bool {
         match self.frequency {
             Frequency::Repeated | Frequency::Required => return true,
             Frequency::Optional if !self.is_message(msgs) => true,
-            _ => leaf_messages.iter().any(|m| m == &self.typ),
+            _ => {
+                let typ = match self.typ.rfind('.') {
+                    Some(p) => &self.typ[p + 1..],
+                    None => &self.typ[..],
+                };
+                leaf_messages.iter().any(|m| &*m == &typ)
+            },
         }
     }
 
     fn is_message(&self, msgs: &[Message]) -> bool {
-        msgs.iter().any(|m| m.name == self.typ)
+        self.find_message(msgs).is_some()
     }
 
     fn is_enum(&self, msgs: &[Message]) -> bool {
@@ -93,6 +99,32 @@ impl Field {
         }
     }
 
+    fn find_message<'a, 'b>(&'a self, msgs: &'b [Message]) -> Option<&'b Message> {
+
+        let mut found = match self.typ.rfind('.') {
+            Some(p) => {
+                let package = &self.typ[..p];
+                let name = &self.typ[(p + 1)..];
+                msgs.iter().find(|m| m.package == package && m.name == name)
+            },
+            None => msgs.iter().find(|m| m.name == self.typ),
+        };
+
+        if found.is_none() {
+            // recursively search into nested messages
+            for m in msgs {
+                found = self.find_message(&m.messages);
+                if found.is_some() { break; }
+            }
+        }
+
+        found
+    }
+
+    fn find_enum<'a, 'b>(&'a self, enums: &'b [Enumerator]) -> Option<&'b Enumerator> {
+        enums.iter().find(|m| m.name == self.typ)
+    }
+
     fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
         match self.default {
             None => false,
@@ -101,23 +133,14 @@ impl Field {
                 "bool" => *d != "false",
                 "Cow<'a, str>" => *d != "\"\"",
                 "Cow<'a, [u8]>" => *d != "[]",
-                t => match enums.iter().find(|e| e.name == self.typ) {
-                    Some(e) => t != e.fields[0].0,
-                    None => false, // Messages are regular defaults
-                }
+                t => self.find_enum(enums).map_or(false, |e| t != e.fields[0].0),
             } 
         }
     }
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        // borrow bytes and string
         if self.is_cow() { return true; }
-
-        // borrow messages that have lifetime (ie they have at least one borrowed field)
-        match msgs.iter().find(|m| m.name == self.typ) {
-            Some(ref m) if m.has_lifetime(msgs) => true,
-            _ => false,
-        }
+        self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs))
     }
 
     fn rust_type(&self, msgs: &[Message]) -> String {
@@ -130,11 +153,15 @@ impl Field {
             "double" => "f64".to_string(),
             "string" => "Cow<'a, str>".to_string(),
             "bytes" => "Cow<'a, [u8]>".to_string(),
-            t => msgs.iter().find(|m| m.name == t).map_or(t.to_string(), |m| if m.has_lifetime(msgs) {
-                format!("{}<'a>", t.replace(".", "::"))
-            } else {
-                t.replace(".", "::")
-            })
+            t => match self.find_message(msgs) {
+                Some(m) => {
+                    let lifetime = if m.has_lifetime(msgs) { "<'a>" } else { "" };
+                    let package = m.package.split('.').filter(|p| !p.is_empty())
+                        .map(|p| format!("mod_{}::", p)).collect::<String>();
+                    format!("{}{}{}", package, m.name, lifetime)
+                },
+                None => t.replace(".", "::"), // enum
+            }
         }
     }
 
@@ -153,7 +180,7 @@ impl Field {
             "fixed64" | "sfixed64" | "double" => 1,
             "fixed32" | "sfixed32" | "float" => 5,
             "string" | "bytes" => 2,
-            t => if msgs.iter().any(|m| m.name == t) { 2 } else { 0 /* enum */ }
+            _ => if self.is_message(msgs) { 2 } else { 0 /* enum */ }
         }
     }
 
@@ -168,10 +195,17 @@ impl Field {
     }
 
     fn read_fn(&self, msgs: &[Message]) -> String {
-        if self.is_message(msgs) {
-            format!("read_message(bytes, {}::from_reader)", self.typ.replace(".", "::"))
-        } else {
-            format!("read_{}(bytes)", self.get_type(msgs))
+        match self.find_message(msgs) {
+            Some(m) if m.package.is_empty()=> {
+                format!("read_message(bytes, {}::from_reader)", m.name)
+            },
+            Some(m) => {
+                format!("read_message(bytes, {}{}::from_reader)", 
+                        m.package.split('.').map(|p| format!("mod_{}::", p)).collect::<String>(), m.name)
+            }
+            None => {
+                format!("read_{}(bytes)", self.get_type(msgs))
+            }
         }
     }
 
@@ -410,19 +444,21 @@ impl Field {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Message {
+    pub messages: Vec<Message>,
     pub name: String,
     pub fields: Vec<Field>,
     pub reserved_nums: Option<Vec<i32>>,
     pub reserved_names: Option<Vec<String>>,
     pub imported: bool,
+    pub package: String, // package from imports + nested classes
 }
 
 impl Message {
 
-    fn is_leaf(&self, leaf_messages: &[&str], msgs: &[Message]) -> bool {
-        self.fields.iter().all(|f| f.is_leaf(leaf_messages, msgs) || f.deprecated)
+    fn is_leaf(&self, leaf_messages: &[String], msgs: &[Message]) -> bool {
+        self.imported || self.fields.iter().all(|f| f.is_leaf(leaf_messages, msgs) || f.deprecated)
     }
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
@@ -548,6 +584,18 @@ impl Message {
         }
         Ok(())
     }
+
+    fn set_package(&mut self, package: &str) {
+        // set package = current_package.package.name to nested messages
+        if package.is_empty() {
+            for m in &mut self.messages { m.set_package(&self.name); }
+        } else {
+            self.package = package.to_string();
+            let child_package = format!("{}.{}", package, self.name);
+            for m in &mut self.messages { m.set_package(&child_package); }
+        }
+    }
+
 }
 
 #[derive(Debug, Clone)]
@@ -555,6 +603,7 @@ pub struct Enumerator {
     pub name: String,
     pub fields: Vec<(String, i32)>,
     pub imported: bool,
+    pub package: String,
 }
 
 impl Enumerator {
@@ -596,7 +645,7 @@ impl Enumerator {
 #[derive(Debug, Default)]
 pub struct FileDescriptor {
     pub import_paths: Vec<PathBuf>,
-    pub package: Vec<String>,
+    pub package: String,
     pub syntax: Syntax,
     pub messages: Vec<Message>,
     pub enums: Vec<Enumerator>,
@@ -607,7 +656,10 @@ impl FileDescriptor {
     pub fn write_proto<P: AsRef<Path>>(in_file: P, out_file: P) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&in_file)?;
         desc.fetch_imports(in_file.as_ref())?;
-        desc.break_cycles();
+
+        let mut leaf_messages = Vec::new();
+        break_cycles(&mut desc.messages, &mut leaf_messages);
+
         desc.sanity_checks(in_file.as_ref())?;
         desc.set_defaults();
 
@@ -647,69 +699,28 @@ impl FileDescriptor {
 
     /// Get messages and enums from imports
     fn fetch_imports(&mut self, in_file: &Path) -> Result<()> {
+        for m in &mut self.messages {
+            m.set_package("");
+        }
         for p in &self.import_paths {
             let import_path = get_imported_path(&in_file, p);
             let mut f = FileDescriptor::read_proto(&import_path)?;
             f.fetch_imports(&import_path)?;
 
             // if the proto has a packge then the names will be prefixed
-            if f.package.is_empty() {
-                self.messages.extend(f.messages.drain(..).map(|mut m| {
-                    m.imported = true;
-                    m
-                }));
-                self.enums.extend(f.enums.drain(..).map(|mut e| {
-                    e.imported = true;
-                    e
-                }));
-            } else {
-                let name_prefix = f.package.join(".");
-                self.messages.extend(f.messages.drain(..).map(|mut m| {
-                    m.name = format!("{}.{}", name_prefix, m.name);
-                    m.imported = true;
-                    m
-                }));
-                self.enums.extend(f.enums.drain(..).map(|mut e| {
-                    e.name = format!("{}.{}", name_prefix, e.name);
-                    e.imported = true;
-                    e
-                }));
-            }
+            let package = f.package.clone();
+            self.messages.extend(f.messages.drain(..).map(|mut m| {
+                m.set_package(&package);
+                m.imported = true;
+                m
+            }));
+            self.enums.extend(f.enums.drain(..).map(|mut e| {
+                e.package = package.clone();
+                e.imported = true;
+                e
+            }));
         }
         Ok(())
-    }
-
-    fn break_cycles(&mut self) {
-
-        let message_names = self.messages.iter().map(|m| m.name.to_string()).collect::<Vec<_>>();
-
-        let mut leaf_messages = Vec::new();
-        let mut undef_messages = (0..self.messages.len()).collect::<Vec<_>>();
-        while !undef_messages.is_empty() {
-            let len = undef_messages.len();
-            let mut new_undefs = Vec::new();
-            for i in undef_messages.into_iter() {
-                if self.messages[i].is_leaf(&leaf_messages, &self.messages) {
-                    leaf_messages.push(&*message_names[i])
-                } else {
-                    new_undefs.push(i);
-                }
-            }
-            undef_messages = new_undefs;
-            if len == undef_messages.len() {
-                // try boxing messages, one by one ...
-                let k = undef_messages.pop().unwrap();
-                {
-                    let mut m = self.messages[k].clone();
-                    for f in m.fields.iter_mut() {
-                        if !f.is_leaf(&leaf_messages, &self.messages) {
-                            f.boxed = true;
-                        }
-                    }
-                    self.messages[k] = m;
-                }
-            }
-        }
     }
 
     fn set_defaults(&mut self) {
@@ -790,15 +801,16 @@ impl FileDescriptor {
     }
 
     fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
-        for p in &self.package { writeln!(w, "pub mod {} {{", p)?; }
-        if !self.package.is_empty() { writeln!(w, "")?; }
+        if self.package.is_empty() { return Ok(()); }
+        for p in self.package.split('.') { writeln!(w, "pub mod mod_{} {{", p)?; }
+        writeln!(w, "")?;
         Ok(())
     }
 
     fn write_package_end<W: Write>(&self, w: &mut W) -> Result<()> {
         if self.package.is_empty() { return Ok(()); }
         writeln!(w, "")?;
-        for _ in &self.package { writeln!(w, "}}")?; }
+        for _ in self.package.split('.') { writeln!(w, "}}")?; }
         Ok(())
     }
 
@@ -824,6 +836,24 @@ impl FileDescriptor {
             m.write_impl_message_read(w, &self.enums, &self.messages)?;
             writeln!(w, "")?;
             m.write_impl_message_write(w, &self.messages)?;
+
+            if !m.messages.is_empty() {
+                writeln!(w, "")?;
+                writeln!(w, "pub mod mod_{} {{", m.name)?;
+                writeln!(w, "")?;
+                writeln!(w, "use super::*;")?;
+                for m_sub in &m.messages {
+                    println!("Writing message mod_{}::{}", m.name, m_sub.name);
+                    writeln!(w, "")?;
+                    m_sub.write_definition(w, &self.enums, &self.messages)?;
+                    writeln!(w, "")?;
+                    m_sub.write_impl_message_read(w, &self.enums, &self.messages)?;
+                    writeln!(w, "")?;
+                    m_sub.write_impl_message_write(w, &self.messages)?;
+                }
+                writeln!(w, "")?;
+                writeln!(w, "}}")?;
+            }
         }
         Ok(())
     }
@@ -832,3 +862,40 @@ impl FileDescriptor {
 fn get_imported_path<P: AsRef<Path>, Q: AsRef<Path>>(in_file: P, import: Q) -> PathBuf {
     in_file.as_ref().parent().map_or_else(|| import.as_ref().into(), |p| p.join(import.as_ref()))
 }
+
+fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
+    
+    for m in messages.iter_mut() {
+        break_cycles(&mut m.messages, leaf_messages);
+    }
+
+    let message_names = messages.iter().map(|m| m.name.to_string()).collect::<Vec<_>>();
+
+    let mut undef_messages = (0..messages.len()).collect::<Vec<_>>();
+    while !undef_messages.is_empty() {
+        let len = undef_messages.len();
+        let mut new_undefs = Vec::new();
+        for i in undef_messages {
+            if messages[i].is_leaf(&leaf_messages, &messages) {
+                leaf_messages.push(message_names[i].clone())
+            } else {
+                new_undefs.push(i);
+            }
+        }
+        undef_messages = new_undefs;
+        if len == undef_messages.len() {
+            // try boxing messages, one by one ...
+            let k = undef_messages.pop().unwrap();
+            {
+                let mut m = messages[k].clone();
+                for f in m.fields.iter_mut() {
+                    if !f.is_leaf(&leaf_messages, &messages) {
+                        f.boxed = true;
+                    }
+                }
+                messages[k] = m;
+            }
+        }
+    }
+}
+

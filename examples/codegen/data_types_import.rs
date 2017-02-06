@@ -4,8 +4,8 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-pub mod a {
-pub mod b {
+pub mod mod_a {
+pub mod mod_b {
 
 use std::io::{Write};
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
