@@ -410,8 +410,9 @@ impl Field {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Message {
+    pub parents: Vec<String>, 
     pub name: String,
     pub fields: Vec<Field>,
     pub reserved_nums: Option<Vec<i32>>,

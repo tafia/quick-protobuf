@@ -49,22 +49,12 @@ named!(reserved_names<Vec<String>>,
                                         many0!(alt!(br | tag!(",") => { |_| () })) >>
                                         (name))) >>
                 (names) ));
-                              
 
-named!(default_value<String>, 
-       do_parse!(tag!("[") >> many0!(br) >> tag!("default") >> many0!(br) >> tag!("=") >> many0!(br) >> 
-                 default: word >> many0!(br) >> tag!("]") >>
-                 (default) ));
-
-named!(deprecated<bool>, 
-       do_parse!(tag!("[") >> many0!(br) >> tag!("deprecated") >> many0!(br) >> tag!("=") >> many0!(br) >> 
-                 deprecated: map_res!(word_ref, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
-                 (deprecated) ));
-
-named!(packed<bool>, 
-       do_parse!(tag!("[") >> many0!(br) >> tag!("packed") >> many0!(br) >> tag!("=") >> many0!(br) >> 
-                 packed: map_res!(word_ref, str::FromStr::from_str) >> many0!(br) >> tag!("]") >>
-                 (packed) ));
+named!(key_val<(&str, &str)>, 
+       do_parse!(tag!("[") >> many0!(br) >> 
+                 key: word_ref >> many0!(br) >> tag!("=") >> many0!(br) >> 
+                 value: word_ref >> many0!(br) >> tag!("]") >> many0!(br) >>
+                 ((key, value)) ));
 
 named!(frequency<Frequency>,
        alt!(tag!("optional") => { |_| Frequency::Optional } |
@@ -74,38 +64,68 @@ named!(frequency<Frequency>,
 named!(message_field<Field>, 
        do_parse!(frequency: opt!(frequency) >> many1!(br) >>
                  typ: word >> many1!(br) >>
-                 name: word >> many0!(br) >>
-                 tag!("=") >> many0!(br) >>
+                 name: word >> many0!(br) >> tag!("=") >> many0!(br) >>
                  number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
-                 default: opt!(default_value) >> many0!(br) >> 
-                 deprecated: opt!(deprecated) >> many0!(br) >> 
-                 packed: opt!(packed) >> many0!(br) >> tag!(";") >> many0!(br) >>
+                 key_vals: many0!(key_val) >> tag!(";") >>
                  (Field {
                     name: name,
                     frequency: frequency.unwrap_or(Frequency::Optional),
                     typ: typ,
                     number: number,
-                    default: default,
-                    packed: packed,
+                    default: key_vals.iter().find(|&&(k, _)| k == "default")
+                                      .map(|&(_, v)| v.to_string()),
+                    packed: key_vals.iter().find(|&&(k, _)| k == "packed")
+                                    .map(|&(_, v)| str::FromStr::from_str(v)
+                                         .expect("Cannot parse Packed value")),
                     boxed: false,
-                    deprecated: deprecated.unwrap_or(false),
+                    deprecated: key_vals.iter().find(|&&(k, _)| k == "deprecated")
+                                        .map_or(false, |&(_, v)| str::FromStr::from_str(v)
+                                                .expect("Cannot parse Deprecated value")),
                  }) ));
 
-named!(message<Message>, 
+enum MessageEvent {
+    Messages(Vec<Message>),
+    Field(Field),
+    ReservedNums(Vec<i32>),
+    ReservedNames(Vec<String>),
+    Ignore,
+}
+
+named!(message_event<MessageEvent>, alt!(reserved_nums => { |r| MessageEvent::ReservedNums(r) } |
+                                         reserved_names => { |r| MessageEvent::ReservedNames(r) } |
+                                         message_field => { |f| MessageEvent::Field(f) } |
+                                         message => { |m| MessageEvent::Messages(m) } |
+                                         br => { |_| MessageEvent::Ignore }));
+
+named!(message_events<(String, Vec<MessageEvent>)>, 
        do_parse!(tag!("message") >> many0!(br) >> 
                  name: word >> many0!(br) >> 
                  tag!("{") >> many0!(br) >>
-                 reserved_nums: opt!(reserved_nums) >> many0!(br) >>
-                 reserved_names: opt!(reserved_names) >> many0!(br) >>
-                 fields: many0!(message_field) >> 
-                 tag!("}") >>
-                 (Message { 
-                     name: name, 
-                     fields: fields, 
-                     reserved_nums: reserved_nums,
-                     reserved_names: reserved_names,
-                     imported: false,
-                 }) ));
+                 events: many0!(message_event) >>
+                 many0!(br) >> tag!("}") >>
+                 ((name, events)) ));
+
+named!(message<Vec<Message>>,
+       map!(message_events, |(name, events): (String, Vec<MessageEvent>)| {
+           let mut messages = Vec::new();
+           let mut msg = Message { name: name.clone(), .. Message::default() };
+           for e in events {
+               match e {
+                   MessageEvent::Field(f) => msg.fields.push(f),
+                   MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
+                   MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
+                   MessageEvent::Messages(ms) => {
+                       for mut m in ms {
+                           m.parents.push(name.clone());
+                           messages.push(m)
+                       }
+                   },
+                   MessageEvent::Ignore => (),
+               }
+           }
+           messages.push(msg);
+           messages
+       }));
 
 named!(enum_field<(String, i32)>, 
        do_parse!(name: word >> many0!(br) >>
@@ -123,9 +143,8 @@ named!(enumerator<Enumerator>,
                      imported: false,
                  })));
 
-named!(ignore<()>, 
-       do_parse!(alt!(tag!("package") | tag!("option")) >> many1!(br) >> 
-                 take_until_and_consume!(";") >> ()));
+named!(option_ignore<()>, 
+       do_parse!(tag!("option") >> many1!(br) >> take_until_and_consume!(";") >> ()));
 
 named!(service_ignore<()>, 
        do_parse!(tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{") >>
@@ -135,7 +154,7 @@ enum Event {
     Syntax(Syntax),
     Import(PathBuf),
     Package(String),
-    Message(Message),
+    Messages(Vec<Message>),
     Enum(Enumerator),
     Ignore
 }
@@ -144,9 +163,9 @@ named!(event<Event>,
        alt!(syntax => { |s| Event::Syntax(s) } |
             import => { |i| Event::Import(i) } |
             package => { |p| Event::Package(p) } |
-            message => { |m| Event::Message(m) } | 
+            message => { |m| Event::Messages(m) } | 
             enumerator => { |e| Event::Enum(e) } |
-            ignore => { |_| Event::Ignore } |
+            option_ignore => { |_| Event::Ignore } |
             service_ignore => { |_| Event::Ignore } |
             br => { |_| Event::Ignore }));
 
@@ -158,7 +177,7 @@ named!(pub file_descriptor<FileDescriptor>,
                    Event::Syntax(s) => desc.syntax = s,
                    Event::Import(i) => desc.import_paths.push(i),
                    Event::Package(p) => desc.package = p.split('.').map(|s| s.to_string()).collect(),
-                   Event::Message(m) => desc.messages.push(m),
+                   Event::Messages(m) => desc.messages.extend(m),
                    Event::Enum(e) => desc.enums.push(e),
                    Event::Ignore => (),
                }
@@ -168,6 +187,8 @@ named!(pub file_descriptor<FileDescriptor>,
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
     #[test]
     fn test_message() {
         let msg = r#"message ReferenceData 
@@ -186,7 +207,8 @@ mod test {
 
         let mess = message(msg.as_bytes());
         if let ::nom::IResult::Done(_, mess) = mess {
-            assert_eq!(10, mess.fields.len());
+            assert!(mess.len() == 1);
+            assert_eq!(10, mess[0].fields.len());
         }
     }
 
@@ -207,12 +229,9 @@ mod test {
 
     #[test]
     fn test_ignore() {
-        let msg = r#"package com.test.v0;
+        let msg = r#"option optimize_for = SPEED;"#;
 
-    option optimize_for = SPEED;
-    "#;
-
-        match ignore(msg.as_bytes()) {
+        match option_ignore(msg.as_bytes()) {
             ::nom::IResult::Done(_, _) => (),
             e => panic!("Expecting done {:?}", e),
         }
@@ -244,6 +263,6 @@ mod test {
     }
     "#;
         let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
-        assert_eq!(Some("foo.bar".to_string()), desc.package);
+        assert_eq!(vec!("foo".to_string(), "bar".to_string()), desc.package);
     }
 }
