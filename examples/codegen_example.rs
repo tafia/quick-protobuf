@@ -5,7 +5,7 @@ mod codegen;
 use std::borrow::Cow;
 
 use codegen::data_types::FooMessage;
-use codegen::data_types_import::a::b::ImportedMessage;
+use codegen::data_types_import::mod_a::mod_b::ImportedMessage;
 use quick_protobuf::{BytesReader, Writer};
 
 fn main() {
