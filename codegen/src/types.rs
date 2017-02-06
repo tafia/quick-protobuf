@@ -72,7 +72,7 @@ impl Field {
     }
 
     fn is_message(&self, msgs: &[Message]) -> bool {
-        msgs.iter().any(|m| m.name == self.typ)
+        self.find_message(msgs).is_some()
     }
 
     fn is_enum(&self, msgs: &[Message]) -> bool {
@@ -93,6 +93,22 @@ impl Field {
         }
     }
 
+    fn find_message<'a, 'b>(&'a self, msgs: &'b [Message]) -> Option<&'b Message> {
+        if self.name.contains('.') {
+            msgs.iter().filter(|m| m.package.is_empty())
+                .find(|m| m.name == self.typ)
+
+        } else {
+            msgs.iter().filter(|m| m.package.is_empty())
+//                 .chain(msgs.messages.iter())
+                .find(|m| m.name == self.typ)
+        }
+    }
+
+    fn find_enum<'a, 'b>(&'a self, enums: &'b [Enumerator]) -> Option<&'b Enumerator> {
+        enums.iter().find(|m| m.name == self.typ)
+    }
+
     fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
         match self.default {
             None => false,
@@ -101,23 +117,14 @@ impl Field {
                 "bool" => *d != "false",
                 "Cow<'a, str>" => *d != "\"\"",
                 "Cow<'a, [u8]>" => *d != "[]",
-                t => match enums.iter().find(|e| e.name == self.typ) {
-                    Some(e) => t != e.fields[0].0,
-                    None => false, // Messages are regular defaults
-                }
+                t => self.find_enum(enums).map_or(false, |e| t != e.fields[0].0),
             } 
         }
     }
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        // borrow bytes and string
         if self.is_cow() { return true; }
-
-        // borrow messages that have lifetime (ie they have at least one borrowed field)
-        match msgs.iter().find(|m| m.name == self.typ) {
-            Some(ref m) if m.has_lifetime(msgs) => true,
-            _ => false,
-        }
+        self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs))
     }
 
     fn rust_type(&self, msgs: &[Message]) -> String {
@@ -130,7 +137,7 @@ impl Field {
             "double" => "f64".to_string(),
             "string" => "Cow<'a, str>".to_string(),
             "bytes" => "Cow<'a, [u8]>".to_string(),
-            t => msgs.iter().find(|m| m.name == t).map_or(t.to_string(), |m| if m.has_lifetime(msgs) {
+            t => self.find_message(msgs).map_or(t.to_string(), |m| if m.has_lifetime(msgs) {
                 format!("{}<'a>", t.replace(".", "::"))
             } else {
                 t.replace(".", "::")
@@ -153,7 +160,7 @@ impl Field {
             "fixed64" | "sfixed64" | "double" => 1,
             "fixed32" | "sfixed32" | "float" => 5,
             "string" | "bytes" => 2,
-            t => if msgs.iter().any(|m| m.name == t) { 2 } else { 0 /* enum */ }
+            _ => if self.is_message(msgs) { 2 } else { 0 /* enum */ }
         }
     }
 
@@ -412,12 +419,13 @@ impl Field {
 
 #[derive(Debug, Clone, Default)]
 pub struct Message {
-    pub parents: Vec<String>, 
+    pub messages: Vec<Message>,
     pub name: String,
     pub fields: Vec<Field>,
     pub reserved_nums: Option<Vec<i32>>,
     pub reserved_names: Option<Vec<String>>,
     pub imported: bool,
+    pub package: String, // package from imports + nested classes
 }
 
 impl Message {
@@ -549,6 +557,26 @@ impl Message {
         }
         Ok(())
     }
+
+    fn set_package(&mut self, package: &str) {
+        if package.is_empty() {
+            for m in &mut self.messages {
+                // set package = name to nested messages
+                m.set_package(&self.name);
+            }
+        } else {
+            if !self.package.is_empty() {
+                self.package.push('.');
+            }
+            self.package.push_str(package);
+            let package = format!("{}.{}", self.package, self.name);
+            for m in &mut self.messages {
+                // set package = package.name to nested messages
+                m.set_package(&package);
+            }
+        }
+    }
+
 }
 
 #[derive(Debug, Clone)]
@@ -556,6 +584,7 @@ pub struct Enumerator {
     pub name: String,
     pub fields: Vec<(String, i32)>,
     pub imported: bool,
+    pub package: String,
 }
 
 impl Enumerator {
@@ -597,7 +626,7 @@ impl Enumerator {
 #[derive(Debug, Default)]
 pub struct FileDescriptor {
     pub import_paths: Vec<PathBuf>,
-    pub package: Vec<String>,
+    pub package: String,
     pub syntax: Syntax,
     pub messages: Vec<Message>,
     pub enums: Vec<Enumerator>,
@@ -654,28 +683,17 @@ impl FileDescriptor {
             f.fetch_imports(&import_path)?;
 
             // if the proto has a packge then the names will be prefixed
-            if f.package.is_empty() {
-                self.messages.extend(f.messages.drain(..).map(|mut m| {
-                    m.imported = true;
-                    m
-                }));
-                self.enums.extend(f.enums.drain(..).map(|mut e| {
-                    e.imported = true;
-                    e
-                }));
-            } else {
-                let name_prefix = f.package.join(".");
-                self.messages.extend(f.messages.drain(..).map(|mut m| {
-                    m.name = format!("{}.{}", name_prefix, m.name);
-                    m.imported = true;
-                    m
-                }));
-                self.enums.extend(f.enums.drain(..).map(|mut e| {
-                    e.name = format!("{}.{}", name_prefix, e.name);
-                    e.imported = true;
-                    e
-                }));
-            }
+            let package = f.package.clone();
+            self.messages.extend(f.messages.drain(..).map(|mut m| {
+                m.set_package(&package);
+                m.imported = true;
+                m
+            }));
+            self.enums.extend(f.enums.drain(..).map(|mut e| {
+                e.package = package.clone();
+                e.imported = true;
+                e
+            }));
         }
         Ok(())
     }
@@ -791,7 +809,7 @@ impl FileDescriptor {
     }
 
     fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
-        for p in &self.package { writeln!(w, "pub mod {} {{", p)?; }
+        for p in self.package.split('.') { writeln!(w, "pub mod {} {{", p)?; }
         if !self.package.is_empty() { writeln!(w, "")?; }
         Ok(())
     }
@@ -799,7 +817,7 @@ impl FileDescriptor {
     fn write_package_end<W: Write>(&self, w: &mut W) -> Result<()> {
         if self.package.is_empty() { return Ok(()); }
         writeln!(w, "")?;
-        for _ in &self.package { writeln!(w, "}}")?; }
+        for _ in self.package.split('.') { writeln!(w, "}}")?; }
         Ok(())
     }
 

@@ -84,7 +84,7 @@ named!(message_field<Field>,
                  }) ));
 
 enum MessageEvent {
-    Messages(Vec<Message>),
+    Message(Message),
     Field(Field),
     ReservedNums(Vec<i32>),
     ReservedNames(Vec<String>),
@@ -94,7 +94,7 @@ enum MessageEvent {
 named!(message_event<MessageEvent>, alt!(reserved_nums => { |r| MessageEvent::ReservedNums(r) } |
                                          reserved_names => { |r| MessageEvent::ReservedNames(r) } |
                                          message_field => { |f| MessageEvent::Field(f) } |
-                                         message => { |m| MessageEvent::Messages(m) } |
+                                         message => { |m| MessageEvent::Message(m) } |
                                          br => { |_| MessageEvent::Ignore }));
 
 named!(message_events<(String, Vec<MessageEvent>)>, 
@@ -105,26 +105,19 @@ named!(message_events<(String, Vec<MessageEvent>)>,
                  many0!(br) >> tag!("}") >>
                  ((name, events)) ));
 
-named!(message<Vec<Message>>,
+named!(message<Message>,
        map!(message_events, |(name, events): (String, Vec<MessageEvent>)| {
-           let mut messages = Vec::new();
            let mut msg = Message { name: name.clone(), .. Message::default() };
            for e in events {
                match e {
                    MessageEvent::Field(f) => msg.fields.push(f),
                    MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
                    MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
-                   MessageEvent::Messages(ms) => {
-                       for mut m in ms {
-                           m.parents.push(name.clone());
-                           messages.push(m)
-                       }
-                   },
+                   MessageEvent::Message(m) => msg.messages.push(m),
                    MessageEvent::Ignore => (),
                }
            }
-           messages.push(msg);
-           messages
+           msg
        }));
 
 named!(enum_field<(String, i32)>, 
@@ -141,6 +134,7 @@ named!(enumerator<Enumerator>,
                      name: name, 
                      fields: fields,
                      imported: false,
+                     package: "".to_string(),
                  })));
 
 named!(option_ignore<()>, 
@@ -154,7 +148,7 @@ enum Event {
     Syntax(Syntax),
     Import(PathBuf),
     Package(String),
-    Messages(Vec<Message>),
+    Message(Message),
     Enum(Enumerator),
     Ignore
 }
@@ -163,7 +157,7 @@ named!(event<Event>,
        alt!(syntax => { |s| Event::Syntax(s) } |
             import => { |i| Event::Import(i) } |
             package => { |p| Event::Package(p) } |
-            message => { |m| Event::Messages(m) } | 
+            message => { |m| Event::Message(m) } | 
             enumerator => { |e| Event::Enum(e) } |
             option_ignore => { |_| Event::Ignore } |
             service_ignore => { |_| Event::Ignore } |
@@ -176,8 +170,8 @@ named!(pub file_descriptor<FileDescriptor>,
                match event {
                    Event::Syntax(s) => desc.syntax = s,
                    Event::Import(i) => desc.import_paths.push(i),
-                   Event::Package(p) => desc.package = p.split('.').map(|s| s.to_string()).collect(),
-                   Event::Messages(m) => desc.messages.extend(m),
+                   Event::Package(p) => desc.package = p,
+                   Event::Message(m) => desc.messages.push(m),
                    Event::Enum(e) => desc.enums.push(e),
                    Event::Ignore => (),
                }
@@ -207,8 +201,7 @@ mod test {
 
         let mess = message(msg.as_bytes());
         if let ::nom::IResult::Done(_, mess) = mess {
-            assert!(mess.len() == 1);
-            assert_eq!(10, mess[0].fields.len());
+            assert_eq!(10, mess.fields.len());
         }
     }
 
@@ -263,6 +256,23 @@ mod test {
     }
     "#;
         let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
-        assert_eq!(vec!("foo".to_string(), "bar".to_string()), desc.package);
+        assert_eq!("foo.bar".to_string(), desc.package);
+    }
+
+    #[test]
+    fn test_nested_message() {
+        let msg = r#"message A
+    {
+        message B {
+            repeated int32 a = 1;
+            optional string b = 2;
+        }
+        optional b = 1;
+    }"#;
+
+        let mess = message(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert!(mess.messages.len() == 1);
+        }
     }
 }
