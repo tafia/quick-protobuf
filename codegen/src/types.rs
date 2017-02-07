@@ -147,6 +147,90 @@ impl FieldType {
         }
     }
 
+    /// Searches for message corresponding to the current type
+    ///
+    /// Searches first basic name then within nested messages
+    fn find_message<'a, 'b>(&'a self, msgs: &'b [Message]) -> Option<&'b Message> {
+        match *self {
+            FieldType::Message(ref m) => {
+                let mut found = match m.rfind('.') {
+                    Some(p) => {
+                        let package = &m[..p];
+                        let name = &m[(p + 1)..];
+                        msgs.iter().find(|m| m.package == package && m.name == name)
+                    },
+                    None => msgs.iter().find(|m2| m2.name == &m[..]),
+                };
+
+                if found.is_none() {
+                    // recursively search into nested messages
+                    for m in msgs {
+                        found = self.find_message(&m.messages);
+                        if found.is_some() { break; }
+                    }
+                }
+
+                found
+            },
+            _ => None,
+        }
+    }
+
+    fn find_enum<'a, 'b>(&'a self, enums: &'b [Enumerator]) -> Option<&'b Enumerator> {
+        match *self {
+            FieldType::Enum(ref e) => enums.iter().find(|m| m.name == &e[..]),
+            _ => None,
+        }
+    }
+
+    fn has_lifetime(&self, msgs: &[Message]) -> bool {
+        if self.is_cow() { return true; }
+        self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs))
+    }
+
+    fn rust_type(&self, msgs: &[Message]) -> String {
+        match *self {
+            FieldType::Int32 | FieldType::Sint32 | FieldType::Sfixed32 => "i32".to_string(),
+            FieldType::Int64 | FieldType::Sint64 | FieldType::Sfixed64 => "i64".to_string(),
+            FieldType::Uint32 | FieldType::Fixed32 => "u32".to_string(),
+            FieldType::Uint64 | FieldType::Fixed64 => "u64".to_string(),
+            FieldType::Double => "f64".to_string(),
+            FieldType::Float => "f32".to_string(),
+            FieldType::String_ => "Cow<'a, str>".to_string(),
+            FieldType::Bytes => "Cow<'a, [u8]>".to_string(),
+            FieldType::Bool => "bool".to_string(),
+            FieldType::Enum(ref e) => e.replace(".", "::"),
+            FieldType::Message(ref msg) => match self.find_message(msgs) {
+                Some(m) => {
+                    let lifetime = if m.has_lifetime(msgs) { "<'a>" } else { "" };
+                    let package = m.package.split('.').filter(|p| !p.is_empty())
+                        .map(|p| format!("mod_{}::", p)).collect::<String>();
+                    format!("{}{}{}", package, m.name, lifetime)
+                },
+                None => unreachable!(format!("Could not find message {}", msg)),
+            },
+            FieldType::Map(ref t) => {
+                let &(ref key, ref value) = &**t;
+                format!("HashMap<{}, {}>", key.rust_type(msgs), value.rust_type(msgs))
+            }
+        }
+    }
+
+    fn read_fn(&self, msgs: &[Message]) -> String {
+        match self.find_message(msgs) {
+            Some(m) if m.package.is_empty()=> {
+                format!("read_message(bytes, {}::from_reader)", m.name)
+            },
+            Some(m) => {
+                format!("read_message(bytes, {}{}::from_reader)", 
+                        m.package.split('.').map(|p| format!("mod_{}::", p)).collect::<String>(), m.name)
+            }
+            None => {
+                format!("read_{}(bytes)", self.proto_type())
+            }
+        }
+    }
+
 }
 
 #[derive(Debug, Clone)]
@@ -186,97 +270,16 @@ impl Field {
         }
     }
 
-    /// Searches for message corresponding to the current type
-    ///
-    /// Searches first basic name then within nested messages
-    fn find_message<'a, 'b>(&'a self, msgs: &'b [Message]) -> Option<&'b Message> {
-        match self.typ {
-            FieldType::Message(ref m) => {
-                let mut found = match m.rfind('.') {
-                    Some(p) => {
-                        let package = &m[..p];
-                        let name = &m[(p + 1)..];
-                        msgs.iter().find(|m| m.package == package && m.name == name)
-                    },
-                    None => msgs.iter().find(|m2| m2.name == &m[..]),
-                };
-
-                if found.is_none() {
-                    // recursively search into nested messages
-                    for m in msgs {
-                        found = self.find_message(&m.messages);
-                        if found.is_some() { break; }
-                    }
-                }
-
-                found
-            },
-            _ => None,
-        }
-    }
-
-    fn find_enum<'a, 'b>(&'a self, enums: &'b [Enumerator]) -> Option<&'b Enumerator> {
-        match self.typ {
-            FieldType::Enum(ref e) => enums.iter().find(|m| m.name == &e[..]),
-            _ => None,
-        }
-    }
-
     fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
         match self.default {
             None => false,
-            Some(ref d) => match &*self.rust_type(msgs) {
+            Some(ref d) => match &*self.typ.rust_type(msgs) {
                 "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
                 "bool" => *d != "false",
                 "Cow<'a, str>" => *d != "\"\"",
                 "Cow<'a, [u8]>" => *d != "[]",
-                t => self.find_enum(enums).map_or(false, |e| t != e.fields[0].0),
+                t => self.typ.find_enum(enums).map_or(false, |e| t != e.fields[0].0),
             } 
-        }
-    }
-
-    fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        if self.typ.is_cow() { return true; }
-        self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs))
-    }
-
-    fn rust_type(&self, msgs: &[Message]) -> String {
-        match self.typ {
-            FieldType::Int32 | FieldType::Sint32 | FieldType::Sfixed32 => "i32".to_string(),
-            FieldType::Int64 | FieldType::Sint64 | FieldType::Sfixed64 => "i64".to_string(),
-            FieldType::Uint32 | FieldType::Fixed32 => "u32".to_string(),
-            FieldType::Uint64 | FieldType::Fixed64 => "u64".to_string(),
-            FieldType::Double => "f64".to_string(),
-            FieldType::Float => "f32".to_string(),
-            FieldType::String_ => "Cow<'a, str>".to_string(),
-            FieldType::Bytes => "Cow<'a, [u8]>".to_string(),
-            FieldType::Bool => "bool".to_string(),
-            FieldType::Enum(ref e) => e.replace(".", "::"),
-            FieldType::Message(ref msg) => match self.find_message(msgs) {
-                Some(m) => {
-                    let lifetime = if m.has_lifetime(msgs) { "<'a>" } else { "" };
-                    let package = m.package.split('.').filter(|p| !p.is_empty())
-                        .map(|p| format!("mod_{}::", p)).collect::<String>();
-                    format!("{}{}{}", package, m.name, lifetime)
-                },
-                None => unreachable!(format!("Could not find message {}", msg)),
-            },
-            FieldType::Map(..) => unimplemented!(),
-        }
-    }
-
-    fn read_fn(&self, msgs: &[Message]) -> String {
-        match self.find_message(msgs) {
-            Some(m) if m.package.is_empty()=> {
-                format!("read_message(bytes, {}::from_reader)", m.name)
-            },
-            Some(m) => {
-                format!("read_message(bytes, {}{}::from_reader)", 
-                        m.package.split('.').map(|p| format!("mod_{}::", p)).collect::<String>(), m.name)
-            }
-            None => {
-                format!("read_{}(bytes)", self.typ.proto_type())
-            }
         }
     }
 
@@ -287,20 +290,20 @@ impl Field {
     fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
         write!(w, "    pub {}: ", self.name)?;
         match self.frequency {
-            Frequency::Optional if self.boxed => writeln!(w, "Option<Box<{}>>,", self.rust_type(msgs))?,
-            Frequency::Optional if self.default.is_some() => writeln!(w, "{},", self.rust_type(msgs))?,
-            Frequency::Optional => writeln!(w, "Option<{}>,", self.rust_type(msgs))?,
-            Frequency::Repeated => writeln!(w, "Vec<{}>,", self.rust_type(msgs))?,
-            Frequency::Required => writeln!(w, "{},", self.rust_type(msgs))?,
+            Frequency::Optional if self.boxed => writeln!(w, "Option<Box<{}>>,", self.typ.rust_type(msgs))?,
+            Frequency::Optional if self.default.is_some() => writeln!(w, "{},", self.typ.rust_type(msgs))?,
+            Frequency::Optional => writeln!(w, "Option<{}>,", self.typ.rust_type(msgs))?,
+            Frequency::Repeated => writeln!(w, "Vec<{}>,", self.typ.rust_type(msgs))?,
+            Frequency::Required => writeln!(w, "{},", self.typ.rust_type(msgs))?,
         }
         Ok(())
     }
 
     fn write_match_tag<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
         let val = if self.typ.is_cow() {
-            format!("Cow::Borrowed(r.{}?)", self.read_fn(msgs))
+            format!("Cow::Borrowed(r.{}?)", self.typ.read_fn(msgs))
         } else {
-            format!("r.{}?", self.read_fn(msgs))
+            format!("r.{}?", self.typ.read_fn(msgs))
         };
 
         write!(w, "                Ok({}) => msg.{}", self.tag(), self.name)?;
@@ -310,7 +313,7 @@ impl Field {
             Frequency::Optional if self.boxed => writeln!(w, " = Some(Box::new({})),", val)?,
             Frequency::Optional => writeln!(w, " = Some({}),", val)?,
             Frequency::Repeated if self.packed() => {
-                writeln!(w, " = r.read_packed(bytes, |r, bytes| r.{})?,", self.read_fn(msgs))?
+                writeln!(w, " = r.read_packed(bytes, |r, bytes| r.{})?,", self.typ.read_fn(msgs))?
             }
             Frequency::Repeated => writeln!(w, ".push({}),", val)?,
         }
@@ -474,7 +477,7 @@ impl Message {
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
         self.fields.iter().any(|f| match f.typ {
-            FieldType::Message(ref m) => &m[..] != self.name && f.has_lifetime(msgs),
+            FieldType::Message(ref m) => &m[..] != self.name && f.typ.has_lifetime(msgs),
             _ => f.typ.is_cow(),
         })
     }
@@ -590,7 +593,7 @@ impl Message {
     /// If none is found, 
     fn set_enums(&mut self, msgs: &[Message]) {
         for f in &mut self.fields {
-            if f.find_message(&msgs).is_none() {
+            if f.typ.find_message(&msgs).is_none() {
                 if let FieldType::Message(m) = f.typ.clone() {
                     f.typ = FieldType::Enum(m);
                     f.boxed = false;
