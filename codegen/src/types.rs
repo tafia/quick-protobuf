@@ -110,10 +110,10 @@ impl FieldType {
             FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
             FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
             FieldType::Bool | FieldType::Enum(_) => 0,
-            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => 1,
-            FieldType::String_ | FieldType::Bytes | FieldType::Message(_) => 2,
-            FieldType::Map(..) => unimplemented!(),
+            FieldType::String_ | FieldType::Bytes | 
+                FieldType::Message(_) | FieldType::Map(_) => 2,
+            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
         }
     }
 
@@ -136,7 +136,7 @@ impl FieldType {
             FieldType::String_ => "string",
             FieldType::Bytes => "bytes",
             FieldType::Message(_) => "message",
-            FieldType::Map(..) => unimplemented!(),
+            FieldType::Map(_) => "map",
         }
     }
 
@@ -177,8 +177,15 @@ impl FieldType {
     }
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        if self.is_cow() { return true; }
-        self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs))
+        match *self {
+            FieldType::String_ | FieldType::Bytes => true, // Cow
+            FieldType::Message(_) => self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs)),
+            FieldType::Map(ref m) => {
+                let &(ref key, ref value) = &**m;
+                key.has_lifetime(msgs) || value.has_lifetime(msgs)
+            }
+            _ => false,
+        }
     }
 
     fn rust_type(&self, msgs: &[Message]) -> String {
@@ -196,9 +203,7 @@ impl FieldType {
             FieldType::Message(ref msg) => match self.find_message(msgs) {
                 Some(m) => {
                     let lifetime = if m.has_lifetime(msgs) { "<'a>" } else { "" };
-                    let package = m.package.split('.').filter(|p| !p.is_empty())
-                        .map(|p| format!("mod_{}::", p)).collect::<String>();
-                    format!("{}{}{}", package, m.name, lifetime)
+                    format!("{}{}{}", m.get_modules(), m.name, lifetime)
                 },
                 None => unreachable!(format!("Could not find message {}", msg)),
             },
@@ -210,17 +215,18 @@ impl FieldType {
     }
 
     fn read_fn(&self, msgs: &[Message]) -> String {
-        match self.find_message(msgs) {
-            Some(m) if m.package.is_empty()=> {
-                format!("read_message(bytes, {}::from_reader)", m.name)
+        match *self {
+            FieldType::Message(ref msg) => match self.find_message(msgs) {
+                Some(m) => format!("read_message(bytes, {}{}::from_reader)", 
+                                   m.get_modules(), m.name),
+                None => unreachable!(format!("Could not find message {}", msg)),
             },
-            Some(m) => {
-                format!("read_message(bytes, {}{}::from_reader)", 
-                        m.package.split('.').map(|p| format!("mod_{}::", p)).collect::<String>(), m.name)
-            }
-            None => {
-                format!("read_{}(bytes)", self.proto_type())
-            }
+            FieldType::Map(ref m) => {
+                let &(ref key, ref value) = &**m;
+                format!("read_map(bytes, |r, bytes| {}, |r, bytes| {})",
+                        key.read_fn(msgs), value.read_fn(msgs))
+            },
+            _ => format!("read_{}(bytes)", self.proto_type()),
         }
     }
 
@@ -460,13 +466,15 @@ impl Message {
         })
     }
 
+    fn get_modules(&self) -> String {
+        self.package
+            .split('.').filter(|p| !p.is_empty())
+            .map(|p| format!("mod_{}::", p))
+            .collect()
+    }
+
     fn write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        println!("Writing message {}{}", 
-                 self.package
-                    .split('.').filter(|p| !p.is_empty())
-                    .map(|p| format!("mod_{}::", p))
-                    .collect::<String>(),
-                 self.name);
+        println!("Writing message {}{}", self.get_modules(), self.name);
         writeln!(w, "")?;
         self.write_definition(w, msgs)?;
         writeln!(w, "")?;
