@@ -306,4 +306,26 @@ mod test {
             assert!(mess.messages.len() == 1);
         }
     }
+
+    #[test]
+    fn test_map() {
+        let msg = r#"message A
+    {
+        optional map<string, int32> b = 1;
+    }"#;
+
+        let mess = message(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(1, mess.fields.len());
+            match mess.fields[0].typ {
+                FieldType::Map(ref f) => match &**f {
+                    &(FieldType::String_, FieldType::Int32) => (),
+                    ref f => panic!("Expecting Map<String, Int32> found {:?}", f),
+                },
+                ref f => panic!("Expecting map, got {:?}", f),
+            }
+        } else {
+            panic!("Could not parse map message");
+        }
+    }
 }
