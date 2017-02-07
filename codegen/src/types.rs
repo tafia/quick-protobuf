@@ -176,13 +176,6 @@ impl FieldType {
         }
     }
 
-    fn find_enum<'a, 'b>(&'a self, enums: &'b [Enumerator]) -> Option<&'b Enumerator> {
-        match *self {
-            FieldType::Enum(ref e) => enums.iter().find(|m| m.name == &e[..]),
-            _ => None,
-        }
-    }
-
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
         if self.is_cow() { return true; }
         self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs))
@@ -246,7 +239,6 @@ pub struct Field {
 }
 
 impl Field {
-
     fn packed(&self) -> bool {
         self.packed.unwrap_or(false)
     }
@@ -267,19 +259,6 @@ impl Field {
                 }
             }
             _ => true,
-        }
-    }
-
-    fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
-        match self.default {
-            None => false,
-            Some(ref d) => match &*self.typ.rust_type(msgs) {
-                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
-                "bool" => *d != "false",
-                "Cow<'a, str>" => *d != "\"\"",
-                "Cow<'a, [u8]>" => *d != "[]",
-                t => self.typ.find_enum(enums).map_or(false, |e| t != e.fields[0].0),
-            } 
         }
     }
 
@@ -470,24 +449,50 @@ pub struct Message {
 }
 
 impl Message {
-
     fn is_leaf(&self, leaf_messages: &[String]) -> bool {
         self.imported || self.fields.iter().all(|f| f.is_leaf(leaf_messages) || f.deprecated)
     }
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
         self.fields.iter().any(|f| match f.typ {
-            FieldType::Message(ref m) => &m[..] != self.name && f.typ.has_lifetime(msgs),
-            _ => f.typ.is_cow(),
+            FieldType::Message(ref m) if &m[..] == self.name => false,
+            ref t => t.has_lifetime(msgs),
         })
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, enums: &[Enumerator], msgs: &[Message]) -> Result<()> {
-        if self.can_derive_default(enums, msgs) {
-            writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
-        } else {
-            writeln!(w, "#[derive(Debug, PartialEq, Clone)]")?;
+    fn write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        println!("Writing message {}{}", 
+                 self.package
+                    .split('.').filter(|p| !p.is_empty())
+                    .map(|p| format!("mod_{}::", p))
+                    .collect::<String>(),
+                 self.name);
+        writeln!(w, "")?;
+        self.write_definition(w, msgs)?;
+        writeln!(w, "")?;
+        self.write_impl_message_read(w, msgs)?;
+        writeln!(w, "")?;
+        self.write_impl_message_write(w, msgs)?;
+
+        if !self.messages.is_empty() {
+            writeln!(w, "")?;
+            writeln!(w, "pub mod mod_{} {{", self.name)?;
+            writeln!(w, "")?;
+            if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_cow())) {
+                writeln!(w, "use std::borrow::Cow;")?;
+            }
+            writeln!(w, "use super::*;")?;
+            for m in &self.messages {
+                m.write(w, msgs)?;
+            }
+            writeln!(w, "")?;
+            writeln!(w, "}}")?;
         }
+        Ok(())
+    }
+
+    fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
         if self.has_lifetime(msgs) {
             writeln!(w, "pub struct {}<'a> {{", self.name)?;
         } else {
@@ -498,10 +503,6 @@ impl Message {
         }
         writeln!(w, "}}")?;
         Ok(())
-    }
-
-    fn can_derive_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
-        self.fields.iter().all(|f| f.deprecated || !f.has_unregular_default(enums, msgs))
     }
 
     fn write_impl_message_read<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
@@ -604,7 +605,6 @@ impl Message {
             m.set_enums(msgs);
         }
     }
-
 }
 
 #[derive(Debug, Clone)]
@@ -848,35 +848,7 @@ impl FileDescriptor {
 
     fn write_messages<W: Write>(&self, w: &mut W) -> Result<()> {
         for m in self.messages.iter().filter(|m| !m.imported) {
-            println!("Writing message {}", m.name);
-            writeln!(w, "")?;
-            m.write_definition(w, &self.enums, &self.messages)?;
-            writeln!(w, "")?;
-            m.write_impl_message_read(w, &self.messages)?;
-            writeln!(w, "")?;
-            m.write_impl_message_write(w, &self.messages)?;
-
-            if !m.messages.is_empty() {
-                writeln!(w, "")?;
-                writeln!(w, "pub mod mod_{} {{", m.name)?;
-                writeln!(w, "")?;
-                if m.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_cow())) {
-                    writeln!(w, "use std::borrow::Cow;")?;
-                    writeln!(w, "")?;
-                }
-                writeln!(w, "use super::*;")?;
-                for m_sub in &m.messages {
-                    println!("Writing message mod_{}::{}", m.name, m_sub.name);
-                    writeln!(w, "")?;
-                    m_sub.write_definition(w, &self.enums, &self.messages)?;
-                    writeln!(w, "")?;
-                    m_sub.write_impl_message_read(w, &self.messages)?;
-                    writeln!(w, "")?;
-                    m_sub.write_impl_message_write(w, &self.messages)?;
-                }
-                writeln!(w, "")?;
-                writeln!(w, "}}")?;
-            }
+            m.write(w, &self.messages)?;
         }
         Ok(())
     }
