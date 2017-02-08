@@ -228,13 +228,13 @@ impl FieldType {
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
 
-            FieldType::String_ | FieldType::Bytes => format!("{}.len()", s),
+            FieldType::String_ | FieldType::Bytes => format!("sizeof_var_length({}.len())", s),
 
-            FieldType::Message(_) => format!("{}.get_size()", s),
+            FieldType::Message(_) => format!("sizeof_var_length({}.get_size())", s),
             
             FieldType::Map(ref m) => {
                 let &(ref k, ref v) = &**m;
-                format!("{}.iter().map(|(k, v)| 2 + {} + {}).sum::<usize>()", s, k.get_size("k"), v.get_size("v"))
+                format!("{}.iter().map(|(k, v)| sizeof_var_length(2 + {} + {})).sum::<usize>()", s, k.get_size("k"), v.get_size("v"))
             }
         }
     }
@@ -374,33 +374,33 @@ impl Field {
         } else { 
             write!(w, "        + ")?;
         }
+        let tag_size = sizeof_varint(self.tag());
         match self.frequency {
-            Frequency::Required => writeln!(w, "{}", self.typ.get_size(&format!("&self.{}", self.name)))?,
+            Frequency::Required => writeln!(w, "{} + {}", tag_size, self.typ.get_size(&format!("&self.{}", self.name)))?,
             Frequency::Optional => {
                 match self.default.as_ref() {
                     None => {
                         write!(w, "self.{}.as_ref().map_or(0, ", self.name)?;
                         if self.typ.is_fixed_size() {
-                            writeln!(w, "|_| {})", self.typ.get_size(""))?;
+                            writeln!(w, "|_| {} + {})", tag_size, self.typ.get_size(""))?;
                         } else {
-                            writeln!(w, "|m| {})", self.typ.get_size("m"))?;
+                            writeln!(w, "|m| {} + {})", tag_size, self.typ.get_size("m"))?;
                         }
                     }
                     Some(d) => {
-                        write!(w, "if self.{} == {} {{ 0 }} else {{ {} }}", 
-                               self.name, d, self.typ.get_size(&format!("&self.{}", self.name)))?;
+                        write!(w, "if self.{} == {} {{ 0 }} else {{ {} + {} }}", 
+                               self.name, d, tag_size, self.typ.get_size(&format!("&self.{}", self.name)))?;
                     }
                 }
             }
             Frequency::Repeated => {
-                let tag_size = sizeof_varint(self.tag());
                 if self.packed() {
-                    write!(w, "if self.{}.is_empty() {{ 0 }} else {{ ", self.name)?;
+                    write!(w, "if self.{}.is_empty() {{ 0 }} else {{ {} + ", self.name, tag_size)?;
                     match self.typ.wire_type_num_non_packed() {
-                        1 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 8) }}", tag_size, self.name)?,
-                        5 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 4) }}", tag_size, self.name)?,
-                        _ => writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| {}).sum::<usize>()) }}", 
-                                    tag_size, self.name, self.typ.get_size("s"))?,
+                        1 => writeln!(w, "sizeof_var_length(self.{}.len() * 8) }}", self.name)?,
+                        5 => writeln!(w, "sizeof_var_length(self.{}.len() * 4) }}", self.name)?,
+                        _ => writeln!(w, "sizeof_var_length(self.{}.iter().map(|s| {}).sum::<usize>()) }}", 
+                                      self.name, self.typ.get_size("s"))?,
                     }
                 } else {
                     match self.typ.wire_type_num_non_packed() {
@@ -408,7 +408,6 @@ impl Field {
                         5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
                         _ => writeln!(w, "self.{}.iter().map(|s| {} + {}).sum::<usize>()", 
                                       self.name, tag_size, self.typ.get_size("s"))?,
-
                     }
                 }
             }
