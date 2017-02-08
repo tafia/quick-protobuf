@@ -18,9 +18,5 @@ error_chain! {
             display("cannot convert protobuf import into module import: {}", desc)
             cause("import definition might be invalid, some characters may not be supported")
         }
-        InvalidWireType(wire_type: u32) {
-            description("invalid wire type value")
-            display("expecting a value between 0 and 5, got {}", wire_type)
-        }
     }
 }

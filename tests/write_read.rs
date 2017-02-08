@@ -205,7 +205,7 @@ fn wr_packed_uint32(){
     let mut buf = Vec::new();
     {
         let mut w = Writer::new(&mut buf);
-        w.write_packed_repeated_field(&v, |r, m| r.write_uint32(*m), &|m| sizeof_uint32(*m)).unwrap();
+        w.write_packed(&v, |r, m| r.write_uint32(*m), &|m| sizeof_uint32(*m)).unwrap();
     }
     let mut r = BytesReader::from_bytes(&buf);
     assert_eq!(v, r.read_packed(&buf, |r, b| r.read_uint32(b)).unwrap());

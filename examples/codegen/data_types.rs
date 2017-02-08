@@ -54,11 +54,11 @@ impl BarMessage {
 
 impl MessageWrite for BarMessage {
     fn get_size(&self) -> usize {
-        1 + sizeof_int32(self.b_required_int32)
+        sizeof_varint(*&self.b_required_int32 as u64)
     }
 
-    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
-        r.write_int32_with_tag(8, self.b_required_int32)?;
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        w.write_with_tag(8, |w| w.write_varint(*&self.b_required_int32 as u64))?;
         Ok(())
     }
 }
@@ -109,8 +109,8 @@ impl<'a> FooMessage<'a> {
                 Ok(101) => msg.f_sfixed32 = Some(r.read_sfixed32(bytes)?),
                 Ok(105) => msg.f_double = Some(r.read_double(bytes)?),
                 Ok(117) => msg.f_float = Some(r.read_float(bytes)?),
-                Ok(122) => msg.f_bytes = Some(Cow::Borrowed(r.read_bytes(bytes)?)),
-                Ok(130) => msg.f_string = Some(Cow::Borrowed(r.read_string(bytes)?)),
+                Ok(122) => msg.f_bytes = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
+                Ok(130) => msg.f_string = Some(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(138) => msg.f_self_message = Some(Box::new(r.read_message(bytes, FooMessage::from_reader)?)),
                 Ok(146) => msg.f_bar_message = Some(r.read_message(bytes, BarMessage::from_reader)?),
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
@@ -128,55 +128,55 @@ impl<'a> FooMessage<'a> {
 
 impl<'a> MessageWrite for FooMessage<'a> {
     fn get_size(&self) -> usize {
-        self.f_int32.as_ref().map_or(0, |m| 1 + sizeof_int32(*m))
-        + self.f_int64.as_ref().map_or(0, |m| 1 + sizeof_int64(*m))
-        + self.f_uint32.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m))
-        + self.f_uint64.as_ref().map_or(0, |m| 1 + sizeof_uint64(*m))
-        + self.f_sint32.as_ref().map_or(0, |m| 1 + sizeof_sint32(*m))
-        + self.f_sint64.as_ref().map_or(0, |m| 1 + sizeof_sint64(*m))
-        + self.f_bool.as_ref().map_or(0, |m| 1 + sizeof_bool(*m))
-        + self.f_FooEnum.as_ref().map_or(0, |m| 1 + sizeof_enum(*m as i32))
-        + self.f_fixed64.as_ref().map_or(0, |_| 1 + 8)
-        + self.f_sfixed64.as_ref().map_or(0, |_| 1 + 8)
-        + self.f_fixed32.as_ref().map_or(0, |_| 1 + 4)
-        + self.f_sfixed32.as_ref().map_or(0, |_| 1 + 4)
-        + self.f_double.as_ref().map_or(0, |_| 1 + 8)
-        + self.f_float.as_ref().map_or(0, |_| 1 + 4)
-        + self.f_bytes.as_ref().map_or(0, |m| 1 + sizeof_var_length(m.len()))
-        + self.f_string.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.len()))
-        + self.f_self_message.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
-        + self.f_bar_message.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
-        + self.f_repeated_int32.iter().map(|s| 2 + sizeof_int32(*s)).sum::<usize>()
-        + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_var_length(self.f_repeated_packed_int32.iter().map(|s| sizeof_int32(*s)).sum::<usize>()) }
-        + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
-        + self.f_baz.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
-        + self.f_nested.as_ref().map_or(0, |m| 2 + sizeof_var_length(m.get_size()))
+        self.f_int32.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
+        + self.f_int64.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
+        + self.f_uint32.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
+        + self.f_uint64.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
+        + self.f_sint32.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
+        + self.f_sint64.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
+        + self.f_bool.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
+        + self.f_FooEnum.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
+        + self.f_fixed64.as_ref().map_or(0, |_| 8)
+        + self.f_sfixed64.as_ref().map_or(0, |_| 8)
+        + self.f_fixed32.as_ref().map_or(0, |_| 4)
+        + self.f_sfixed32.as_ref().map_or(0, |_| 4)
+        + self.f_double.as_ref().map_or(0, |_| 8)
+        + self.f_float.as_ref().map_or(0, |_| 4)
+        + self.f_bytes.as_ref().map_or(0, |m| m.len())
+        + self.f_string.as_ref().map_or(0, |m| m.len())
+        + self.f_self_message.as_ref().map_or(0, |m| m.get_size())
+        + self.f_bar_message.as_ref().map_or(0, |m| m.get_size())
+        + self.f_repeated_int32.iter().map(|s| 2 + sizeof_varint(*s as u64)).sum::<usize>()
+        + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_var_length(self.f_repeated_packed_int32.iter().map(|s| sizeof_varint(*s as u64)).sum::<usize>()) }
+        + self.f_imported.as_ref().map_or(0, |m| m.get_size())
+        + self.f_baz.as_ref().map_or(0, |m| m.get_size())
+        + self.f_nested.as_ref().map_or(0, |m| m.get_size())
     }
 
-    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.f_int32 { r.write_int32_with_tag(8, *s)?; }
-        if let Some(ref s) = self.f_int64 { r.write_int64_with_tag(16, *s)?; }
-        if let Some(ref s) = self.f_uint32 { r.write_uint32_with_tag(24, *s)?; }
-        if let Some(ref s) = self.f_uint64 { r.write_uint64_with_tag(32, *s)?; }
-        if let Some(ref s) = self.f_sint32 { r.write_sint32_with_tag(40, *s)?; }
-        if let Some(ref s) = self.f_sint64 { r.write_sint64_with_tag(48, *s)?; }
-        if let Some(ref s) = self.f_bool { r.write_bool_with_tag(56, *s)?; }
-        if let Some(ref s) = self.f_FooEnum { r.write_enum_with_tag(64, *s as i32)?; }
-        if let Some(ref s) = self.f_fixed64 { r.write_fixed64_with_tag(73, *s)?; }
-        if let Some(ref s) = self.f_sfixed64 { r.write_sfixed64_with_tag(81, *s)?; }
-        if let Some(ref s) = self.f_fixed32 { r.write_fixed32_with_tag(93, *s)?; }
-        if let Some(ref s) = self.f_sfixed32 { r.write_sfixed32_with_tag(101, *s)?; }
-        if let Some(ref s) = self.f_double { r.write_double_with_tag(105, *s)?; }
-        if let Some(ref s) = self.f_float { r.write_float_with_tag(117, *s)?; }
-        if let Some(ref s) = self.f_bytes { r.write_bytes_with_tag(122, s)?; }
-        if let Some(ref s) = self.f_string { r.write_string_with_tag(130, s)?; }
-        if let Some(ref s) = self.f_self_message { r.write_message_with_tag(138, &**s)?; }
-        if let Some(ref s) = self.f_bar_message { r.write_message_with_tag(146, s)?; }
-        for s in &self.f_repeated_int32 { r.write_int32_with_tag(152, *s)? }
-        r.write_packed_repeated_field_with_tag(162, &self.f_repeated_packed_int32, |r, m| r.write_int32(*m), &|m| sizeof_int32(*m))?;
-        if let Some(ref s) = self.f_imported { r.write_message_with_tag(170, s)?; }
-        if let Some(ref s) = self.f_baz { r.write_message_with_tag(178, s)?; }
-        if let Some(ref s) = self.f_nested { r.write_message_with_tag(186, s)?; }
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        if let Some(ref s) = self.f_int32 { w.write_with_tag(8, |w| w.write_varint(*s as u64))?; }
+        if let Some(ref s) = self.f_int64 { w.write_with_tag(16, |w| w.write_varint(*s as u64))?; }
+        if let Some(ref s) = self.f_uint32 { w.write_with_tag(24, |w| w.write_varint(*s as u64))?; }
+        if let Some(ref s) = self.f_uint64 { w.write_with_tag(32, |w| w.write_varint(*s as u64))?; }
+        if let Some(ref s) = self.f_sint32 { w.write_with_tag(40, |w| w.write_varint(*s as u64))?; }
+        if let Some(ref s) = self.f_sint64 { w.write_with_tag(48, |w| w.write_varint(*s as u64))?; }
+        if let Some(ref s) = self.f_bool { w.write_with_tag(56, |w| w.write_varint(*s as u64))?; }
+        if let Some(ref s) = self.f_FooEnum { w.write_with_tag(64, |w| w.write_varint(*s as u64))?; }
+        if let Some(ref s) = self.f_fixed64 { w.write_with_tag(73, |w| w.write_fixed64(*s))?; }
+        if let Some(ref s) = self.f_sfixed64 { w.write_with_tag(81, |w| w.write_sfixed64(*s))?; }
+        if let Some(ref s) = self.f_fixed32 { w.write_with_tag(93, |w| w.write_fixed32(*s))?; }
+        if let Some(ref s) = self.f_sfixed32 { w.write_with_tag(101, |w| w.write_sfixed32(*s))?; }
+        if let Some(ref s) = self.f_double { w.write_with_tag(105, |w| w.write_double(*s))?; }
+        if let Some(ref s) = self.f_float { w.write_with_tag(117, |w| w.write_float(*s))?; }
+        if let Some(ref s) = self.f_bytes { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
+        if let Some(ref s) = self.f_string { w.write_with_tag(130, |w| w.write_string(&**s))?; }
+        if let Some(ref s) = self.f_self_message { w.write_with_tag(138, |w| w.write_message(&**s))?; }
+        if let Some(ref s) = self.f_bar_message { w.write_with_tag(146, |w| w.write_message(s))?; }
+        for s in &self.f_repeated_int32 { w.write_with_tag(152, |w| w.write_varint(*s as u64))?; }
+        w.write_packed_with_tag(162, &self.f_repeated_packed_int32, |w, m| w.write_varint(*m as u64), &|m| sizeof_varint(*m as u64))?;
+        if let Some(ref s) = self.f_imported { w.write_with_tag(170, |w| w.write_message(s))?; }
+        if let Some(ref s) = self.f_baz { w.write_with_tag(178, |w| w.write_message(s))?; }
+        if let Some(ref s) = self.f_nested { w.write_with_tag(186, |w| w.write_message(s))?; }
         Ok(())
     }
 }
@@ -202,11 +202,11 @@ impl BazMessage {
 
 impl MessageWrite for BazMessage {
     fn get_size(&self) -> usize {
-        self.nested.as_ref().map_or(0, |m| 1 + sizeof_var_length(m.get_size()))
+        self.nested.as_ref().map_or(0, |m| m.get_size())
     }
 
-    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.nested { r.write_message_with_tag(10, s)?; }
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        if let Some(ref s) = self.nested { w.write_with_tag(10, |w| w.write_message(s))?; }
         Ok(())
     }
 }
@@ -236,11 +236,11 @@ impl Nested {
 
 impl MessageWrite for Nested {
     fn get_size(&self) -> usize {
-        1 + sizeof_int32(self.f_nested)
+        sizeof_varint(*&self.f_nested as u64)
     }
 
-    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
-        r.write_int32_with_tag(8, self.f_nested)?;
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        w.write_with_tag(8, |w| w.write_varint(*&self.f_nested as u64))?;
         Ok(())
     }
 }

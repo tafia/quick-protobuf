@@ -68,15 +68,15 @@ named!(field_type<FieldType>,
             tag!("uint64") => { |_| FieldType::Uint64 } |
             tag!("sint32") => { |_| FieldType::Sint32 } |
             tag!("sint64") => { |_| FieldType::Sint64 } |
-            tag!("bool") => { |_| FieldType::Bool } |
-            tag!("fixed64") => { |_| FieldType::Fixed64 } |
-            tag!("sfixed64") => { |_| FieldType::Sfixed64 } |
-            tag!("double") => { |_| FieldType::Double } |
-            tag!("string") => { |_| FieldType::String_ } |
-            tag!("bytes") => { |_| FieldType::Bytes } |
             tag!("fixed32") => { |_| FieldType::Fixed32 } |
             tag!("sfixed32") => { |_| FieldType::Sfixed32 } |
+            tag!("fixed64") => { |_| FieldType::Fixed64 } |
+            tag!("sfixed64") => { |_| FieldType::Sfixed64 } |
+            tag!("bool") => { |_| FieldType::Bool } |
+            tag!("string") => { |_| FieldType::String_ } |
+            tag!("bytes") => { |_| FieldType::Bytes } |
             tag!("float") => { |_| FieldType::Float } |
+            tag!("double") => { |_| FieldType::Double } |
             map_field => { |(k, v)| FieldType::Map(Box::new((k, v))) } |
             word => { |w| FieldType::Message(w) }));
 

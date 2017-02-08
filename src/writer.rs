@@ -1,5 +1,6 @@
 //! A module to manage protobuf serialization
 
+use std::collections::HashMap;
 use std::io::Write;
 
 use errors::Result;
@@ -75,6 +76,14 @@ impl<W: Write> Writer<W> {
     /// Writes a tag, which represents both the field number and the wire type
     pub fn write_tag(&mut self, tag: u32) -> Result<()> {
         self.write_varint(tag as u64)
+    }
+
+    /// Writes another item prefixed with tag
+    pub fn write_with_tag<F>(&mut self, tag: u32, mut write: F) -> Result<()>
+        where F: FnMut(&mut Self) -> Result<()>
+    {
+        self.write_tag(tag)?;
+        write(self)
     }
 
     /// Writes a `int32` which is internally coded as a `varint`
@@ -159,7 +168,7 @@ impl<W: Write> Writer<W> {
     }
 
     /// Writes packed repeated field: length first then the chunk of data
-    pub fn write_packed_repeated_field<M, F, S>(&mut self, v: &[M], mut write: F, size: &S) -> Result<()>
+    pub fn write_packed<M, F, S>(&mut self, v: &[M], mut write: F, size: &S) -> Result<()>
         where F: FnMut(&mut Self, &M) -> Result<()>,
               S: Fn(&M) -> usize,
     {
@@ -179,8 +188,8 @@ impl<W: Write> Writer<W> {
     /// `item_size` is internally used to compute the total length
     /// As the length is fixed (and the same as rust internal representation, we can directly dump
     /// all data at once
-    pub fn write_packed_fixed_size<M>(&mut self, v: &[M], item_size: usize) -> Result<()> {
-        let len = v.len() * item_size;
+    pub fn write_packed_fixed_size<M>(&mut self, v: &[M]) -> Result<()> {
+        let len = v.len() * ::std::mem::size_of::<M>();
         let bytes = unsafe { ::std::slice::from_raw_parts(v as *const [M] as *const M as *const u8, len) };
         self.write_bytes(bytes)
     }
@@ -191,6 +200,31 @@ impl<W: Write> Writer<W> {
         self.write_varint(len as u64)?;
         m.write_message(self)
     }
+
+    /// Write entire map
+    pub fn write_map<K, V, FK, SK, FV, SV>(&mut self, v: &HashMap<K, V>, 
+                                           tag_key: u32, mut write_key: FK, size_key: &SK,
+                                           tag_val: u32, mut write_val: FV, size_val: &SV) -> Result<()>
+        where K: Eq + ::std::hash::Hash,
+              FK: FnMut(&mut Self, &K) -> Result<()>,
+              SK: Fn(&K) -> usize,
+              FV: FnMut(&mut Self, &V) -> Result<()>,
+              SV: Fn(&V) -> usize,
+    {
+        if v.is_empty() {
+            return Ok(());
+        }
+        
+        for (k, v) in v.iter() {
+            self.write_varint((size_key(k) + size_val(v) + 2) as u64)?;
+            self.write_tag(tag_key)?;
+            write_key(self, k)?;
+            self.write_tag(tag_val)?;
+            write_val(self, v)?;
+        }
+        Ok(())
+    }
+
 
     /// Writes tag then `int32`
     pub fn write_int32_with_tag(&mut self, tag: u32, v: i32) -> Result<()> {
@@ -286,11 +320,11 @@ impl<W: Write> Writer<W> {
     /// Writes tag then repeated field
     ///
     /// If array is empty, then do nothing (do not even write the tag)
-    pub fn write_packed_repeated_field_with_tag<M, F, S>(&mut self, 
-                                                         tag: u32, 
-                                                         v: &[M], 
-                                                         mut write: F, 
-                                                         size: &S) -> Result<()>
+    pub fn write_packed_with_tag<M, F, S>(&mut self, 
+                                          tag: u32, 
+                                          v: &[M], 
+                                          mut write: F, 
+                                          size: &S) -> Result<()>
         where F: FnMut(&mut Self, &M) -> Result<()>,
               S: Fn(&M) -> usize,
     {

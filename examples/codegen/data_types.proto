@@ -33,6 +33,7 @@ message FooMessage {
     optional a.b.ImportedMessage f_imported = 21;
     optional BazMessage f_baz = 22;
     optional BazMessage.Nested f_nested = 23;
+    //map<string, int32> f_map = 24;
 }
 
 message BazMessage {

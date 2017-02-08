@@ -28,5 +28,9 @@ error_chain! {
             display("error while parsing message: {}", s)
 
         }
+        Map(tag: u32, key: u32, value: u32) {
+            description("unexpected map tag")
+            display("expecting a tag key ({}) or a tag value ({}), got {}", key, value, tag)
+        }
     }
 }

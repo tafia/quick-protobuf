@@ -76,23 +76,16 @@ impl FieldType {
         }
     }
 
-    fn is_message(&self) -> bool {
-        match *self {
-            FieldType::Message(_) => true,
-            _ => false,
-        }
-    }
-
-    fn is_enum(&self) -> bool {
-        match *self {
-            FieldType::Enum(_) => true,
-            _ => false,
-        }
-    }
-
     fn is_cow(&self) -> bool {
         match *self {
             FieldType::Bytes | FieldType::String_ => true,
+            _ => false,
+        }
+    }
+
+    fn is_map(&self) -> bool {
+        match *self {
+            FieldType::Map(_) => true,
             _ => false,
         }
     }
@@ -217,19 +210,61 @@ impl FieldType {
     fn read_fn(&self, msgs: &[Message]) -> String {
         match *self {
             FieldType::Message(ref msg) => match self.find_message(msgs) {
-                Some(m) => format!("read_message(bytes, {}{}::from_reader)", 
+                Some(m) => format!("r.read_message(bytes, {}{}::from_reader)", 
                                    m.get_modules(), m.name),
                 None => unreachable!(format!("Could not find message {}", msg)),
             },
-            FieldType::Map(ref m) => {
-                let &(ref key, ref value) = &**m;
-                format!("read_map(bytes, |r, bytes| {}, |r, bytes| {})",
-                        key.read_fn(msgs), value.read_fn(msgs))
-            },
-            _ => format!("read_{}(bytes)", self.proto_type()),
+            FieldType::Map(_) => unreachable!("There should be a special case for maps"),
+            _ => format!("r.read_{}(bytes)", self.proto_type()),
         }
     }
 
+    fn get_size(&self, s: &str) -> String {
+        match *self {
+            FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
+            FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
+            FieldType::Bool | FieldType::Enum(_) => format!("sizeof_varint(*{} as u64)", s),
+
+            FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
+            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
+
+            FieldType::String_ | FieldType::Bytes => format!("{}.len()", s),
+
+            FieldType::Message(_) => format!("{}.get_size()", s),
+            
+            FieldType::Map(ref m) => {
+                let &(ref k, ref v) = &**m;
+                format!("{}.iter().map(|(k, v)| 2 + {} + {}).sum::<usize>()", s, k.get_size("k"), v.get_size("v"))
+            }
+        }
+    }
+
+    fn get_write(&self, s: &str, boxed: bool) -> String {
+        match *self {
+            FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
+            FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
+            FieldType::Bool | FieldType::Enum(_) => format!("write_varint(*{} as u64)", s),
+
+            FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double |
+            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => {
+                format!("write_{}(*{})", self.proto_type(), s)
+            },
+
+            FieldType::String_ => format!("write_string(&**{})", s),
+            FieldType::Bytes => format!("write_bytes(&**{})", s),
+
+            FieldType::Message(_) if boxed => format!("write_message(&**{})", s),
+            FieldType::Message(_) => format!("write_message({})", s),
+            
+            FieldType::Map(ref m) => {
+                let &(ref k, ref v) = &**m;
+                format!("write_map(&{}, {}, |w, k| w.{}, &|k| {}, {}, |w, v| w.{}, &|v| {})",
+                        s, 
+                        tag(1, k, false), k.get_write("k", false), k.get_size("k"), 
+                        tag(2, v, false), v.get_write("v", false), v.get_size("v"))
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -269,7 +304,7 @@ impl Field {
     }
 
     fn tag(&self) -> u32 {
-        (self.number as u32) << 3 | self.typ.wire_type_num(self.packed())
+        tag(self.number as u32, &self.typ, self.packed())
     }
 
     fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
@@ -285,22 +320,50 @@ impl Field {
     }
 
     fn write_match_tag<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        let val = if self.typ.is_cow() {
-            format!("Cow::Borrowed(r.{}?)", self.typ.read_fn(msgs))
-        } else {
-            format!("r.{}?", self.typ.read_fn(msgs))
-        };
 
-        write!(w, "                Ok({}) => msg.{}", self.tag(), self.name)?;
+        // special case for FieldType::Map
+        if let FieldType::Map(ref m) = self.typ {
+            let &(ref key, ref value) = &**m;
+
+            let fn_key = if key.is_cow() {
+                format!("{}.map(Cow::Borrowed)", key.read_fn(msgs))
+            } else {
+                key.read_fn(msgs)
+            };
+            let fn_val = if value.is_cow() {
+                format!("{}.map(Cow::Borrowed)", value.read_fn(msgs))
+            } else {
+                value.read_fn(msgs)
+            };
+
+            writeln!(w, "                Ok({}) => {{", self.tag())?;
+            writeln!(w, "                    let (key, value) = r.read_map(bytes,")?;
+            writeln!(w, "                                                  {}, |r, bytes| {},",
+                     tag(1, key, false), fn_key)?;
+            writeln!(w, "                                                  {}, |r, bytes| {})?;",
+                     tag(2, value, false), fn_val)?;
+            writeln!(w, "                    msg.{}.insert(key, value);", self.name)?;
+            writeln!(w, "                }}")?;
+            return Ok(());
+        }
+
+        let val = self.typ.read_fn(msgs);
+        let val_cow = if self.typ.is_cow() { 
+            format!("{}.map(Cow::Borrowed)", val) 
+        } else {
+            val.clone() 
+        };
+        let name = &self.name;
+        write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
-            Frequency::Required => writeln!(w, " = {},", val)?,
-            Frequency::Optional if self.default.is_some() => writeln!(w, " = {},", val)?,
-            Frequency::Optional if self.boxed => writeln!(w, " = Some(Box::new({})),", val)?,
-            Frequency::Optional => writeln!(w, " = Some({}),", val)?,
+            Frequency::Required => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
+            Frequency::Optional if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
+            Frequency::Optional if self.default.is_some() => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
+            Frequency::Optional => writeln!(w, "msg.{} = Some({}?),", name, val_cow)?,
             Frequency::Repeated if self.packed() => {
-                writeln!(w, " = r.read_packed(bytes, |r, bytes| r.{})?,", self.typ.read_fn(msgs))?
-            }
-            Frequency::Repeated => writeln!(w, ".push({}),", val)?,
+                writeln!(w, "msg.{} = r.read_packed(bytes, |r, bytes| {})?,", name, val)?;
+            },
+            Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val)?,
         }
         Ok(())
     }
@@ -312,130 +375,70 @@ impl Field {
             write!(w, "        + ")?;
         }
         match self.frequency {
-            Frequency::Required => {
-                self.write_inner_get_size(w, &format!("self.{}", self.name), "")?;
-                writeln!(w, "")?;
-            }
+            Frequency::Required => writeln!(w, "{}", self.typ.get_size(&format!("&self.{}", self.name)))?,
             Frequency::Optional => {
                 match self.default.as_ref() {
                     None => {
+                        write!(w, "self.{}.as_ref().map_or(0, ", self.name)?;
                         if self.typ.is_fixed_size() {
-                            write!(w, "self.{}.as_ref().map_or(0, |_| ", self.name)?;
+                            writeln!(w, "|_| {})", self.typ.get_size(""))?;
                         } else {
-                            write!(w, "self.{}.as_ref().map_or(0, |m| ", self.name)?;
+                            writeln!(w, "|m| {})", self.typ.get_size("m"))?;
                         }
-                        self.write_inner_get_size(w, "m", "*")?;
-                        writeln!(w, ")")?;
                     }
                     Some(d) => {
-                        write!(w, "if self.{} == {} {{ 0 }} else {{", self.name, d)?;
-                        self.write_inner_get_size(w, &format!("self.{}", self.name), "")?;
-                        writeln!(w, "}}")?;
+                        write!(w, "if self.{} == {} {{ 0 }} else {{ {} }}", 
+                               self.name, d, self.typ.get_size(&format!("&self.{}", self.name)))?;
                     }
                 }
             }
             Frequency::Repeated => {
                 let tag_size = sizeof_varint(self.tag());
-                let get_type = self.typ.proto_type();
-                let as_enum = if self.typ.is_enum() { " as i32" } else { "" };
                 if self.packed() {
                     write!(w, "if self.{}.is_empty() {{ 0 }} else {{ ", self.name)?;
                     match self.typ.wire_type_num_non_packed() {
-                        0 => write!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_{}(*s{})).sum::<usize>())", 
-                                    tag_size, self.name, get_type, as_enum)?,
-                        1 => write!(w, "{} + sizeof_var_length(self.{}.len() * 8)", tag_size, self.name)?,
-                        5 => write!(w, "{} + sizeof_var_length(self.{}.len() * 4)", tag_size, self.name)?,
-                        2 => {
-                            let len = if self.typ.is_message() { "get_size" } else { "len" };
-                            write!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_var_length(s.{}())).sum::<usize>())", 
-                                   tag_size, self.name, len)?;
-                        }
-                        e => panic!("expecting wire type number, got: {}", e),
+                        1 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 8) }}", tag_size, self.name)?,
+                        5 => writeln!(w, "{} + sizeof_var_length(self.{}.len() * 4) }}", tag_size, self.name)?,
+                        _ => writeln!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| {}).sum::<usize>()) }}", 
+                                    tag_size, self.name, self.typ.get_size("s"))?,
                     }
-                    writeln!(w, " }}")?;
                 } else {
                     match self.typ.wire_type_num_non_packed() {
-                        0 => writeln!(w, "self.{}.iter().map(|s| {} + sizeof_{}(*s{})).sum::<usize>()", 
-                                      self.name, tag_size, get_type, as_enum)?,
                         1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
                         5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
-                        2 => {
-                            let len = if self.typ.is_message() { "get_size" } else { "len" };
-                            writeln!(w, "self.{}.iter().map(|s| {} + sizeof_var_length(s.{}())).sum::<usize>()", 
-                                     self.name, tag_size, len)?;
-                        }
-                        e => return Err(ErrorKind::InvalidWireType(e).into()),
+                        _ => writeln!(w, "self.{}.iter().map(|s| {} + {}).sum::<usize>()", 
+                                      self.name, tag_size, self.typ.get_size("s"))?,
+
                     }
                 }
             }
-        }
-        Ok(())
-    }
-
-    fn write_inner_get_size<W: Write>(&self, w: &mut W, s: &str, as_ref: &str) -> Result<()> {
-        let tag_size = sizeof_varint(self.tag());
-        match self.typ.wire_type_num_non_packed() {
-            0 => {
-                let get_type = self.typ.proto_type();
-                let as_enum = if self.typ.is_enum() { " as i32" } else { "" };
-                write!(w, "{} + sizeof_{}({}{}{})", tag_size, get_type, as_ref, s, as_enum)?
-            },
-            1 => write!(w, "{} + 8", tag_size)?,
-            5 => write!(w, "{} + 4", tag_size)?,
-            2 => {
-                let len = if self.typ.is_message() { "get_size" } else { "len" };
-                if self.packed() {
-                    write!(w, "if s.is_empty() {{ 0 }} else {{ {} + sizeof_var_length({}.{}()) }}", tag_size, s, len)?;
-                } else {
-                    write!(w, "{} + sizeof_var_length({}.{}())", tag_size, s, len)?;
-                }
-            }
-            e => return Err(ErrorKind::InvalidWireType(e).into()),
         }
         Ok(())
     }
 
     fn write_write<W: Write>(&self, w: &mut W) -> Result<()> {
-        let tag = self.tag();
-        let use_ref = self.typ.wire_type_num_non_packed() == 2;
-        let get_type = self.typ.proto_type();
-        let as_enum = if self.typ.is_enum() { " as i32" } else { "" };
         match self.frequency {
             Frequency::Required => {
-                let r = if use_ref { "&" } else { "" };
-                writeln!(w, "        r.write_{}_with_tag({}, {}self.{}{})?;", get_type, tag, r, self.name, as_enum)?;
-            },
-            Frequency::Optional => {
-                let r = if use_ref { 
-                    if self.boxed { "&**" } else { "" }
-                } else { 
-                    "*" 
-                };
-                match self.default.as_ref() {
-                    None => {
-                        writeln!(w, "        if let Some(ref s) = self.{} {{ r.write_{}_with_tag({}, {}s{})?; }}", 
-                                 self.name, get_type, tag, r, as_enum)?;
-                    },
-                    Some(d) => {
-                        writeln!(w, "        if self.{} != {} {{ r.write_{}_with_tag({}, self.{0}{})?; }}", 
-                                 self.name, d, get_type, tag, as_enum)?;
-                    }
-                }
+                writeln!(w, "        w.write_with_tag({}, |w| w.{})?;", 
+                         self.tag(), self.typ.get_write(&format!("&self.{}", self.name), self.boxed))?;
             }
+            Frequency::Optional => match self.default.as_ref() {
+                None => {
+                    writeln!(w, "        if let Some(ref s) = self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                             self.name, self.tag(), self.typ.get_write("s", self.boxed))?;
+                },
+                Some(d) => {
+                    writeln!(w, "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                             self.name, d, self.tag(), self.typ.get_write(&format!("&self.{}", self.name), self.boxed))?;
+                }
+            },
             Frequency::Repeated if self.packed() => {
-                let size_of = match self.typ {
-                    FieldType::Message(_) => "&|m| sizeof_var_length(m.get_size())".to_string(),
-                    FieldType::String_ | 
-                        FieldType::Bytes => "&|m| sizeof_var_length(m.len())".to_string(),
-                    _ => format!("&|m| sizeof_{}(*m)", get_type),
-
-                };
-                writeln!(w, "        r.write_packed_repeated_field_with_tag({}, &self.{}, |r, m| r.write_{}({}m{}), {})?;",
-                         tag, self.name, get_type, if use_ref { "" } else { "*" }, as_enum, size_of)?
+                writeln!(w, "        w.write_packed_with_tag({}, &self.{}, |w, m| w.{}, &|m| {})?;",
+                         self.tag(), self.name, self.typ.get_write("m", self.boxed), self.typ.get_size("m"))?
             }
             Frequency::Repeated => {
-                writeln!(w, "        for s in &self.{} {{ r.write_{}_with_tag({}, {}s{})? }}", 
-                         self.name, get_type, tag, if use_ref { "" } else { "*" }, as_enum)?;
+                writeln!(w, "        for s in &self.{} {{ w.write_with_tag({}, |w| w.{})?; }}", 
+                         self.name, self.tag(), self.typ.get_write("s", self.boxed))?;
             }
         }
         Ok(())
@@ -488,6 +491,9 @@ impl Message {
             writeln!(w, "")?;
             if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_cow())) {
                 writeln!(w, "use std::borrow::Cow;")?;
+            }
+            if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_map())) {
+                writeln!(w, "use std::collections::HashMap;")?;
             }
             writeln!(w, "use super::*;")?;
             for m in &self.messages {
@@ -564,7 +570,7 @@ impl Message {
     }
 
     fn write_write_message<W: Write>(&self, w: &mut W) -> Result<()> {
-        writeln!(w, "    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {{")?;
+        writeln!(w, "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w)?;
         }
@@ -742,6 +748,14 @@ impl FileDescriptor {
     }
 
     fn set_defaults(&mut self) {
+        // set map fields as required (they are equivalent to repeated message)
+        for m in &mut self.messages {
+            for f in &mut m.fields {
+                if let FieldType::Map(_) = f.typ {
+                    f.frequency = Frequency::Required;
+                }
+            }
+        }
         // if proto3, then changes several defaults
         if let Syntax::Proto3 = self.syntax {
             for m in &mut self.messages {
@@ -795,6 +809,9 @@ impl FileDescriptor {
         writeln!(w, "use std::io::{{Write}};")?;
         if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_cow())) {
             writeln!(w, "use std::borrow::Cow;")?;
+        }
+        if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_map())) {
+            writeln!(w, "use std::collections::HashMap;")?;
         }
         writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
@@ -903,4 +920,9 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
             }
         }
     }
+}
+
+/// Calculates the tag value
+fn tag(number: u32, typ: &FieldType, packed: bool) -> u32 {
+    number << 3 | typ.wire_type_num(packed)
 }

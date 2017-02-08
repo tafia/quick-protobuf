@@ -32,11 +32,11 @@ impl ImportedMessage {
 
 impl MessageWrite for ImportedMessage {
     fn get_size(&self) -> usize {
-        self.i.as_ref().map_or(0, |m| 1 + sizeof_bool(*m))
+        self.i.as_ref().map_or(0, |m| sizeof_varint(*m as u64))
     }
 
-    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.i { r.write_bool_with_tag(8, *s)?; }
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        if let Some(ref s) = self.i { w.write_with_tag(8, |w| w.write_varint(*s as u64))?; }
         Ok(())
     }
 }

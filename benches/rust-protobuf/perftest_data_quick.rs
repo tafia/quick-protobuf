@@ -2,6 +2,7 @@
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
 
 use std::io::{Write};
 use std::borrow::Cow;
@@ -186,9 +187,9 @@ impl<'a> TestStrings<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.s1 = Some(Cow::Borrowed(r.read_string(bytes)?)),
-                Ok(18) => msg.s2 = Some(Cow::Borrowed(r.read_string(bytes)?)),
-                Ok(26) => msg.s3 = Some(Cow::Borrowed(r.read_string(bytes)?)),
+                Ok(10) => msg.s1 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.s2 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.s3 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -222,7 +223,7 @@ impl<'a> TestBytes<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.b1 = Some(Cow::Borrowed(r.read_bytes(bytes)?)),
+                Ok(10) => msg.b1 = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
