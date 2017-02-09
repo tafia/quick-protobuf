@@ -87,7 +87,7 @@ named!(map_field<(FieldType, FieldType)>,
                  ((key, value)) ));
 
 named!(message_field<Field>, 
-       do_parse!(frequency: opt!(frequency) >> many1!(br) >>
+       do_parse!(frequency: opt!(frequency) >> many0!(br) >>
                  typ: field_type >> many1!(br) >>
                  name: word >> many0!(br) >> tag!("=") >> many0!(br) >>
                  number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
