@@ -89,6 +89,7 @@ pub struct FooMessage<'a> {
     pub f_imported: Option<mod_a::mod_b::ImportedMessage>,
     pub f_baz: Option<BazMessage>,
     pub f_nested: Option<mod_BazMessage::Nested>,
+    pub f_nested_enum: Option<mod_BazMessage::mod_Nested::NestedEnum>,
     pub f_map: HashMap<Cow<'a, str>, i32>,
 }
 
@@ -120,7 +121,8 @@ impl<'a> FooMessage<'a> {
                 Ok(170) => msg.f_imported = Some(r.read_message(bytes, mod_a::mod_b::ImportedMessage::from_reader)?),
                 Ok(178) => msg.f_baz = Some(r.read_message(bytes, BazMessage::from_reader)?),
                 Ok(186) => msg.f_nested = Some(r.read_message(bytes, mod_BazMessage::Nested::from_reader)?),
-                Ok(194) => {
+                Ok(192) => msg.f_nested_enum = Some(r.read_enum(bytes)?),
+                Ok(202) => {
                     let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_int32(bytes))?;
                     msg.f_map.insert(key, value);
                 }
@@ -157,6 +159,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_baz.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_nested.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
+        + self.f_nested_enum.as_ref().map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
         + self.f_map.iter().map(|(k, v)| 2 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))).sum::<usize>()
     }
 
@@ -184,7 +187,8 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_imported { w.write_with_tag(170, |w| w.write_message(s))?; }
         if let Some(ref s) = self.f_baz { w.write_with_tag(178, |w| w.write_message(s))?; }
         if let Some(ref s) = self.f_nested { w.write_with_tag(186, |w| w.write_message(s))?; }
-        for (k, v) in self.f_map.iter() { w.write_with_tag(194, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)))?; }
+        if let Some(ref s) = self.f_nested_enum { w.write_with_tag(192, |w| w.write_enum(*s as i32))?; }
+        for (k, v) in self.f_map.iter() { w.write_with_tag(202, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)))?; }
         Ok(())
     }
 }
@@ -225,7 +229,7 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Nested {
-    pub f_nested: mod_BazMessage::mod_Nested::Nested2,
+    pub f_nested: mod_BazMessage::mod_Nested::NestedMessage,
 }
 
 impl Nested {
@@ -233,7 +237,7 @@ impl Nested {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.f_nested = r.read_message(bytes, mod_BazMessage::mod_Nested::Nested2::from_reader)?,
+                Ok(10) => msg.f_nested = r.read_message(bytes, mod_BazMessage::mod_Nested::NestedMessage::from_reader)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -258,11 +262,11 @@ pub mod mod_Nested {
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct Nested2 {
+pub struct NestedMessage {
     pub f_nested: i32,
 }
 
-impl Nested2 {
+impl NestedMessage {
     pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
@@ -276,7 +280,7 @@ impl Nested2 {
     }
 }
 
-impl MessageWrite for Nested2 {
+impl MessageWrite for NestedMessage {
     fn get_size(&self) -> usize {
         1 + sizeof_varint(*(&self.f_nested) as u64)
     }
@@ -284,6 +288,30 @@ impl MessageWrite for Nested2 {
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_with_tag(8, |w| w.write_int32(*&self.f_nested))?;
         Ok(())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum NestedEnum {
+    Foo = 0,
+    Bar = 1,
+    Baz = 2,
+}
+
+impl Default for NestedEnum {
+    fn default() -> Self {
+        NestedEnum::Foo
+    }
+}
+
+impl From<i32> for NestedEnum {
+    fn from(i: i32) -> Self {
+        match i {
+            0 => NestedEnum::Foo,
+            1 => NestedEnum::Bar,
+            2 => NestedEnum::Baz,
+            _ => Self::default(),
+        }
     }
 }
 

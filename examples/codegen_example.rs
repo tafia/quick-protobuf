@@ -33,8 +33,11 @@ fn main() {
 
         // nested messages are encapsulated into a rust module mod_Message
         f_nested: Some(data_types::mod_BazMessage::Nested { 
-            f_nested: data_types::mod_BazMessage::mod_Nested::Nested2 { f_nested: 2 }
+            f_nested: data_types::mod_BazMessage::mod_Nested::NestedMessage { f_nested: 2 }
         }),
+
+        // nested enums too
+        f_nested_enum: Some(data_types::mod_BazMessage::mod_Nested::NestedEnum::Baz),
 
         // a map!
         f_map: vec![(Cow::Borrowed("foo"), 1), (Cow::Borrowed("bar"), 2)].into_iter().collect(),

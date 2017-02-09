@@ -33,15 +33,21 @@ message FooMessage {
     optional a.b.ImportedMessage f_imported = 21;
     optional BazMessage f_baz = 22;
     optional BazMessage.Nested f_nested = 23;
-    map<string, int32> f_map = 24;
+    optional BazMessage.Nested.NestedEnum f_nested_enum = 24;
+    map<string, int32> f_map = 25;
 }
 
 message BazMessage {
     message Nested {
-        message Nested2 {
+        message NestedMessage {
             required int32 f_nested = 1;
         }
-        required Nested2 f_nested = 1;
+        enum NestedEnum {
+            Foo = 0;
+            Bar = 1;
+            Baz = 2;
+        }
+        required NestedMessage f_nested = 1;
     }
     optional Nested nested = 1;
 }
