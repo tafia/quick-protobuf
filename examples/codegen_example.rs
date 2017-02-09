@@ -34,6 +34,9 @@ fn main() {
         // nested messages are encapsulated into a rust module mod_Message
         f_nested: Some(data_types::mod_BazMessage::Nested { f_nested: 2 }),
 
+        // a map!
+        f_map: vec![(Cow::Borrowed("foo"), 1), (Cow::Borrowed("bar"), 2)].into_iter().collect(),
+
         // Each message implements Default ... which makes it much easier
         ..FooMessage::default()
     };

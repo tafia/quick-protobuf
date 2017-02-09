@@ -1,7 +1,7 @@
 use std::str;
 use std::path::{Path, PathBuf};
 
-use types::{Frequency, Field, Message, Enumerator, FileDescriptor, Syntax};
+use types::{Frequency, Field, Message, Enumerator, FileDescriptor, Syntax, FieldType};
 use nom::{multispace, digit};
 
 fn is_word(b: u8) -> bool {
@@ -61,30 +61,59 @@ named!(frequency<Frequency>,
             tag!("repeated") => { |_| Frequency::Repeated } |
             tag!("required") => { |_| Frequency::Required } ));
 
+named!(field_type<FieldType>,
+       alt!(tag!("int32") => { |_| FieldType::Int32 } |
+            tag!("int64") => { |_| FieldType::Int64 } |
+            tag!("uint32") => { |_| FieldType::Uint32 } |
+            tag!("uint64") => { |_| FieldType::Uint64 } |
+            tag!("sint32") => { |_| FieldType::Sint32 } |
+            tag!("sint64") => { |_| FieldType::Sint64 } |
+            tag!("fixed32") => { |_| FieldType::Fixed32 } |
+            tag!("sfixed32") => { |_| FieldType::Sfixed32 } |
+            tag!("fixed64") => { |_| FieldType::Fixed64 } |
+            tag!("sfixed64") => { |_| FieldType::Sfixed64 } |
+            tag!("bool") => { |_| FieldType::Bool } |
+            tag!("string") => { |_| FieldType::String_ } |
+            tag!("bytes") => { |_| FieldType::Bytes } |
+            tag!("float") => { |_| FieldType::Float } |
+            tag!("double") => { |_| FieldType::Double } |
+            map_field => { |(k, v)| FieldType::Map(Box::new((k, v))) } |
+            word => { |w| FieldType::Message(w) }));
+
+named!(map_field<(FieldType, FieldType)>,
+       do_parse!(tag!("map") >> many0!(br) >> tag!("<") >> many0!(br) >>
+                 key: field_type >> many0!(br) >> tag!(",") >> many0!(br) >>
+                 value: field_type >> tag!(">") >>
+                 ((key, value)) ));
+
 named!(message_field<Field>, 
-       do_parse!(frequency: opt!(frequency) >> many1!(br) >>
-                 typ: word >> many1!(br) >>
+       do_parse!(frequency: opt!(frequency) >> many0!(br) >>
+                 typ: field_type >> many1!(br) >>
                  name: word >> many0!(br) >> tag!("=") >> many0!(br) >>
                  number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
                  key_vals: many0!(key_val) >> tag!(";") >>
                  (Field {
-                    name: name,
-                    frequency: frequency.unwrap_or(Frequency::Optional),
-                    typ: typ,
-                    number: number,
-                    default: key_vals.iter().find(|&&(k, _)| k == "default")
-                                      .map(|&(_, v)| v.to_string()),
-                    packed: key_vals.iter().find(|&&(k, _)| k == "packed")
-                                    .map(|&(_, v)| str::FromStr::from_str(v)
-                                         .expect("Cannot parse Packed value")),
-                    boxed: false,
-                    deprecated: key_vals.iter().find(|&&(k, _)| k == "deprecated")
-                                        .map_or(false, |&(_, v)| str::FromStr::from_str(v)
-                                                .expect("Cannot parse Deprecated value")),
+                      name: name,
+                      frequency: frequency.unwrap_or(Frequency::Optional),
+                      typ: typ,
+                      number: number,
+                      default: key_vals.iter()
+                               .find(|&&(k, _)| k == "default")
+                               .map(|&(_, v)| v.to_string()),
+                      packed: key_vals.iter()
+                              .find(|&&(k, _)| k == "packed")
+                              .map(|&(_, v)| str::FromStr::from_str(v)
+                                   .expect("Cannot parse Packed value")),
+                      boxed: false,
+                      deprecated: key_vals.iter()
+                                  .find(|&&(k, _)| k == "deprecated")
+                                  .map_or(false, |&(_, v)| str::FromStr::from_str(v)
+                                          .expect("Cannot parse Deprecated value")),
                  }) ));
 
 enum MessageEvent {
     Message(Message),
+    Enumerator(Enumerator),
     Field(Field),
     ReservedNums(Vec<i32>),
     ReservedNames(Vec<String>),
@@ -95,6 +124,7 @@ named!(message_event<MessageEvent>, alt!(reserved_nums => { |r| MessageEvent::Re
                                          reserved_names => { |r| MessageEvent::ReservedNames(r) } |
                                          message_field => { |f| MessageEvent::Field(f) } |
                                          message => { |m| MessageEvent::Message(m) } |
+                                         enumerator => { |e| MessageEvent::Enumerator(e) } |
                                          br => { |_| MessageEvent::Ignore }));
 
 named!(message_events<(String, Vec<MessageEvent>)>, 
@@ -114,6 +144,7 @@ named!(message<Message>,
                    MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
                    MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
                    MessageEvent::Message(m) => msg.messages.push(m),
+                   MessageEvent::Enumerator(e) => msg.enums.push(e),
                    MessageEvent::Ignore => (),
                }
            }
@@ -273,6 +304,28 @@ mod test {
         let mess = message(msg.as_bytes());
         if let ::nom::IResult::Done(_, mess) = mess {
             assert!(mess.messages.len() == 1);
+        }
+    }
+
+    #[test]
+    fn test_map() {
+        let msg = r#"message A
+    {
+        optional map<string, int32> b = 1;
+    }"#;
+
+        let mess = message(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(1, mess.fields.len());
+            match mess.fields[0].typ {
+                FieldType::Map(ref f) => match &**f {
+                    &(FieldType::String_, FieldType::Int32) => (),
+                    ref f => panic!("Expecting Map<String, Int32> found {:?}", f),
+                },
+                ref f => panic!("Expecting map, got {:?}", f),
+            }
+        } else {
+            panic!("Could not parse map message");
         }
     }
 }

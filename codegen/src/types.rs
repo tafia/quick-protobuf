@@ -34,11 +34,256 @@ pub enum Frequency {
     Required,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum FieldType {
+    Int32,
+    Int64,
+    Uint32,
+    Uint64,
+    Sint32,
+    Sint64,
+    Bool,
+    Enum(String),
+    Fixed64,
+    Sfixed64,
+    Double,
+    String_,
+    Bytes,
+    Message(String),
+    Fixed32,
+    Sfixed32,
+    Float,
+    Map(Box<(FieldType, FieldType)>),
+}
+
+impl FieldType {
+
+    fn is_numeric(&self) -> bool {
+        match *self {
+            FieldType::Int32 |
+            FieldType::Int64 |
+            FieldType::Uint32 |
+            FieldType::Uint64 |
+            FieldType::Sint32 |
+            FieldType::Sint64 |
+            FieldType::Fixed64 |
+            FieldType::Sfixed64 |
+            FieldType::Double |
+            FieldType::Fixed32 |
+            FieldType::Sfixed32 |
+            FieldType::Float => true,
+            _ => false,
+        }
+    }
+
+    fn is_cow(&self) -> bool {
+        match *self {
+            FieldType::Bytes | FieldType::String_ => true,
+            _ => false,
+        }
+    }
+
+    fn is_map(&self) -> bool {
+        match *self {
+            FieldType::Map(_) => true,
+            _ => false,
+        }
+    }
+
+    fn wire_type_num(&self, packed: bool) -> u32 {
+        if packed {
+            2
+        } else {
+            self.wire_type_num_non_packed()
+        }
+    }
+
+    fn wire_type_num_non_packed(&self) -> u32 {
+        match *self {
+            FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
+            FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
+            FieldType::Bool | FieldType::Enum(_) => 0,
+            FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => 1,
+            FieldType::String_ | FieldType::Bytes | 
+                FieldType::Message(_) | FieldType::Map(_) => 2,
+            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
+        }
+    }
+
+    fn proto_type(&self) -> &str {
+        match *self {
+            FieldType::Int32 => "int32",
+            FieldType::Sint32 => "sint32",
+            FieldType::Int64 => "int64",
+            FieldType::Sint64 => "sint64",
+            FieldType::Uint32 => "uint32",
+            FieldType::Uint64 => "uint64",
+            FieldType::Bool => "bool",
+            FieldType::Enum(_) => "enum",
+            FieldType::Fixed32 => "fixed32",
+            FieldType::Sfixed32 => "sfixed32",
+            FieldType::Float => "float",
+            FieldType::Fixed64 => "fixed64",
+            FieldType::Sfixed64 => "sfixed64",
+            FieldType::Double => "double",
+            FieldType::String_ => "string",
+            FieldType::Bytes => "bytes",
+            FieldType::Message(_) => "message",
+            FieldType::Map(_) => "map",
+        }
+    }
+
+    fn is_fixed_size(&self) -> bool {
+        match self.wire_type_num_non_packed() {
+            1 | 5 => true,
+            _ => false,
+        }
+    }
+
+    /// Searches for message corresponding to the current type
+    ///
+    /// Searches first basic name then within nested messages
+    fn find_message<'a, 'b>(&'a self, msgs: &'b [Message]) -> Option<&'b Message> {
+        match *self {
+            FieldType::Message(ref m) => {
+                let mut found = match m.rfind('.') {
+                    Some(p) => {
+                        let package = &m[..p];
+                        let name = &m[(p + 1)..];
+                        msgs.iter().find(|m| m.package == package && m.name == name)
+                    },
+                    None => msgs.iter().find(|m2| m2.name == &m[..]),
+                };
+
+                if found.is_none() {
+                    // recursively search into nested messages
+                    for m in msgs {
+                        found = self.find_message(&m.messages);
+                        if found.is_some() { break; }
+                    }
+                }
+
+                found
+            },
+            _ => None,
+        }
+    }
+
+    fn has_lifetime(&self, msgs: &[Message]) -> bool {
+        match *self {
+            FieldType::String_ | FieldType::Bytes => true, // Cow
+            FieldType::Message(_) => self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs)),
+            FieldType::Map(ref m) => {
+                let &(ref key, ref value) = &**m;
+                key.has_lifetime(msgs) || value.has_lifetime(msgs)
+            }
+            _ => false,
+        }
+    }
+
+    fn rust_type(&self, msgs: &[Message]) -> String {
+        match *self {
+            FieldType::Int32 | FieldType::Sint32 | FieldType::Sfixed32 => "i32".to_string(),
+            FieldType::Int64 | FieldType::Sint64 | FieldType::Sfixed64 => "i64".to_string(),
+            FieldType::Uint32 | FieldType::Fixed32 => "u32".to_string(),
+            FieldType::Uint64 | FieldType::Fixed64 => "u64".to_string(),
+            FieldType::Double => "f64".to_string(),
+            FieldType::Float => "f32".to_string(),
+            FieldType::String_ => "Cow<'a, str>".to_string(),
+            FieldType::Bytes => "Cow<'a, [u8]>".to_string(),
+            FieldType::Bool => "bool".to_string(),
+            FieldType::Enum(ref e) => e.replace(".", "::"),
+            FieldType::Message(ref msg) => match self.find_message(msgs) {
+                Some(m) => {
+                    let lifetime = if m.has_lifetime(msgs) { "<'a>" } else { "" };
+                    format!("{}{}{}", m.get_modules(), m.name, lifetime)
+                },
+                None => unreachable!(format!("Could not find message {}", msg)),
+            },
+            FieldType::Map(ref t) => {
+                let &(ref key, ref value) = &**t;
+                format!("HashMap<{}, {}>", key.rust_type(msgs), value.rust_type(msgs))
+            }
+        }
+    }
+
+    /// Returns the relevant function to read the data, both for regular and Cow wrapped
+    fn read_fn(&self, msgs: &[Message]) -> (String, String) {
+        match *self {
+            FieldType::Message(ref msg) => match self.find_message(msgs) {
+                Some(m) => {
+                    let m = format!("r.read_message(bytes, {}{}::from_reader)", m.get_modules(), m.name);
+                    (m.clone(), m)
+                }
+                None => unreachable!(format!("Could not find message {}", msg)),
+            },
+            FieldType::Map(_) => unreachable!("There should be a special case for maps"),
+            FieldType::String_ | FieldType::Bytes => {
+                let m = format!("r.read_{}(bytes)", self.proto_type());
+                let cow = format!("{}.map(Cow::Borrowed)", m);
+                (m, cow)
+            },
+            _ => {
+                let m = format!("r.read_{}(bytes)", self.proto_type());
+                (m.clone(), m)
+            }
+        }
+    }
+
+    fn get_size(&self, s: &str) -> String {
+        match *self {
+            FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
+            FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
+            FieldType::Bool | FieldType::Enum(_) => format!("sizeof_varint(*{} as u64)", s),
+
+            FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
+            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
+
+            FieldType::String_ | FieldType::Bytes => format!("sizeof_len({}.len())", s),
+
+            FieldType::Message(_) => format!("sizeof_len({}.get_size())", s),
+            
+            FieldType::Map(ref m) => {
+                let &(ref k, ref v) = &**m;
+                format!("2 + {} + {}", k.get_size("k"), v.get_size("v"))
+            }
+        }
+    }
+
+    fn get_write(&self, s: &str, boxed: bool) -> String {
+        match *self {
+            FieldType::Enum(_) => format!("write_enum(*{} as i32)", s),
+
+            FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
+            FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
+            FieldType::Bool |
+            FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double |
+            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => {
+                format!("write_{}(*{})", self.proto_type(), s)
+            },
+
+            FieldType::String_ => format!("write_string(&**{})", s),
+            FieldType::Bytes => format!("write_bytes(&**{})", s),
+
+            FieldType::Message(_) if boxed => format!("write_message(&**{})", s),
+            FieldType::Message(_) => format!("write_message({})", s),
+            
+            FieldType::Map(ref m) => {
+                let &(ref k, ref v) = &**m;
+                format!("write_map({}, {}, |w| w.{}, {}, |w| w.{})",
+                        self.get_size(""), 
+                        tag(1, k, false), k.get_write("k", false),
+                        tag(2, v, false), v.get_write("v", false))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Field {
     pub name: String,
     pub frequency: Frequency,
-    pub typ: String,
+    pub typ: FieldType,
     pub number: i32,
     pub default: Option<String>,
     pub packed: Option<bool>,
@@ -51,313 +296,115 @@ impl Field {
         self.packed.unwrap_or(false)
     }
 
-    fn is_numeric(&self) -> bool {
-        match &*self.typ {
-            "int32" | "sint32" | "sfixed32" |
-            "int64" | "sint64" | "sfixed64" |
-            "uint32" | "fixed32" |
-            "uint64" | "fixed64" | 
-            "float" | "double" => true,
-            _ => false,
-        }
-    }
-
     /// searches if the message must be boxed
-    fn is_leaf(&self, leaf_messages: &[String], msgs: &[Message]) -> bool {
-        match self.frequency {
-            Frequency::Repeated | Frequency::Required => return true,
-            Frequency::Optional if !self.is_message(msgs) => true,
-            _ => {
-                let typ = match self.typ.rfind('.') {
-                    Some(p) => &self.typ[p + 1..],
-                    None => &self.typ[..],
-                };
-                leaf_messages.iter().any(|m| &*m == &typ)
-            },
-        }
-    }
-
-    fn is_message(&self, msgs: &[Message]) -> bool {
-        self.find_message(msgs).is_some()
-    }
-
-    fn is_enum(&self, msgs: &[Message]) -> bool {
-        self.get_type(msgs) == "enum"
-    }
-
-    fn is_fixed_size(&self, msgs: &[Message]) -> bool {
-        match self.wire_type_num_non_packed(msgs) {
-            1 | 5 => true,
-            _ => false,
-        }
-    }
-
-    fn is_cow(&self) -> bool {
-        match &*self.typ {
-            "bytes" | "string" => true,
-            _ => false,
-        }
-    }
-
-    fn find_message<'a, 'b>(&'a self, msgs: &'b [Message]) -> Option<&'b Message> {
-
-        let mut found = match self.typ.rfind('.') {
-            Some(p) => {
-                let package = &self.typ[..p];
-                let name = &self.typ[(p + 1)..];
-                msgs.iter().find(|m| m.package == package && m.name == name)
-            },
-            None => msgs.iter().find(|m| m.name == self.typ),
-        };
-
-        if found.is_none() {
-            // recursively search into nested messages
-            for m in msgs {
-                found = self.find_message(&m.messages);
-                if found.is_some() { break; }
+    fn is_leaf(&self, leaf_messages: &[String]) -> bool {
+        match self.typ {
+            FieldType::Message(ref s) => {
+                match self.frequency {
+                    Frequency::Repeated | Frequency::Required => true,
+                    _ => {
+                        let typ = match s.rfind('.') {
+                            Some(p) => &s[p + 1..],
+                            None => &s[..],
+                        };
+                        leaf_messages.iter().any(|m| &*m == &typ)
+                    }
+                }
             }
-        }
-
-        found
-    }
-
-    fn find_enum<'a, 'b>(&'a self, enums: &'b [Enumerator]) -> Option<&'b Enumerator> {
-        enums.iter().find(|m| m.name == self.typ)
-    }
-
-    fn has_unregular_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
-        match self.default {
-            None => false,
-            Some(ref d) => match &*self.rust_type(msgs) {
-                "i32" | "i64" | "u32" | "u64" | "f32" | "f64" => d.parse::<f32>().unwrap() != 0.,
-                "bool" => *d != "false",
-                "Cow<'a, str>" => *d != "\"\"",
-                "Cow<'a, [u8]>" => *d != "[]",
-                t => self.find_enum(enums).map_or(false, |e| t != e.fields[0].0),
-            } 
+            _ => true,
         }
     }
 
-    fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        if self.is_cow() { return true; }
-        self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs))
-    }
-
-    fn rust_type(&self, msgs: &[Message]) -> String {
-        match &*self.typ {
-            "int32" | "sint32" | "sfixed32" => "i32".to_string(),
-            "int64" | "sint64" | "sfixed64" => "i64".to_string(),
-            "uint32" | "fixed32" => "u32".to_string(),
-            "uint64" | "fixed64" => "u64".to_string(),
-            "float" => "f32".to_string(),
-            "double" => "f64".to_string(),
-            "string" => "Cow<'a, str>".to_string(),
-            "bytes" => "Cow<'a, [u8]>".to_string(),
-            t => match self.find_message(msgs) {
-                Some(m) => {
-                    let lifetime = if m.has_lifetime(msgs) { "<'a>" } else { "" };
-                    let package = m.package.split('.').filter(|p| !p.is_empty())
-                        .map(|p| format!("mod_{}::", p)).collect::<String>();
-                    format!("{}{}{}", package, m.name, lifetime)
-                },
-                None => t.replace(".", "::"), // enum
-            }
-        }
-    }
-
-    fn wire_type_num(&self, msgs: &[Message]) -> u32 {
-        if self.packed() {
-            2
-        } else {
-            self.wire_type_num_non_packed(msgs)
-        }
-    }
-
-    fn wire_type_num_non_packed(&self, msgs: &[Message]) -> u32 {
-        match &*self.typ {
-            "int32" | "sint32" | "int64" | "sint64" | 
-                "uint32" | "uint64" | "bool" | "enum" => 0,
-            "fixed64" | "sfixed64" | "double" => 1,
-            "fixed32" | "sfixed32" | "float" => 5,
-            "string" | "bytes" => 2,
-            _ => if self.is_message(msgs) { 2 } else { 0 /* enum */ }
-        }
-    }
-
-    fn get_type(&self, msgs: &[Message]) -> &str {
-        match &*self.typ {
-            "int32" | "sint32" | "int64" | "sint64" | 
-                "uint32" | "uint64" | "bool" | "fixed64" | 
-                "sfixed64" | "double" | "fixed32" | "sfixed32" | 
-                "float" | "bytes" | "string" => &self.typ,
-            _ => if self.is_message(msgs) { "message" } else { "enum" },
-        }
-    }
-
-    fn read_fn(&self, msgs: &[Message]) -> String {
-        match self.find_message(msgs) {
-            Some(m) if m.package.is_empty()=> {
-                format!("read_message(bytes, {}::from_reader)", m.name)
-            },
-            Some(m) => {
-                format!("read_message(bytes, {}{}::from_reader)", 
-                        m.package.split('.').map(|p| format!("mod_{}::", p)).collect::<String>(), m.name)
-            }
-            None => {
-                format!("read_{}(bytes)", self.get_type(msgs))
-            }
-        }
-    }
-
-    fn tag(&self, msgs: &[Message]) -> u32 {
-        (self.number as u32) << 3 | self.wire_type_num(msgs)
+    fn tag(&self) -> u32 {
+        tag(self.number as u32, &self.typ, self.packed())
     }
 
     fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        write!(w, "    pub {}: ", self.name)?;
         match self.frequency {
-            Frequency::Optional => {
-                if self.boxed {
-                    writeln!(w, "    pub {}: Option<Box<{}>>,", self.name, self.rust_type(msgs))?
-                } else {
-                    if self.default.is_none() {
-                        writeln!(w, "    pub {}: Option<{}>,", self.name, self.rust_type(msgs))?
-                    } else {
-                        writeln!(w, "    pub {}: {},", self.name, self.rust_type(msgs))?
-                    }
-                }
-            }
-            Frequency::Repeated => writeln!(w, "    pub {}: Vec<{}>,", self.name, self.rust_type(msgs))?,
-            Frequency::Required => writeln!(w, "    pub {}: {},", self.name, self.rust_type(msgs))?,
+            Frequency::Optional if self.boxed => writeln!(w, "Option<Box<{}>>,", self.typ.rust_type(msgs))?,
+            Frequency::Optional if self.default.is_some() => writeln!(w, "{},", self.typ.rust_type(msgs))?,
+            Frequency::Optional => writeln!(w, "Option<{}>,", self.typ.rust_type(msgs))?,
+            Frequency::Repeated => writeln!(w, "Vec<{}>,", self.typ.rust_type(msgs))?,
+            Frequency::Required => writeln!(w, "{},", self.typ.rust_type(msgs))?,
         }
         Ok(())
     }
 
-    fn write_match_tag_owned<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+    fn write_match_tag<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+
+        // special case for FieldType::Map: destructure tuple before inserting in HashMap
+        if let FieldType::Map(ref m) = self.typ {
+            let &(ref key, ref value) = &**m;
+
+            writeln!(w, "                Ok({}) => {{", self.tag())?;
+            writeln!(w, "                    let (key, value) = r.read_map(bytes, |r, bytes| {}, |r, bytes| {})?;", 
+                     key.read_fn(msgs).1, value.read_fn(msgs).1)?;
+            writeln!(w, "                    msg.{}.insert(key, value);", self.name)?;
+            writeln!(w, "                }}")?;
+            return Ok(());
+        }
+
+        let (val, val_cow) = self.typ.read_fn(msgs);
+        let name = &self.name;
+        write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
-            Frequency::Optional => {
-                if self.boxed {
-                    writeln!(w, "Ok({}) => msg.{} = Some(Box::new(r.{}?)),",
-                             self.tag(msgs), self.name, self.read_fn(msgs))?
-                } else {
-                    if self.default.is_none() {
-                        writeln!(w, "Ok({}) => msg.{} = Some(r.{}?),",
-                                 self.tag(msgs), self.name, self.read_fn(msgs))?
-                    } else {
-                        writeln!(w, "Ok({}) => msg.{} = r.{}?,",
-                                 self.tag(msgs), self.name, self.read_fn(msgs))?
-                    }
-                }
-            }
-            Frequency::Repeated => {
-                if self.packed() {
-                    writeln!(w, "Ok({}) => msg.{} = r.read_packed(bytes, |r, bytes| r.{})?,",
-                             self.tag(msgs), self.name, self.read_fn(msgs))?
-                } else {
-                    writeln!(w, "Ok({}) => msg.{}.push(r.{}?),",
-                             self.tag(msgs), self.name, self.read_fn(msgs))?
-                }
-            }
-            Frequency::Required => {
-                writeln!(w, "Ok({}) => msg.{} = r.{}?,",
-                         self.tag(msgs), self.name, self.read_fn(msgs))?
-            }
+            Frequency::Required => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
+            Frequency::Optional if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
+            Frequency::Optional if self.default.is_some() => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
+            Frequency::Optional => writeln!(w, "msg.{} = Some({}?),", name, val_cow)?,
+            Frequency::Repeated if self.packed() => {
+                writeln!(w, "msg.{} = r.read_packed(bytes, |r, bytes| {})?,", name, val)?;
+            },
+            Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val)?,
         }
         Ok(())
     }
 
-    fn write_match_tag_borrowed<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        match self.frequency {
-            Frequency::Optional => {
-                if self.boxed {
-                    writeln!(w, "Ok({}) => msg.{} = Some(Box::new(Cow::Borrowed(r.{}?))),",
-                             self.tag(msgs), self.name, self.read_fn(msgs))?
-                } else {
-                    if self.default.is_none() {
-                        writeln!(w, "Ok({}) => msg.{} = Some(Cow::Borrowed(r.{}?)),",
-                                 self.tag(msgs), self.name, self.read_fn(msgs))?
-                    } else {
-                        writeln!(w, "Ok({}) => msg.{} = Cow::Borrowed(r.{}?),",
-                                 self.tag(msgs), self.name, self.read_fn(msgs))?
-                    }
-                }
-            }
-            Frequency::Repeated => {
-                if self.packed() {
-                    writeln!(w, "Ok({}) => msg.{} = r.read_packed(bytes, |r, bytes| r.{})?,",
-                             self.tag(msgs), self.name, self.read_fn(msgs))?
-                } else {
-                    writeln!(w, "Ok({}) => msg.{}.push(Cow::Borrowed(r.{}?)),",
-                             self.tag(msgs), self.name, self.read_fn(msgs))?
-                }
-            }
-            Frequency::Required => {
-                writeln!(w, "Ok({}) => msg.{} = Cow::Borrowed(r.{}?),",
-                         self.tag(msgs), self.name, self.read_fn(msgs))?
-            }
-        }
-        Ok(())
-    }
-
-    fn write_get_size<W: Write>(&self, w: &mut W, msgs: &[Message], is_first: bool) -> Result<()> {
+    fn write_get_size<W: Write>(&self, w: &mut W, is_first: bool) -> Result<()> {
         if is_first { 
             write!(w, "        ")?;
         } else { 
             write!(w, "        + ")?;
         }
+        let tag_size = sizeof_varint(self.tag());
         match self.frequency {
-            Frequency::Required => {
-                self.write_inner_get_size(w, msgs, &format!("self.{}", self.name), "")?;
-                writeln!(w, "")?;
+            Frequency::Required if self.typ.is_map() => {
+                writeln!(w, "self.{}.iter().map(|(k, v)| {} + sizeof_len({})).sum::<usize>()", 
+                         self.name, tag_size, self.typ.get_size(""))?;
             }
+            Frequency::Required => writeln!(w, "{} + {}", tag_size, self.typ.get_size(&format!("&self.{}", self.name)))?,
             Frequency::Optional => {
                 match self.default.as_ref() {
                     None => {
-                        if self.is_fixed_size(msgs) {
-                            write!(w, "self.{}.as_ref().map_or(0, |_| ", self.name)?;
+                        write!(w, "self.{}.as_ref().map_or(0, ", self.name)?;
+                        if self.typ.is_fixed_size() {
+                            writeln!(w, "|_| {} + {})", tag_size, self.typ.get_size(""))?;
                         } else {
-                            write!(w, "self.{}.as_ref().map_or(0, |m| ", self.name)?;
+                            writeln!(w, "|m| {} + {})", tag_size, self.typ.get_size("m"))?;
                         }
-                        self.write_inner_get_size(w, msgs, "m", "*")?;
-                        writeln!(w, ")")?;
                     }
                     Some(d) => {
-                        write!(w, "if self.{} == {} {{ 0 }} else {{", self.name, d)?;
-                        self.write_inner_get_size(w, msgs, &format!("self.{}", self.name), "")?;
-                        writeln!(w, "}}")?;
+                        write!(w, "if self.{} == {} {{ 0 }} else {{ {} + {} }}", 
+                               self.name, d, tag_size, self.typ.get_size(&format!("&self.{}", self.name)))?;
                     }
                 }
             }
             Frequency::Repeated => {
-                let tag_size = sizeof_varint(self.tag(msgs));
-                let get_type = self.get_type(msgs);
-                let as_enum = if self.is_enum(msgs) { " as i32" } else { "" };
                 if self.packed() {
-                    write!(w, "if self.{}.is_empty() {{ 0 }} else {{ ", self.name)?;
-                    match self.wire_type_num_non_packed(msgs) {
-                        0 => write!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_{}(*s{})).sum::<usize>())", 
-                                    tag_size, self.name, get_type, as_enum)?,
-                        1 => write!(w, "{} + sizeof_var_length(self.{}.len() * 8)", tag_size, self.name)?,
-                        5 => write!(w, "{} + sizeof_var_length(self.{}.len() * 4)", tag_size, self.name)?,
-                        2 => {
-                            let len = if self.is_message(msgs) { "get_size" } else { "len" };
-                            write!(w, "{} + sizeof_var_length(self.{}.iter().map(|s| sizeof_var_length(s.{}())).sum::<usize>())", 
-                                   tag_size, self.name, len)?;
-                        }
-                        e => panic!("expecting wire type number, got: {}", e),
+                    write!(w, "if self.{}.is_empty() {{ 0 }} else {{ {} + ", self.name, tag_size)?;
+                    match self.typ.wire_type_num_non_packed() {
+                        1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
+                        5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
+                        _ => writeln!(w, "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}", 
+                                      self.name, self.typ.get_size("s"))?,
                     }
-                    writeln!(w, " }}")?;
                 } else {
-                    match self.wire_type_num_non_packed(msgs) {
-                        0 => writeln!(w, "self.{}.iter().map(|s| {} + sizeof_{}(*s{})).sum::<usize>()", 
-                                      self.name, tag_size, get_type, as_enum)?,
+                    match self.typ.wire_type_num_non_packed() {
                         1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
                         5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
-                        2 => {
-                            let len = if self.is_message(msgs) { "get_size" } else { "len" };
-                            writeln!(w, "self.{}.iter().map(|s| {} + sizeof_var_length(s.{}())).sum::<usize>()", 
-                                     self.name, tag_size, len)?;
-                        }
-                        e => panic!("expecting wire type number, got: {}", e),
+                        _ => writeln!(w, "self.{}.iter().map(|s| {} + {}).sum::<usize>()", 
+                                      self.name, tag_size, self.typ.get_size("s"))?,
                     }
                 }
             }
@@ -365,79 +412,33 @@ impl Field {
         Ok(())
     }
 
-    fn write_inner_get_size<W: Write>(&self, w: &mut W, msgs: &[Message], s: &str, as_ref: &str) -> Result<()> {
-        let tag_size = sizeof_varint(self.tag(msgs));
-        match self.wire_type_num_non_packed(msgs) {
-            0 => {
-                let get_type = self.get_type(msgs);
-                let as_enum = if self.is_enum(msgs) { " as i32" } else { "" };
-                write!(w, "{} + sizeof_{}({}{}{})", tag_size, get_type, as_ref, s, as_enum)?
-            },
-            1 => write!(w, "{} + 8", tag_size)?,
-            5 => write!(w, "{} + 4", tag_size)?,
-            2 => {
-                let len = if self.is_message(msgs) { "get_size" } else { "len" };
-                if self.packed() {
-                    write!(w, "if s.is_empty() {{ 0 }} else {{ {} + sizeof_var_length({}.{}()) }}", tag_size, s, len)?;
-                } else {
-                    write!(w, "{} + sizeof_var_length({}.{}())", tag_size, s, len)?;
-                }
-            }
-            e => panic!("expecting wire type number, got: {}", e),
-        }
-        Ok(())
-    }
-
-    fn write_write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        let tag = self.tag(msgs);
-        let use_ref = self.wire_type_num_non_packed(msgs) == 2;
-        let get_type = self.get_type(msgs);
-        let as_enum = if self.is_enum(msgs) { " as i32" } else { "" };
+    fn write_write<W: Write>(&self, w: &mut W) -> Result<()> {
         match self.frequency {
+            Frequency::Required if self.typ.is_map() => {
+                writeln!(w, "        for (k, v) in self.{}.iter() {{ w.write_with_tag({}, |w| w.{})?; }}",
+                         self.name, self.tag(), self.typ.get_write("", false))?;
+            }
             Frequency::Required => {
-                let r = if use_ref { "&" } else { "" };
-                writeln!(w, "        r.write_{}_with_tag({}, {}self.{}{})?;", get_type, tag, r, self.name, as_enum)?;
-            },
-            Frequency::Optional => {
-                let r = if use_ref { 
-                    if self.boxed { "&**" } else { "" }
-                } else { 
-                    "*" 
-                };
-                match self.default.as_ref() {
-                    None => {
-                        writeln!(w, "        if let Some(ref s) = self.{} {{ r.write_{}_with_tag({}, {}s{})?; }}", 
-                                 self.name, get_type, tag, r, as_enum)?;
-                    },
-                    Some(d) => {
-                        writeln!(w, "        if self.{} != {} {{ r.write_{}_with_tag({}, self.{0}{})?; }}", 
-                                 self.name, d, get_type, tag, as_enum)?;
-                    }
+                writeln!(w, "        w.write_with_tag({}, |w| w.{})?;", 
+                         self.tag(), self.typ.get_write(&format!("&self.{}", self.name), self.boxed))?;
+            }
+            Frequency::Optional => match self.default.as_ref() {
+                None => {
+                    writeln!(w, "        if let Some(ref s) = self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                             self.name, self.tag(), self.typ.get_write("s", self.boxed))?;
+                },
+                Some(d) => {
+                    writeln!(w, "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                             self.name, d, self.tag(), self.typ.get_write(&format!("&self.{}", self.name), self.boxed))?;
                 }
+            },
+            Frequency::Repeated if self.packed() => {
+                writeln!(w, "        w.write_packed_with_tag({}, &self.{}, |w, m| w.{}, &|m| {})?;",
+                         self.tag(), self.name, self.typ.get_write("m", self.boxed), self.typ.get_size("m"))?
             }
             Frequency::Repeated => {
-                if self.packed() {
-                    match get_type {
-                        "message" => {
-                            writeln!(w, "        r.write_packed_repeated_field_with_tag({}, &self.{}, |r, m| r.write_{}({}m{}), \
-                                        &|m| sizeof_var_length(m.get_size()))?;", 
-                                     tag, self.name, get_type, if use_ref { "" } else { "*" }, as_enum)?
-                        },
-                        "bytes" | "string" => {
-                            writeln!(w, "        r.write_packed_repeated_field_with_tag({}, &self.{}, |r, m| r.write_{}({}m{}), \
-                                        &|m| sizeof_var_length(m.len()))?;", 
-                                     tag, self.name, get_type, if use_ref { "" } else { "*" }, as_enum)?
-                        },
-                        t => {
-                            writeln!(w, "        r.write_packed_repeated_field_with_tag({}, &self.{}, |r, m| r.write_{}({}m{}), \
-                                        &|m| sizeof_{}(*m))?;", 
-                                     tag, self.name, get_type, if use_ref { "" } else { "*" }, as_enum, t)?
-                        },
-                    }
-                } else {
-                    writeln!(w, "        for s in &self.{} {{ r.write_{}_with_tag({}, {}s{})? }}", 
-                             self.name, get_type, tag, if use_ref { "" } else { "*" }, as_enum)?;
-                }
+                writeln!(w, "        for s in &self.{} {{ w.write_with_tag({}, |w| w.{})?; }}", 
+                         self.name, self.tag(), self.typ.get_write("s", self.boxed))?;
             }
         }
         Ok(())
@@ -446,31 +447,66 @@ impl Field {
 
 #[derive(Debug, Clone, Default)]
 pub struct Message {
-    pub messages: Vec<Message>,
     pub name: String,
     pub fields: Vec<Field>,
     pub reserved_nums: Option<Vec<i32>>,
     pub reserved_names: Option<Vec<String>>,
     pub imported: bool,
-    pub package: String, // package from imports + nested classes
+    pub package: String,        // package from imports + nested items
+    pub messages: Vec<Message>, // nested messages
+    pub enums: Vec<Enumerator>, // nested enums
 }
 
 impl Message {
-
-    fn is_leaf(&self, leaf_messages: &[String], msgs: &[Message]) -> bool {
-        self.imported || self.fields.iter().all(|f| f.is_leaf(leaf_messages, msgs) || f.deprecated)
+    fn is_leaf(&self, leaf_messages: &[String]) -> bool {
+        self.imported || self.fields.iter().all(|f| f.is_leaf(leaf_messages) || f.deprecated)
     }
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        self.fields.iter().any(|f| f.typ != self.name && f.has_lifetime(msgs))
+        self.fields.iter().any(|f| match f.typ {
+            FieldType::Message(ref m) if &m[..] == self.name => false,
+            ref t => t.has_lifetime(msgs),
+        })
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, enums: &[Enumerator], msgs: &[Message]) -> Result<()> {
-        if self.can_derive_default(enums, msgs) {
-            writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
-        } else {
-            writeln!(w, "#[derive(Debug, PartialEq, Clone)]")?;
+    fn get_modules(&self) -> String {
+        self.package
+            .split('.').filter(|p| !p.is_empty())
+            .map(|p| format!("mod_{}::", p))
+            .collect()
+    }
+
+    fn write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        println!("Writing message {}{}", self.get_modules(), self.name);
+        writeln!(w, "")?;
+        self.write_definition(w, msgs)?;
+        writeln!(w, "")?;
+        self.write_impl_message_read(w, msgs)?;
+        writeln!(w, "")?;
+        self.write_impl_message_write(w, msgs)?;
+
+        if !self.messages.is_empty() {
+            writeln!(w, "")?;
+            writeln!(w, "pub mod mod_{} {{", self.name)?;
+            writeln!(w, "")?;
+            if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_cow())) {
+                writeln!(w, "use std::borrow::Cow;")?;
+            }
+            if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_map())) {
+                writeln!(w, "use std::collections::HashMap;")?;
+            }
+            writeln!(w, "use super::*;")?;
+            for m in &self.messages {
+                m.write(w, msgs)?;
+            }
+            writeln!(w, "")?;
+            writeln!(w, "}}")?;
         }
+        Ok(())
+    }
+
+    fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
         if self.has_lifetime(msgs) {
             writeln!(w, "pub struct {}<'a> {{", self.name)?;
         } else {
@@ -483,11 +519,7 @@ impl Message {
         Ok(())
     }
 
-    fn can_derive_default(&self, enums: &[Enumerator], msgs: &[Message]) -> bool {
-        self.fields.iter().all(|f| f.deprecated || !f.has_unregular_default(enums, msgs))
-    }
-
-    fn write_impl_message_read<W: Write>(&self, w: &mut W, enums: &[Enumerator], msgs: &[Message]) -> Result<()> {
+    fn write_impl_message_read<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
         if self.has_lifetime(msgs) {
             writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
@@ -499,12 +531,7 @@ impl Message {
         writeln!(w, "        while !r.is_eof() {{")?;
         writeln!(w, "            match r.next_tag(bytes) {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            write!(w, "                ")?;
-            if f.is_cow() {
-                f.write_match_tag_borrowed(w, msgs)?;
-            } else {
-                f.write_match_tag_owned(w, msgs)?;
-            }
+            f.write_match_tag(w, msgs)?;
         }
         writeln!(w, "                Ok(t) => {{ r.read_unknown(bytes, t)?; }}")?;
         writeln!(w, "                Err(e) => return Err(e),")?;
@@ -514,10 +541,9 @@ impl Message {
         writeln!(w, "    }}")?;
         writeln!(w, "}}")?;
 
-        if !self.can_derive_default(enums, msgs) {
-//             writeln!(w, "")?;
-//             self.write_impl_default(w, msgs)?;
-        }
+        // TODO: write impl default when special default? 
+        // alternatively set the default value directly when reading
+
         Ok(())
     }
 
@@ -527,50 +553,31 @@ impl Message {
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
         }
-        self.write_get_size(w, msgs)?;
+        self.write_get_size(w)?;
         writeln!(w, "")?;
-        self.write_write_message(w, msgs)?;
+        self.write_write_message(w)?;
         writeln!(w, "}}")?;
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+    fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
         for (i, f) in self.fields.iter().filter(|f| !f.deprecated).enumerate() {
-            f.write_get_size(w, msgs, i == 0)?;
+            f.write_get_size(w, i == 0)?;
         }
         writeln!(w, "    }}")?;
         Ok(())
     }
 
-    fn write_write_message<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        writeln!(w, "    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {{")?;
+    fn write_write_message<W: Write>(&self, w: &mut W) -> Result<()> {
+        writeln!(w, "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_write(w, msgs)?;
+            f.write_write(w)?;
         }
         writeln!(w, "        Ok(())")?;
         writeln!(w, "    }}")?;
         Ok(())
     }
-
-//     fn write_impl_default<W: Write>(&self, w: &mut W, msgs: &[Message]) -> IoResult<()> {
-//         writeln!(w, "impl Default for {} {{", self.name)?;
-//         writeln!(w, "    fn default() -> Self {{")?;
-//         writeln!(w, "        {} {{", self.name)?;
-//         for f in self.fields.iter().filter(|f| !f.deprecated) {
-//             match f.default {
-//                 None => writeln!(w, "            {}::default(),", f.rust_type())?,
-//                 Some(ref d) => if msgs.iter().any(|m| m.name == f.typ) {
-//                     writeln!(w, "            {}: {},", f.name, d)?
-//                 } else {
-//                     writeln!(w, "            {}: {}::{},", f.name, f.typ, d)?
-//                 }
-//             }
-//         }
-//         writeln!(w, "        }}")?;
-//         writeln!(w, "    }}")?;
-//         writeln!(w, "}}")
-//     }
 
     fn sanity_checks(&self) -> Result<()> {
         // checks for reserved fields
@@ -596,6 +603,22 @@ impl Message {
         }
     }
 
+    /// Searches for a matching message in all message
+    ///
+    /// If none is found, 
+    fn set_enums(&mut self, msgs: &[Message]) {
+        for f in &mut self.fields {
+            if f.typ.find_message(&msgs).is_none() {
+                if let FieldType::Message(m) = f.typ.clone() {
+                    f.typ = FieldType::Enum(m);
+                    f.boxed = false;
+                }
+            }
+        }
+        for m in &mut self.messages {
+            m.set_enums(msgs);
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -661,6 +684,7 @@ impl FileDescriptor {
         break_cycles(&mut desc.messages, &mut leaf_messages);
 
         desc.sanity_checks(in_file.as_ref())?;
+        desc.set_enums();
         desc.set_defaults();
 
         let name = in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
@@ -724,6 +748,14 @@ impl FileDescriptor {
     }
 
     fn set_defaults(&mut self) {
+        // set map fields as required (they are equivalent to repeated message)
+        for m in &mut self.messages {
+            for f in &mut m.fields {
+                if let FieldType::Map(_) = f.typ {
+                    f.frequency = Frequency::Required;
+                }
+            }
+        }
         // if proto3, then changes several defaults
         if let Syntax::Proto3 = self.syntax {
             for m in &mut self.messages {
@@ -733,11 +765,20 @@ impl FileDescriptor {
                             f.packed = Some(true); 
                         }
                     }
-                    if f.default.is_none() && f.is_numeric() { 
+                    if f.default.is_none() && f.typ.is_numeric() { 
                         f.default = Some("0".to_string());
                     }
                 }
             }
+        }
+    }
+
+    fn set_enums(&mut self) {
+        // this is very inefficient but we don't care ...
+        let msgs = self.messages.clone();
+
+        for m in &mut self.messages {
+            m.set_enums(&msgs);
         }
     }
 
@@ -766,8 +807,11 @@ impl FileDescriptor {
 
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
         writeln!(w, "use std::io::{{Write}};")?;
-        if self.messages.iter().any(|m| m.has_lifetime(&self.messages)) {
+        if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_cow())) {
             writeln!(w, "use std::borrow::Cow;")?;
+        }
+        if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_map())) {
+            writeln!(w, "use std::collections::HashMap;")?;
         }
         writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
@@ -829,31 +873,7 @@ impl FileDescriptor {
 
     fn write_messages<W: Write>(&self, w: &mut W) -> Result<()> {
         for m in self.messages.iter().filter(|m| !m.imported) {
-            println!("Writing message {}", m.name);
-            writeln!(w, "")?;
-            m.write_definition(w, &self.enums, &self.messages)?;
-            writeln!(w, "")?;
-            m.write_impl_message_read(w, &self.enums, &self.messages)?;
-            writeln!(w, "")?;
-            m.write_impl_message_write(w, &self.messages)?;
-
-            if !m.messages.is_empty() {
-                writeln!(w, "")?;
-                writeln!(w, "pub mod mod_{} {{", m.name)?;
-                writeln!(w, "")?;
-                writeln!(w, "use super::*;")?;
-                for m_sub in &m.messages {
-                    println!("Writing message mod_{}::{}", m.name, m_sub.name);
-                    writeln!(w, "")?;
-                    m_sub.write_definition(w, &self.enums, &self.messages)?;
-                    writeln!(w, "")?;
-                    m_sub.write_impl_message_read(w, &self.enums, &self.messages)?;
-                    writeln!(w, "")?;
-                    m_sub.write_impl_message_write(w, &self.messages)?;
-                }
-                writeln!(w, "")?;
-                writeln!(w, "}}")?;
-            }
+            m.write(w, &self.messages)?;
         }
         Ok(())
     }
@@ -863,6 +883,9 @@ fn get_imported_path<P: AsRef<Path>, Q: AsRef<Path>>(in_file: P, import: Q) -> P
     in_file.as_ref().parent().map_or_else(|| import.as_ref().into(), |p| p.join(import.as_ref()))
 }
 
+/// Breaks cycles by adding boxes when necessary
+///
+/// Cycles means one Message calls itself at some point
 fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
     
     for m in messages.iter_mut() {
@@ -876,7 +899,7 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
         let len = undef_messages.len();
         let mut new_undefs = Vec::new();
         for i in undef_messages {
-            if messages[i].is_leaf(&leaf_messages, &messages) {
+            if messages[i].is_leaf(&leaf_messages) {
                 leaf_messages.push(message_names[i].clone())
             } else {
                 new_undefs.push(i);
@@ -889,7 +912,7 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
             {
                 let mut m = messages[k].clone();
                 for f in m.fields.iter_mut() {
-                    if !f.is_leaf(&leaf_messages, &messages) {
+                    if !f.is_leaf(&leaf_messages) {
                         f.boxed = true;
                     }
                 }
@@ -899,3 +922,7 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
     }
 }
 
+/// Calculates the tag value
+fn tag(number: u32, typ: &FieldType, packed: bool) -> u32 {
+    number << 3 | typ.wire_type_num(packed)
+}

@@ -32,6 +32,10 @@ message TestBytes {
     optional bytes b1 = 1;
 }
 
+message TestMap {
+    map<string, uint32> value = 1;
+}
+
 message PerftestData {
     repeated Test1 test1 = 1;
     repeated TestRepeatedBool test_repeated_bool = 2;
@@ -41,4 +45,5 @@ message PerftestData {
     repeated TestRepeatedPackedInt32 test_repeated_packed_int32 = 6;
     repeated TestBytes test_small_bytearrays = 7;
     repeated TestBytes test_large_bytearrays = 8;
+    repeated TestMap test_map = 9;
 }

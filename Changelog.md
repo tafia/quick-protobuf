@@ -15,6 +15,8 @@
 - feat: break codegen when reserved fields conflict
 - feat: support imports in proto files
 - feat: support packages by encapsulating into rust modules
+- feat: support map
+- refactor: major refatorings of codegen
 
 ## 0.2.0
 - feat: do not allocate for bytes and string field types

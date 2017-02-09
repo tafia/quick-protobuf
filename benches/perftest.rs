@@ -131,7 +131,7 @@ fn generate_optional_messages() -> Vec<TestOptionalMessages> {
 perfbench!(generate_optional_messages, TestOptionalMessages, write_optional_messages, read_optional_messages);
 
 fn generate_strings() -> Vec<TestStrings<'static>> {
-    let mut s = "hello world from quick-protobuf!!!".split('_').cycle().map(|s| Cow::Borrowed(s));
+    let mut s = "hello world from quick-protobuf!!!".split(' ').cycle().map(|s| Cow::Borrowed(s));
     (1..100).map(|_| TestStrings { 
         s1: s.by_ref().next(),
         s2: s.by_ref().next(),
@@ -142,7 +142,7 @@ fn generate_strings() -> Vec<TestStrings<'static>> {
 perfbench!(generate_strings, TestStrings, write_strings, read_strings);
 
 fn generate_small_bytes() -> Vec<TestBytes<'static>> {
-    let mut s = "hello world from quick-protobuf!!!".split('_').cycle()
+    let mut s = "hello world from quick-protobuf!!!".split(' ').cycle()
         .map(|s| Cow::Borrowed(s.as_bytes()));
     (1..800).map(|_| TestBytes { b1: s.by_ref().next() })
         .collect()
@@ -151,7 +151,7 @@ fn generate_small_bytes() -> Vec<TestBytes<'static>> {
 perfbench!(generate_small_bytes, TestBytes, write_small_bytes, read_small_bytes);
 
 fn generate_large_bytes() -> Vec<TestBytes<'static>> {
-    let mut s = "hello world from quick-protobuf!!!".split('_').cycle().map(|s| s.as_bytes());
+    let mut s = "hello world from quick-protobuf!!!".split(' ').cycle().map(|s| s.as_bytes());
     (1..30).map(|_| TestBytes { 
         b1: Some(Cow::Owned(s.by_ref().take(500).fold(Vec::new(), |mut cur, nxt| {
                 cur.extend_from_slice(nxt);
@@ -161,6 +161,15 @@ fn generate_large_bytes() -> Vec<TestBytes<'static>> {
 }
 
 perfbench!(generate_large_bytes, TestBytes, write_large_bytes, read_large_bytes);
+
+fn generate_map() -> Vec<TestMap<'static>> {
+    let mut s = "hello world from quick-protobuf!!!".split(' ').cycle();
+    (1..30).map(|_| TestMap { 
+        value: s.by_ref().take(500).map(|s| (Cow::Owned(s.to_string()), s.len() as u32)).collect()
+    }).collect()
+}
+
+perfbench!(generate_map, TestMap, write_map, read_map);
 
 fn generate_all() -> Vec<PerftestData<'static>> {
     vec![PerftestData {
@@ -172,6 +181,7 @@ fn generate_all() -> Vec<PerftestData<'static>> {
         test_repeated_packed_int32: generate_repeated_packed_int32(),
         test_small_bytearrays: generate_small_bytes(),
         test_large_bytearrays: generate_large_bytes(),
+        test_map: generate_map(),
     }]
 }
 
