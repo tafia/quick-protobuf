@@ -25,7 +25,7 @@ pub fn sizeof_varint(v: u64) -> usize {
 ///
 /// The total size is the varint encoded length size plus the length itself
 /// https://developers.google.com/protocol-buffers/docs/encoding
-pub fn sizeof_var_length(len: usize) -> usize {
+pub fn sizeof_len(len: usize) -> usize {
     sizeof_varint(len as u64) + len
 }
 

@@ -118,8 +118,8 @@ impl MessageWrite for TestMessage {
     }
 
     fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.id { r.write_uint32_with_tag(10, *s)?; }
-        for s in &self.val { r.write_sint64_with_tag(18, *s)?; }
+        if let Some(ref s) = self.id { r.write_with_tag(10, |r| r.write_uint32(*s))?; }
+        for s in &self.val { r.write_with_tag(18, |r| r.write_sint64(*s))?; }
         Ok(())
     }
 }
@@ -168,12 +168,12 @@ impl<'a> TestMessageBorrow<'a> {
 impl<'a> MessageWrite for TestMessageBorrow<'a> {
     fn get_size(&self) -> usize {
         self.id.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m))
-        + self.val.iter().map(|m| 1 + sizeof_var_length(m.len())).sum::<usize>()
+        + self.val.iter().map(|m| 1 + sizeof_len(m.len())).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.id { r.write_uint32_with_tag(10, *s)?; }
-        for s in &self.val { r.write_string_with_tag(18, *s)?; }
+        if let Some(ref s) = self.id { r.write_with_tag(10, |r| r.write_uint32(*s))?; }
+        for s in &self.val { r.write_with_tag(18, |r| r.write_string(*s))?; }
         Ok(())
     }
 }
@@ -205,6 +205,29 @@ fn wr_packed_uint32(){
     let mut buf = Vec::new();
     {
         let mut w = Writer::new(&mut buf);
+        w.write_packed(&v, |r, m| r.write_uint32(*m), &|m| sizeof_uint32(*m)).unwrap();
+    }
+    let mut r = BytesReader::from_bytes(&buf);
+    assert_eq!(v, r.read_packed(&buf, |r, b| r.read_uint32(b)).unwrap());
+}
+
+#[test]
+fn wr_map(){
+    let v = {
+        let mut v = HasgMap::new();
+        v.insert(Cow::Borrowed("foo"), 1u32);
+        v.insert(Cow::Borrowed("bar"), 2);
+        v
+    };
+    let mut buf = Vec::new();
+    {
+        let mut w = Writer::new(&mut buf);
+        w.write_map(v, 
+                    sizeof_len(v.iter().map(|(k, v)| 2 + sizeof_len(k.len()) + sizeof_uint32(v)).sum::<usize>()), 
+
+
+                
+
         w.write_packed(&v, |r, m| r.write_uint32(*m), &|m| sizeof_uint32(*m)).unwrap();
     }
     let mut r = BytesReader::from_bytes(&buf);

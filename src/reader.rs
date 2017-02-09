@@ -322,47 +322,32 @@ impl BytesReader {
     /// Reads a map item: (key, value)
     pub fn read_map<'a, K, V, F, G>(&mut self,
                                     bytes: &'a[u8],
-                                    tag_key: u32,
                                     mut read_key: F,
-                                    tag_value: u32,
-                                    mut read_value: G) -> Result<(K, V)>
+                                    mut read_val: G) -> Result<(K, V)>
         where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<K>,
               G: FnMut(&mut BytesReader, &'a[u8]) -> Result<V>,
+              K: ::std::fmt::Debug + Default,
+              V: ::std::fmt::Debug + Default,
     {
-        self.read_len(bytes, |r, b| {
-            // a map entry corresponds to:
-            // message MapFieldEntry {
-            //       key_type key = 1;
-            //         value_type value = 2;
-            // }
-            //
-            // as it is simple we will unroll it
-            let t = r.read_u8(b) as u32;
-            if t == tag_key {
-                let k = read_key(r, b)?;
-                let t = r.read_u8(b) as u32;
-                if t == tag_value {
-                    read_value(r, b).map(|v| (k, v))
-                } else {
-                    Err(ErrorKind::Map(t, tag_key, tag_value).into())
+        self.read_len(bytes, |r, bytes| {
+            let mut k = K::default();
+            let mut v = V::default();
+            while !r.is_eof() {
+                let t = r.read_u8(bytes);
+                match t >> 3 {
+                    1 => k = read_key(r, bytes)?,
+                    2 => v = read_val(r, bytes)?,
+                    t => return Err(ErrorKind::Map(t).into()),
                 }
-            } else if t == tag_value {
-                let v = read_value(r, b)?;
-                let t = r.read_u8(b) as u32;
-                if t == tag_key {
-                    read_key(r, b).map(|k| (k, v))
-                } else {
-                    Err(ErrorKind::Map(t, tag_key, tag_value).into())
-                }
-            } else {
-                Err(ErrorKind::Map(t, tag_key, tag_value).into())
             }
+            Ok((k, v))
         })
     }
 
     /// Reads unknown data, based on its tag value (which itself gives us the wire_type value)
     #[inline]
     pub fn read_unknown(&mut self, bytes: &[u8], tag_value: u32) -> Result<()> {
+        println!("reading unknown {}", tag_value);
         match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => { self.read_varint64(bytes)?; },
             WIRE_TYPE_FIXED64 => self.start += 8,

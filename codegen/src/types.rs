@@ -34,7 +34,7 @@ pub enum Frequency {
     Required,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FieldType {
     Int32,
     Int64,
@@ -207,15 +207,26 @@ impl FieldType {
         }
     }
 
-    fn read_fn(&self, msgs: &[Message]) -> String {
+    /// Returns the relevant function to read the data, both for regular and Cow wrapped
+    fn read_fn(&self, msgs: &[Message]) -> (String, String) {
         match *self {
             FieldType::Message(ref msg) => match self.find_message(msgs) {
-                Some(m) => format!("r.read_message(bytes, {}{}::from_reader)", 
-                                   m.get_modules(), m.name),
+                Some(m) => {
+                    let m = format!("r.read_message(bytes, {}{}::from_reader)", m.get_modules(), m.name);
+                    (m.clone(), m)
+                }
                 None => unreachable!(format!("Could not find message {}", msg)),
             },
             FieldType::Map(_) => unreachable!("There should be a special case for maps"),
-            _ => format!("r.read_{}(bytes)", self.proto_type()),
+            FieldType::String_ | FieldType::Bytes => {
+                let m = format!("r.read_{}(bytes)", self.proto_type());
+                let cow = format!("{}.map(Cow::Borrowed)", m);
+                (m, cow)
+            },
+            _ => {
+                let m = format!("r.read_{}(bytes)", self.proto_type());
+                (m.clone(), m)
+            }
         }
     }
 
@@ -228,23 +239,24 @@ impl FieldType {
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
 
-            FieldType::String_ | FieldType::Bytes => format!("sizeof_var_length({}.len())", s),
+            FieldType::String_ | FieldType::Bytes => format!("sizeof_len({}.len())", s),
 
-            FieldType::Message(_) => format!("sizeof_var_length({}.get_size())", s),
+            FieldType::Message(_) => format!("sizeof_len({}.get_size())", s),
             
             FieldType::Map(ref m) => {
                 let &(ref k, ref v) = &**m;
-                format!("{}.iter().map(|(k, v)| sizeof_var_length(2 + {} + {})).sum::<usize>()", s, k.get_size("k"), v.get_size("v"))
+                format!("2 + {} + {}", k.get_size("k"), v.get_size("v"))
             }
         }
     }
 
     fn get_write(&self, s: &str, boxed: bool) -> String {
         match *self {
+            FieldType::Enum(_) => format!("write_enum(*{} as i32)", s),
+
             FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
             FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
-            FieldType::Bool | FieldType::Enum(_) => format!("write_varint(*{} as u64)", s),
-
+            FieldType::Bool |
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double |
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => {
                 format!("write_{}(*{})", self.proto_type(), s)
@@ -258,10 +270,10 @@ impl FieldType {
             
             FieldType::Map(ref m) => {
                 let &(ref k, ref v) = &**m;
-                format!("write_map(&{}, {}, |w, k| w.{}, &|k| {}, {}, |w, v| w.{}, &|v| {})",
-                        s, 
-                        tag(1, k, false), k.get_write("k", false), k.get_size("k"), 
-                        tag(2, v, false), v.get_write("v", false), v.get_size("v"))
+                format!("write_map({}, {}, |w| w.{}, {}, |w| w.{})",
+                        self.get_size(""), 
+                        tag(1, k, false), k.get_write("k", false),
+                        tag(2, v, false), v.get_write("v", false))
             }
         }
     }
@@ -321,38 +333,19 @@ impl Field {
 
     fn write_match_tag<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
 
-        // special case for FieldType::Map
+        // special case for FieldType::Map: destructure tuple before inserting in HashMap
         if let FieldType::Map(ref m) = self.typ {
             let &(ref key, ref value) = &**m;
 
-            let fn_key = if key.is_cow() {
-                format!("{}.map(Cow::Borrowed)", key.read_fn(msgs))
-            } else {
-                key.read_fn(msgs)
-            };
-            let fn_val = if value.is_cow() {
-                format!("{}.map(Cow::Borrowed)", value.read_fn(msgs))
-            } else {
-                value.read_fn(msgs)
-            };
-
             writeln!(w, "                Ok({}) => {{", self.tag())?;
-            writeln!(w, "                    let (key, value) = r.read_map(bytes,")?;
-            writeln!(w, "                                                  {}, |r, bytes| {},",
-                     tag(1, key, false), fn_key)?;
-            writeln!(w, "                                                  {}, |r, bytes| {})?;",
-                     tag(2, value, false), fn_val)?;
+            writeln!(w, "                    let (key, value) = r.read_map(bytes, |r, bytes| {}, |r, bytes| {})?;", 
+                     key.read_fn(msgs).1, value.read_fn(msgs).1)?;
             writeln!(w, "                    msg.{}.insert(key, value);", self.name)?;
             writeln!(w, "                }}")?;
             return Ok(());
         }
 
-        let val = self.typ.read_fn(msgs);
-        let val_cow = if self.typ.is_cow() { 
-            format!("{}.map(Cow::Borrowed)", val) 
-        } else {
-            val.clone() 
-        };
+        let (val, val_cow) = self.typ.read_fn(msgs);
         let name = &self.name;
         write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
@@ -376,6 +369,10 @@ impl Field {
         }
         let tag_size = sizeof_varint(self.tag());
         match self.frequency {
+            Frequency::Required if self.typ.is_map() => {
+                writeln!(w, "self.{}.iter().map(|(k, v)| {} + sizeof_len({})).sum::<usize>()", 
+                         self.name, tag_size, self.typ.get_size(""))?;
+            }
             Frequency::Required => writeln!(w, "{} + {}", tag_size, self.typ.get_size(&format!("&self.{}", self.name)))?,
             Frequency::Optional => {
                 match self.default.as_ref() {
@@ -397,9 +394,9 @@ impl Field {
                 if self.packed() {
                     write!(w, "if self.{}.is_empty() {{ 0 }} else {{ {} + ", self.name, tag_size)?;
                     match self.typ.wire_type_num_non_packed() {
-                        1 => writeln!(w, "sizeof_var_length(self.{}.len() * 8) }}", self.name)?,
-                        5 => writeln!(w, "sizeof_var_length(self.{}.len() * 4) }}", self.name)?,
-                        _ => writeln!(w, "sizeof_var_length(self.{}.iter().map(|s| {}).sum::<usize>()) }}", 
+                        1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
+                        5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
+                        _ => writeln!(w, "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}", 
                                       self.name, self.typ.get_size("s"))?,
                     }
                 } else {
@@ -417,6 +414,10 @@ impl Field {
 
     fn write_write<W: Write>(&self, w: &mut W) -> Result<()> {
         match self.frequency {
+            Frequency::Required if self.typ.is_map() => {
+                writeln!(w, "        for (k, v) in self.{}.iter() {{ w.write_with_tag({}, |w| w.{})?; }}",
+                         self.name, self.tag(), self.typ.get_write("", false))?;
+            }
             Frequency::Required => {
                 writeln!(w, "        w.write_with_tag({}, |w| w.{})?;", 
                          self.tag(), self.typ.get_write(&format!("&self.{}", self.name), self.boxed))?;
