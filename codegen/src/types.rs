@@ -234,14 +234,14 @@ impl FieldType {
         match *self {
             FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
             FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
-            FieldType::Bool | FieldType::Enum(_) => format!("sizeof_varint(*{} as u64)", s),
+            FieldType::Bool | FieldType::Enum(_) => format!("sizeof_varint(*({}) as u64)", s),
 
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
 
-            FieldType::String_ | FieldType::Bytes => format!("sizeof_len({}.len())", s),
+            FieldType::String_ | FieldType::Bytes => format!("sizeof_len(({}).len())", s),
 
-            FieldType::Message(_) => format!("sizeof_len({}.get_size())", s),
+            FieldType::Message(_) => format!("sizeof_len(({}).get_size())", s),
             
             FieldType::Map(ref m) => {
                 let &(ref k, ref v) = &**m;

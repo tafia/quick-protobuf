@@ -32,7 +32,9 @@ fn main() {
         f_imported: Some(ImportedMessage { i: Some(true) }),
 
         // nested messages are encapsulated into a rust module mod_Message
-        f_nested: Some(data_types::mod_BazMessage::Nested { f_nested: 2 }),
+        f_nested: Some(data_types::mod_BazMessage::Nested { 
+            f_nested: data_types::mod_BazMessage::mod_Nested::Nested2 { f_nested: 2 }
+        }),
 
         // a map!
         f_map: vec![(Cow::Borrowed("foo"), 1), (Cow::Borrowed("bar"), 2)].into_iter().collect(),
