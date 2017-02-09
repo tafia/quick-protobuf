@@ -1,5 +1,7 @@
 extern crate quick_protobuf;
 
+use std::collections::HashMap;
+use std::borrow::Cow;
 use std::io::{Write};
 use quick_protobuf::{BytesReader, Writer, MessageWrite, Result};
 use quick_protobuf::sizeofs::*;
@@ -214,22 +216,23 @@ fn wr_packed_uint32(){
 #[test]
 fn wr_map(){
     let v = {
-        let mut v = HasgMap::new();
-        v.insert(Cow::Borrowed("foo"), 1u32);
+        let mut v = HashMap::new();
+        v.insert(Cow::Borrowed("foo"), 1i32);
         v.insert(Cow::Borrowed("bar"), 2);
         v
     };
     let mut buf = Vec::new();
     {
         let mut w = Writer::new(&mut buf);
-        w.write_map(v, 
-                    sizeof_len(v.iter().map(|(k, v)| 2 + sizeof_len(k.len()) + sizeof_uint32(v)).sum::<usize>()), 
-
-
-                
-
-        w.write_packed(&v, |r, m| r.write_uint32(*m), &|m| sizeof_uint32(*m)).unwrap();
+        for (k, v) in v.iter() { 
+            w.write_map(2 + sizeof_len(k.len()) + sizeof_varint(*v as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)).unwrap();
+        }
     }
     let mut r = BytesReader::from_bytes(&buf);
-    assert_eq!(v, r.read_packed(&buf, |r, b| r.read_uint32(b)).unwrap());
+    let mut read_back = HashMap::new();
+    while !r.is_eof() {
+        let (key, value) = r.read_map(&buf, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_int32(bytes)).unwrap();
+        read_back.insert(key, value);
+    }
+    assert_eq!(v, read_back);
 }
