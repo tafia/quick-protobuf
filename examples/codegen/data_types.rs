@@ -55,7 +55,7 @@ impl BarMessage {
 
 impl MessageWrite for BarMessage {
     fn get_size(&self) -> usize {
-        1 + sizeof_varint(*&self.b_required_int32 as u64)
+        1 + sizeof_varint(*(&self.b_required_int32) as u64)
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -134,30 +134,30 @@ impl<'a> FooMessage<'a> {
 
 impl<'a> MessageWrite for FooMessage<'a> {
     fn get_size(&self) -> usize {
-        self.f_int32.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
-        + self.f_int64.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
-        + self.f_uint32.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
-        + self.f_uint64.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
-        + self.f_sint32.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
-        + self.f_sint64.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
-        + self.f_bool.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
-        + self.f_FooEnum.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
+        self.f_int32.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.f_int64.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.f_uint32.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.f_uint64.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.f_sint32.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.f_sint64.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.f_bool.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.f_FooEnum.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
         + self.f_fixed64.as_ref().map_or(0, |_| 1 + 8)
         + self.f_sfixed64.as_ref().map_or(0, |_| 1 + 8)
         + self.f_fixed32.as_ref().map_or(0, |_| 1 + 4)
         + self.f_sfixed32.as_ref().map_or(0, |_| 1 + 4)
         + self.f_double.as_ref().map_or(0, |_| 1 + 8)
         + self.f_float.as_ref().map_or(0, |_| 1 + 4)
-        + self.f_bytes.as_ref().map_or(0, |m| 1 + sizeof_len(m.len()))
-        + self.f_string.as_ref().map_or(0, |m| 2 + sizeof_len(m.len()))
-        + self.f_self_message.as_ref().map_or(0, |m| 2 + sizeof_len(m.get_size()))
-        + self.f_bar_message.as_ref().map_or(0, |m| 2 + sizeof_len(m.get_size()))
-        + self.f_repeated_int32.iter().map(|s| 2 + sizeof_varint(*s as u64)).sum::<usize>()
-        + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_packed_int32.iter().map(|s| sizeof_varint(*s as u64)).sum::<usize>()) }
-        + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_len(m.get_size()))
-        + self.f_baz.as_ref().map_or(0, |m| 2 + sizeof_len(m.get_size()))
-        + self.f_nested.as_ref().map_or(0, |m| 2 + sizeof_len(m.get_size()))
-        + self.f_map.iter().map(|(k, v)| 2 + sizeof_len(2 + sizeof_len(k.len()) + sizeof_varint(*v as u64))).sum::<usize>()
+        + self.f_bytes.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        + self.f_string.as_ref().map_or(0, |m| 2 + sizeof_len((m).len()))
+        + self.f_self_message.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
+        + self.f_bar_message.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
+        + self.f_repeated_int32.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_packed_int32.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
+        + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
+        + self.f_baz.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
+        + self.f_nested.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
+        + self.f_map.iter().map(|(k, v)| 2 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -180,11 +180,11 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_self_message { w.write_with_tag(138, |w| w.write_message(&**s))?; }
         if let Some(ref s) = self.f_bar_message { w.write_with_tag(146, |w| w.write_message(s))?; }
         for s in &self.f_repeated_int32 { w.write_with_tag(152, |w| w.write_int32(*s))?; }
-        w.write_packed_with_tag(162, &self.f_repeated_packed_int32, |w, m| w.write_int32(*m), &|m| sizeof_varint(*m as u64))?;
+        w.write_packed_with_tag(162, &self.f_repeated_packed_int32, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
         if let Some(ref s) = self.f_imported { w.write_with_tag(170, |w| w.write_message(s))?; }
         if let Some(ref s) = self.f_baz { w.write_with_tag(178, |w| w.write_message(s))?; }
         if let Some(ref s) = self.f_nested { w.write_with_tag(186, |w| w.write_message(s))?; }
-        for (k, v) in self.f_map.iter() { w.write_with_tag(194, |w| w.write_map(2 + sizeof_len(k.len()) + sizeof_varint(*v as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)))?; }
+        for (k, v) in self.f_map.iter() { w.write_with_tag(194, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)))?; }
         Ok(())
     }
 }
@@ -210,7 +210,7 @@ impl BazMessage {
 
 impl MessageWrite for BazMessage {
     fn get_size(&self) -> usize {
-        self.nested.as_ref().map_or(0, |m| 1 + sizeof_len(m.get_size()))
+        self.nested.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -225,10 +225,44 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Nested {
-    pub f_nested: i32,
+    pub f_nested: mod_BazMessage::mod_Nested::Nested2,
 }
 
 impl Nested {
+    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+        let mut msg = Self::default();
+        while !r.is_eof() {
+            match r.next_tag(bytes) {
+                Ok(10) => msg.f_nested = r.read_message(bytes, mod_BazMessage::mod_Nested::Nested2::from_reader)?,
+                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(msg)
+    }
+}
+
+impl MessageWrite for Nested {
+    fn get_size(&self) -> usize {
+        1 + sizeof_len((&self.f_nested).get_size())
+    }
+
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        w.write_with_tag(10, |w| w.write_message(&self.f_nested))?;
+        Ok(())
+    }
+}
+
+pub mod mod_Nested {
+
+use super::*;
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct Nested2 {
+    pub f_nested: i32,
+}
+
+impl Nested2 {
     pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
@@ -242,15 +276,17 @@ impl Nested {
     }
 }
 
-impl MessageWrite for Nested {
+impl MessageWrite for Nested2 {
     fn get_size(&self) -> usize {
-        1 + sizeof_varint(*&self.f_nested as u64)
+        1 + sizeof_varint(*(&self.f_nested) as u64)
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_with_tag(8, |w| w.write_int32(*&self.f_nested))?;
         Ok(())
     }
+}
+
 }
 
 }
