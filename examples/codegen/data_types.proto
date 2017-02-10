@@ -35,6 +35,11 @@ message FooMessage {
     optional BazMessage.Nested f_nested = 23;
     optional BazMessage.Nested.NestedEnum f_nested_enum = 24;
     map<string, int32> f_map = 25;
+    oneof test_oneof {
+        int32 f1 = 26;
+        bool f2 = 27;
+        string f3 = 28;
+    }
 }
 
 message BazMessage {

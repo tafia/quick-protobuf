@@ -392,9 +392,10 @@ impl Field {
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, is_first: bool) -> Result<()> {
-        if is_first { 
+    fn write_get_size<W: Write>(&self, w: &mut W, is_first: &mut bool) -> Result<()> {
+        if *is_first { 
             write!(w, "        ")?;
+            *is_first = false;
         } else { 
             write!(w, "        + ")?;
         }
@@ -480,6 +481,7 @@ impl Field {
 pub struct Message {
     pub name: String,
     pub fields: Vec<Field>,
+    pub oneofs: Vec<OneOf>,
     pub reserved_nums: Option<Vec<i32>>,
     pub reserved_names: Option<Vec<String>>,
     pub imported: bool,
@@ -489,15 +491,21 @@ pub struct Message {
 }
 
 impl Message {
+
     fn is_leaf(&self, leaf_messages: &[String]) -> bool {
-        self.imported || self.fields.iter().all(|f| f.is_leaf(leaf_messages) || f.deprecated)
+        self.imported || 
+            self.fields.iter()
+            .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
+            .all(|f| f.is_leaf(leaf_messages) || f.deprecated)
     }
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        self.fields.iter().any(|f| match f.typ {
-            FieldType::Message(ref m) if &m[..] == self.name => false,
-            ref t => t.has_lifetime(msgs),
-        })
+        self.fields.iter()
+            .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
+            .any(|f| match f.typ {
+                FieldType::Message(ref m) if &m[..] == self.name => false,
+                ref t => t.has_lifetime(msgs),
+            })
     }
 
     fn get_modules(&self) -> String {
@@ -510,6 +518,12 @@ impl Message {
     fn write<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
         println!("Writing message {}{}", self.get_modules(), self.name);
         writeln!(w, "")?;
+
+        // write oneofs Enums, if any
+        for o in &self.oneofs {
+            o.write(w, msgs, enums)?;
+        }
+
         self.write_definition(w, msgs, enums)?;
         writeln!(w, "")?;
         self.write_impl_message_read(w, msgs)?;
@@ -520,10 +534,14 @@ impl Message {
             writeln!(w, "")?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w, "")?;
-            if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_cow())) {
+            if self.messages.iter().any(|m| m.fields.iter()
+                                        .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
+                                        .any(|f| f.typ.is_cow())) {
                 writeln!(w, "use std::borrow::Cow;")?;
             }
-            if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_map())) {
+            if self.messages.iter().any(|m| m.fields.iter()
+                                        .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
+                                        .any(|f| f.typ.is_map())) {
                 writeln!(w, "use std::collections::HashMap;")?;
             }
             writeln!(w, "use super::*;")?;
@@ -536,6 +554,7 @@ impl Message {
             writeln!(w, "")?;
             writeln!(w, "}}")?;
         }
+
         Ok(())
     }
 
@@ -548,6 +567,9 @@ impl Message {
         }
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_definition(w, msgs, enums)?;
+        }
+        for o in &self.oneofs {
+            o.write_message_definition(w, msgs)?;
         }
         writeln!(w, "}}")?;
         Ok(())
@@ -566,6 +588,9 @@ impl Message {
         writeln!(w, "            match r.next_tag(bytes) {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_match_tag(w, msgs)?;
+        }
+        for o in &self.oneofs {
+            o.write_match_tag(w, msgs)?;
         }
         writeln!(w, "                Ok(t) => {{ r.read_unknown(bytes, t)?; }}")?;
         writeln!(w, "                Err(e) => return Err(e),")?;
@@ -596,8 +621,12 @@ impl Message {
 
     fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
-        for (i, f) in self.fields.iter().filter(|f| !f.deprecated).enumerate() {
-            f.write_get_size(w, i == 0)?;
+        let mut first = true;
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
+            f.write_get_size(w, &mut first)?;
+        }
+        for o in self.oneofs.iter() {
+            o.write_get_size(w, &mut first)?;
         }
         writeln!(w, "    }}")?;
         Ok(())
@@ -608,6 +637,9 @@ impl Message {
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w)?;
         }
+        for o in &self.oneofs {
+            o.write_write(w)?;
+        }
         writeln!(w, "        Ok(())")?;
         writeln!(w, "    }}")?;
         Ok(())
@@ -615,7 +647,9 @@ impl Message {
 
     fn sanity_checks(&self) -> Result<()> {
         // checks for reserved fields
-        for f in &self.fields {
+        for f in self.fields.iter()
+            .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
+        {
             if self.reserved_names.as_ref().map_or(false, |names| names.contains(&f.name)) || 
                 self.reserved_nums.as_ref().map_or(false, |nums| nums.contains(&f.number)) {
                 return Err(ErrorKind::InvalidMessage(
@@ -642,7 +676,9 @@ impl Message {
     ///
     /// If none is found, 
     fn set_enums(&mut self, msgs: &[Message]) {
-        for f in &mut self.fields {
+        for f in self.fields.iter_mut()
+            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+        {
             if f.typ.find_message(&msgs).is_none() {
                 if let FieldType::Message(m) = f.typ.clone() {
                     f.typ = FieldType::Enum(m);
@@ -720,6 +756,112 @@ impl Enumerator {
         writeln!(w, "}}")?;
         Ok(())
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct OneOf {
+    pub name: String,
+    pub fields: Vec<Field>,
+}
+
+impl OneOf {
+
+    fn has_lifetime(&self, msgs: &[Message]) -> bool {
+        self.fields.iter().any(|f| !f.deprecated && f.typ.has_lifetime(msgs))
+    }
+
+    fn write<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+        self.write_definition(w, msgs, enums)?;
+        writeln!(w, "")?;
+        self.write_impl_default(w, msgs)?;
+        writeln!(w, "")?;
+        Ok(())
+    }
+
+    fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+        writeln!(w, "#[derive(Debug, PartialEq, Clone)]")?;
+        if self.has_lifetime(msgs) {
+            writeln!(w, "pub enum OneOf{}<'a> {{", self.name)?;
+        } else {
+            writeln!(w, "pub enum OneOf{} {{", self.name)?;
+        }
+        for f in &self.fields {
+            writeln!(w, "    {}({}),", f.name, f.typ.rust_type(msgs, enums))?;
+        }
+        writeln!(w, "    None,")?;
+        writeln!(w, "}}")?;
+        Ok(())
+    }
+
+    fn write_impl_default<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        if self.has_lifetime(msgs) {
+            writeln!(w, "impl<'a> Default for OneOf{}<'a> {{", self.name)?;
+        } else {
+            writeln!(w, "impl Default for OneOf{} {{", self.name)?;
+        }
+        writeln!(w, "    fn default() -> Self {{")?;
+        writeln!(w, "        OneOf{}::None", self.name)?;
+        writeln!(w, "    }}")?;
+        writeln!(w, "}}")?;
+        Ok(())
+    }
+
+    fn write_message_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        if self.has_lifetime(msgs) {
+            writeln!(w, "    pub {0}: OneOf{0}<'a>,", self.name)?;
+        } else {
+            writeln!(w, "    pub {0}: OneOf{0},", self.name)?;
+        }
+        Ok(())
+    }
+
+    fn write_match_tag<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
+            let (val, val_cow) = f.typ.read_fn(msgs);
+            if f.boxed {
+                writeln!(w, "                Ok({}) => msg.{} = OneOf{1}::{}(Box::new({}?)),", 
+                       f.tag(), self.name, f.name, val)?;
+            } else {
+                writeln!(w, "                Ok({}) => msg.{} = OneOf{1}::{}({}?),", 
+                       f.tag(), self.name, f.name, val_cow)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn write_get_size<W: Write>(&self, w: &mut W, is_first: &mut bool) -> Result<()> {
+        if *is_first { 
+            write!(w, "        match self.{} {{", self.name)?;
+            *is_first = false;
+        } else { 
+            write!(w, "        + match self.{} {{", self.name)?;
+        }
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
+            let tag_size = sizeof_varint(f.tag());
+            if f.typ.is_fixed_size() {
+                writeln!(w, "            OneOf{}::{}(_) => {} + {},", 
+                         self.name, f.name, tag_size, f.typ.get_size(""))?;
+            } else {
+                writeln!(w, "            OneOf{}::{}(ref m) => {} + {},", 
+                         self.name, f.name, tag_size, f.typ.get_size("m"))?;
+            }
+        }
+        writeln!(w, "            OneOf{}::None => 0,", self.name)?;
+        write!(w, "    }}")?;
+        Ok(())
+    }
+
+    fn write_write<W: Write>(&self, w: &mut W) -> Result<()> {
+        write!(w, "        match self.{} {{", self.name)?;
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
+            writeln!(w, "            OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},", 
+                     self.name, f.name, f.tag(), f.typ.get_write("m", f.boxed))?;
+        }
+        writeln!(w, "            OneOf{}::None => {{}},", self.name)?;
+        write!(w, "    }}")?;
+        Ok(())
+    }
+
 }
 
 #[derive(Debug, Default)]
@@ -809,7 +951,9 @@ impl FileDescriptor {
     fn set_defaults(&mut self) {
         // set map fields as required (they are equivalent to repeated message)
         for m in &mut self.messages {
-            for f in &mut m.fields {
+            for f in m.fields.iter_mut()
+                .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+            {
                 if let FieldType::Map(_) = f.typ {
                     f.frequency = Frequency::Required;
                 }
@@ -818,7 +962,9 @@ impl FileDescriptor {
         // if proto3, then changes several defaults
         if let Syntax::Proto3 = self.syntax {
             for m in &mut self.messages {
-                for f in &mut m.fields {
+                for f in m.fields.iter_mut()
+                    .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+                {
                     if f.packed.is_none() { 
                         if let Frequency::Repeated = f.frequency { 
                             f.packed = Some(true); 
@@ -866,10 +1012,14 @@ impl FileDescriptor {
 
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
         writeln!(w, "use std::io::{{Write}};")?;
-        if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_cow())) {
+        if self.messages.iter().any(|m| m.fields.iter()
+                                    .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
+                                    .any(|f| f.typ.is_cow())) {
             writeln!(w, "use std::borrow::Cow;")?;
         }
-        if self.messages.iter().any(|m| m.fields.iter().any(|f| f.typ.is_map())) {
+        if self.messages.iter().any(|m| m.fields.iter()
+                                    .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
+                                    .any(|f| f.typ.is_map())) {
             writeln!(w, "use std::collections::HashMap;")?;
         }
         writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
@@ -970,7 +1120,9 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
             let k = undef_messages.pop().unwrap();
             {
                 let mut m = messages[k].clone();
-                for f in m.fields.iter_mut() {
+                for f in m.fields.iter_mut()
+                    .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+                {
                     if !f.is_leaf(&leaf_messages) {
                         f.boxed = true;
                     }
