@@ -37,7 +37,7 @@ cd ../../protobuf_example
 ```toml
 # Cargo.toml
 [dependencies]
-quick-protobuf = "0.2.0"
+quick-protobuf = "0.3.0"
 ```
 
  - 3. Have fun
@@ -206,7 +206,7 @@ This library is an alternative to the widely used [rust-protobuf](https://github
   - Less allocations (bytes and string are converted respectively to `Cow<[u8]>` and `Cow<str>`)
 
 - Cons
-  - Very immature library at the moment, [many missing functionalities](https://github.com/tafia/quick-protobuf/issues/12)
+  - Immature library, [several missing functionalities](https://github.com/tafia/quick-protobuf/issues/12)
   - Not a drop-in replacement of rust-protobuf
     - you have to handle `Option`s unwrapping yourself
     - you may need to handle `Cow` as well if you want to modify it
@@ -215,14 +215,12 @@ This library is an alternative to the widely used [rust-protobuf](https://github
 #### Codegen
 
 Have a look at the different generated modules for the same .proto file:
-- [rust-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data.rs): 2322 loc
-- [quick-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data_quick.rs): 300 loc
+- [rust-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data.rs): 2371 loc
+- [quick-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data_quick.rs): 302 loc
 
 #### Benchmarks
 
-The only implemented benchmarks are the [adaptation from rust-protobuf perftest](benches/rust-protobuf).
-
-They show that quick-protobuf is, at the time of writing and on these specific benches much faster.
+An [adaptation of rust-protobuf perftest](benches/rust-protobuf) is available and show, on these particular examples, that quick-protobuf is much faster than rust-protobuf.
 
 ## Contribution
 
