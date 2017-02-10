@@ -1,7 +1,7 @@
 use std::str;
 use std::path::{Path, PathBuf};
 
-use types::{Frequency, Field, Message, Enumerator, FileDescriptor, Syntax, FieldType};
+use types::{Frequency, Field, Message, Enumerator, OneOf, FileDescriptor, Syntax, FieldType};
 use nom::{multispace, digit};
 
 fn is_word(b: u8) -> bool {
@@ -86,6 +86,15 @@ named!(map_field<(FieldType, FieldType)>,
                  value: field_type >> tag!(">") >>
                  ((key, value)) ));
 
+named!(one_of<OneOf>,
+       do_parse!(tag!("oneof") >> many1!(br) >>
+                 name: word >> many0!(br) >> tag!("{") >>
+                 fields: many1!(message_field) >> many0!(br) >> tag!("}") >> many0!(br) >>
+                 (OneOf {
+                     name: name,
+                     fields: fields,
+                 }) ));
+
 named!(message_field<Field>, 
        do_parse!(frequency: opt!(frequency) >> many0!(br) >>
                  typ: field_type >> many1!(br) >>
@@ -117,6 +126,7 @@ enum MessageEvent {
     Field(Field),
     ReservedNums(Vec<i32>),
     ReservedNames(Vec<String>),
+    OneOf(OneOf),
     Ignore,
 }
 
@@ -125,6 +135,7 @@ named!(message_event<MessageEvent>, alt!(reserved_nums => { |r| MessageEvent::Re
                                          message_field => { |f| MessageEvent::Field(f) } |
                                          message => { |m| MessageEvent::Message(m) } |
                                          enumerator => { |e| MessageEvent::Enumerator(e) } |
+                                         one_of => { |o| MessageEvent::OneOf(o) } |
                                          br => { |_| MessageEvent::Ignore }));
 
 named!(message_events<(String, Vec<MessageEvent>)>, 
@@ -145,6 +156,7 @@ named!(message<Message>,
                    MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
                    MessageEvent::Message(m) => msg.messages.push(m),
                    MessageEvent::Enumerator(e) => msg.enums.push(e),
+                   MessageEvent::OneOf(o) => msg.oneofs.push(o),
                    MessageEvent::Ignore => (),
                }
            }
@@ -326,6 +338,26 @@ mod test {
             }
         } else {
             panic!("Could not parse map message");
+        }
+    }
+
+    #[test]
+    fn test_oneof() {
+        let msg = r#"message A
+    {
+        optional int32 a1 = 1;
+        oneof a_oneof {
+            string a2 = 2;
+            int32 a3 = 3;
+            bytes a4 = 4;
+        }
+        repeated bool a5 = 5;
+    }"#;
+
+        let mess = message(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(1, mess.oneofs.len());
+            assert_eq!(3, mess.oneofs[0].fields.len());
         }
     }
 }

@@ -4,7 +4,7 @@ mod codegen;
 
 use std::borrow::Cow;
 
-use codegen::data_types::{self, FooMessage};
+use codegen::data_types::{self, FooMessage, OneOftest_oneof};
 
 // Imported fields contain package a.b, which is translated into
 // mod_a::mod_b rust module
@@ -41,6 +41,9 @@ fn main() {
 
         // a map!
         f_map: vec![(Cow::Borrowed("foo"), 1), (Cow::Borrowed("bar"), 2)].into_iter().collect(),
+
+        // a oneof value
+        test_oneof: OneOftest_oneof::f1(2),
 
         // Each message implements Default ... which makes it much easier
         ..FooMessage::default()

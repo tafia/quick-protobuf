@@ -64,6 +64,20 @@ impl MessageWrite for BarMessage {
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum OneOftest_oneof<'a> {
+    f1(i32),
+    f2(bool),
+    f3(Cow<'a, str>),
+    None,
+}
+
+impl<'a> Default for OneOftest_oneof<'a> {
+    fn default() -> Self {
+        OneOftest_oneof::None
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct FooMessage<'a> {
     pub f_int32: Option<i32>,
@@ -91,6 +105,7 @@ pub struct FooMessage<'a> {
     pub f_nested: Option<mod_BazMessage::Nested>,
     pub f_nested_enum: Option<mod_BazMessage::mod_Nested::NestedEnum>,
     pub f_map: HashMap<Cow<'a, str>, i32>,
+    pub test_oneof: OneOftest_oneof<'a>,
 }
 
 impl<'a> FooMessage<'a> {
@@ -126,6 +141,9 @@ impl<'a> FooMessage<'a> {
                     let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_int32(bytes))?;
                     msg.f_map.insert(key, value);
                 }
+                Ok(208) => msg.test_oneof = OneOftest_oneof::f1(r.read_int32(bytes)?),
+                Ok(216) => msg.test_oneof = OneOftest_oneof::f2(r.read_bool(bytes)?),
+                Ok(226) => msg.test_oneof = OneOftest_oneof::f3(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -161,7 +179,11 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + self.f_nested.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_nested_enum.as_ref().map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
         + self.f_map.iter().map(|(k, v)| 2 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))).sum::<usize>()
-    }
+        + match self.test_oneof {            OneOftest_oneof::f1(ref m) => 2 + sizeof_varint(*(m) as u64),
+            OneOftest_oneof::f2(ref m) => 2 + sizeof_varint(*(m) as u64),
+            OneOftest_oneof::f3(ref m) => 2 + sizeof_len((m).len()),
+            OneOftest_oneof::None => 0,
+    }    }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.f_int32 { w.write_with_tag(8, |w| w.write_int32(*s))?; }
@@ -189,7 +211,11 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_nested { w.write_with_tag(186, |w| w.write_message(s))?; }
         if let Some(ref s) = self.f_nested_enum { w.write_with_tag(192, |w| w.write_enum(*s as i32))?; }
         for (k, v) in self.f_map.iter() { w.write_with_tag(202, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)))?; }
-        Ok(())
+        match self.test_oneof {            OneOftest_oneof::f1(ref m) => { w.write_with_tag(208, |w| w.write_int32(*m))? },
+            OneOftest_oneof::f2(ref m) => { w.write_with_tag(216, |w| w.write_bool(*m))? },
+            OneOftest_oneof::f3(ref m) => { w.write_with_tag(226, |w| w.write_string(&**m))? },
+            OneOftest_oneof::None => {},
+    }        Ok(())
     }
 }
 
