@@ -12,10 +12,22 @@ It provides both:
 - [**pb-rs**](codegen), a code generation tool: 
   - each `.proto` file will generate a minimal rust module (one function to read, one to write, and one to compute the size of the messages)
   - each message will generate a rust struct where:
-    - `bytes` fields are converted to `Cow::Borrowed([u8])`
-    - `string` fields are converted to `Cow::Borrowed(str)`
-    - `repeated` fields are converted to `Vec`
-    - all other fields are converted into the matching rust primitive type
+
+    | **Proto**      | **Rust**                |
+    |----------------|-------------------------|
+    | bytes          | `Cow<'a, [u8]>`         |
+    | string         | `Cow<'a, str>`          |
+    | other scalars  | rust primitive          |
+    | repeated       | `Vec`                   |
+    | optional       | `Option`                |
+    | message        | `struct`                |
+    | enum           | `enum`                  |
+    | map            | `HashMap`               |
+    | oneof Name     | `OneOfName` enum        |
+    | nested `m1`    | `mod_m1` module         |
+    | package `a.b`  | `mod_a::mod_b` modules  |
+    | import file_a.proto | `use super::file_a::*` |
+
   - no need to use google `protoc` tool to generate the modules
 - **quick-protobuf**, a protobuf file parser: 
   - this is the crate that you will typically refer to in your library. The generated modules will assume it has been imported.
@@ -80,6 +92,10 @@ You can find basic examples in the [examples](examples) directory.
 
 ## Message <-> struct
 
+The best way to check for all kind of generated code is to look for the codegen_example data:
+- definition: [data_types.proto](examples/codegen/data_types.proto)
+- generated code: [data_types.rs](examples/codegen/data_types.rs)
+
 #### Proto definition
 
 ```
@@ -117,6 +133,7 @@ message FooMessage {
 ```
 
 #### Generated structs
+
 ```rust
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FooEnum {
