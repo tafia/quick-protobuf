@@ -55,7 +55,8 @@ impl BarMessage {
 
 impl MessageWrite for BarMessage {
     fn get_size(&self) -> usize {
-        1 + sizeof_varint(*(&self.b_required_int32) as u64)
+        0
+        + 1 + sizeof_varint(*(&self.b_required_int32) as u64)
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -160,7 +161,8 @@ impl<'a> FooMessage<'a> {
 
 impl<'a> MessageWrite for FooMessage<'a> {
     fn get_size(&self) -> usize {
-        self.f_int32.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        0
+        + self.f_int32.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
         + self.f_int64.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
         + self.f_uint32.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
         + self.f_uint64.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
@@ -245,7 +247,8 @@ impl BazMessage {
 
 impl MessageWrite for BazMessage {
     fn get_size(&self) -> usize {
-        self.nested.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.nested.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -279,7 +282,8 @@ impl Nested {
 
 impl MessageWrite for Nested {
     fn get_size(&self) -> usize {
-        1 + sizeof_len((&self.f_nested).get_size())
+        0
+        + 1 + sizeof_len((&self.f_nested).get_size())
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -313,7 +317,8 @@ impl NestedMessage {
 
 impl MessageWrite for NestedMessage {
     fn get_size(&self) -> usize {
-        1 + sizeof_varint(*(&self.f_nested) as u64)
+        0
+        + 1 + sizeof_varint(*(&self.f_nested) as u64)
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {

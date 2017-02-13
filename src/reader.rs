@@ -393,6 +393,11 @@ impl BytesReader {
     pub fn is_eof(&self) -> bool {
         self.start == self.end
     }
+
+    /// Advance inner cursor to the end
+    pub fn read_to_end(&mut self) {
+        self.start = self.end;
+    }
 }
 
 /// A struct to read protobuf data

@@ -359,7 +359,7 @@ impl Field {
         match self.typ {
             FieldType::Message(ref s) => {
                 match self.frequency {
-                    Frequency::Repeated | Frequency::Required => true,
+                    Frequency::Repeated => true,
                     _ => {
                         let typ = match s.rfind('.') {
                             Some(p) => &s[p + 1..],
@@ -386,7 +386,7 @@ impl Field {
         write!(w, "    pub {}: ", self.name)?;
         let rust_type = self.typ.rust_type(msgs, enums);
         match self.frequency {
-            Frequency::Optional if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
+            _ if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
             Frequency::Optional if self.default.is_some() => writeln!(w, "{},", rust_type)?,
             Frequency::Optional => writeln!(w, "Option<{}>,", rust_type)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
@@ -416,28 +416,23 @@ impl Field {
         let name = &self.name;
         write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
+            _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
             Frequency::Required => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
-            Frequency::Optional if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
             Frequency::Optional if self.default.is_some() => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
             Frequency::Optional => writeln!(w, "msg.{} = Some({}?),", name, val_cow)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
                 writeln!(w, "msg.{} = Cow::Borrowed(r.read_packed_fixed(bytes)?),", name)?;
             },
             Frequency::Repeated if self.packed() => {
-                writeln!(w, "msg.{} = r.read_packed(bytes, |r, bytes| {})?,", name, val)?;
+                writeln!(w, "msg.{} = r.read_packed(bytes, |r, bytes| {})?,", name, val_cow)?;
             },
-            Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val)?,
+            Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val_cow)?,
         }
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, is_first: &mut bool) -> Result<()> {
-        if *is_first { 
-            write!(w, "        ")?;
-            *is_first = false;
-        } else { 
-            write!(w, "        + ")?;
-        }
+    fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+        write!(w, "        + ")?;
         let tag_size = sizeof_varint(self.tag());
         match self.frequency {
             Frequency::Required if self.typ.is_map() => {
@@ -618,6 +613,16 @@ impl Message {
     }
 
     fn write_impl_message_read<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+        if self.fields.is_empty() && self.oneofs.is_empty() {
+            writeln!(w, "impl {} {{", self.name)?;
+            writeln!(w, "    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{")?;
+            writeln!(w, "        r.read_to_end();")?;
+            writeln!(w, "        Ok(Self::default())")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}")?;
+            return Ok(());
+        }
+
         if self.has_lifetime(msgs) {
             writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
@@ -674,19 +679,29 @@ impl Message {
     }
 
     fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.fields.is_empty() && self.oneofs.is_empty() {
+            writeln!(w, "    fn get_size(&self) -> usize {{ 0 }}")?;
+            return Ok(());
+        }
+
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
-        let mut first = true;
+        writeln!(w, "        0")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_get_size(w, &mut first)?;
+            f.write_get_size(w)?;
         }
         for o in self.oneofs.iter() {
-            o.write_get_size(w, &mut first)?;
+            o.write_get_size(w)?;
         }
         writeln!(w, "    }}")?;
         Ok(())
     }
 
     fn write_write_message<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.fields.is_empty() && self.oneofs.is_empty() {
+            writeln!(w, "    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> {{ Ok(()) }}")?;
+            return Ok(());
+        }
+
         writeln!(w, "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w)?;
@@ -768,13 +783,17 @@ impl Enumerator {
     }
 
     fn write<W: Write>(&self, w: &mut W) -> Result<()> {
-            println!("Writing enum {}", self.name);
-            writeln!(w, "")?;
-            self.write_definition(w)?;
-            writeln!(w, "")?;
+        println!("Writing enum {}", self.name);
+        writeln!(w, "")?;
+        self.write_definition(w)?;
+        writeln!(w, "")?;
+        if self.fields.is_empty() {
+            Ok(())
+        } else {
             self.write_impl_default(w)?;
             writeln!(w, "")?;
             self.write_from_i32(w)
+        }
     }
 
     fn write_definition<W: Write>(&self, w: &mut W) -> Result<()> {
@@ -883,13 +902,8 @@ impl OneOf {
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, is_first: &mut bool) -> Result<()> {
-        if *is_first { 
-            write!(w, "        match self.{} {{", self.name)?;
-            *is_first = false;
-        } else { 
-            write!(w, "        + match self.{} {{", self.name)?;
-        }
+    fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+        write!(w, "        + match self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {
@@ -1178,6 +1192,7 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
                     .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
                 {
                     if !f.is_leaf(&leaf_messages) {
+                        f.frequency = Frequency::Optional;
                         f.boxed = true;
                     }
                 }

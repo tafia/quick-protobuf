@@ -32,7 +32,8 @@ impl ImportedMessage {
 
 impl MessageWrite for ImportedMessage {
     fn get_size(&self) -> usize {
-        self.i.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        0
+        + self.i.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
