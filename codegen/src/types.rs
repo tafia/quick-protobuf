@@ -472,10 +472,12 @@ impl Field {
                              self.name, d, self.tag(), self.typ.get_write(&format!("&self.{}", self.name), self.boxed))?;
                 }
             },
+            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
+                writeln!(w, "        w.write_packed_fixed_with_tag({}, &self.{})?;", self.tag(), self.name)?
+            }
             Frequency::Repeated if self.packed() => {
-                let (m, v) = if !self.typ.is_fixed_size() { ("m", "m") } else { ("", "_") };
-                writeln!(w, "        w.write_packed_with_tag({}, &self.{}, |w, m| w.{}, &|{}| {})?;",
-                         self.tag(), self.name, self.typ.get_write("m", self.boxed), v, self.typ.get_size(m))?
+                writeln!(w, "        w.write_packed_with_tag({}, &self.{}, |w, m| w.{}, &|m| {})?;",
+                         self.tag(), self.name, self.typ.get_write("m", self.boxed), self.typ.get_size("m"))?
             }
             Frequency::Repeated => {
                 writeln!(w, "        for s in &self.{} {{ w.write_with_tag({}, |w| w.{})?; }}", 

@@ -125,7 +125,7 @@ impl<'a> MessageWrite for TestRepeatedPackedFloat<'a> {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        w.write_packed_with_tag(10, &self.values, |w, m| w.write_float(*m), &|_| 4)?;
+        w.write_packed_fixed_with_tag(10, &self.values)?;
         Ok(())
     }
 }

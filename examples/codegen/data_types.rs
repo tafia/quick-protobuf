@@ -209,7 +209,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_bar_message { w.write_with_tag(146, |w| w.write_message(s))?; }
         for s in &self.f_repeated_int32 { w.write_with_tag(152, |w| w.write_int32(*s))?; }
         w.write_packed_with_tag(162, &self.f_repeated_packed_int32, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
-        w.write_packed_with_tag(170, &self.f_repeated_packed_float, |w, m| w.write_float(*m), &|_| 4)?;
+        w.write_packed_fixed_with_tag(170, &self.f_repeated_packed_float)?;
         if let Some(ref s) = self.f_imported { w.write_with_tag(178, |w| w.write_message(s))?; }
         if let Some(ref s) = self.f_baz { w.write_with_tag(186, |w| w.write_message(s))?; }
         if let Some(ref s) = self.f_nested { w.write_with_tag(194, |w| w.write_message(s))?; }

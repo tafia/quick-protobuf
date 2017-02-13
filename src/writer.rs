@@ -224,6 +224,23 @@ impl<W: Write> Writer<W> {
         Ok(())
     }
 
+    /// Writes tag then repeated field
+    ///
+    /// If array is empty, then do nothing (do not even write the tag)
+    pub fn write_packed_fixed_with_tag<M>(&mut self, tag: u32, v: &[M]) -> Result<()>
+    {
+        if v.is_empty() {
+            return Ok(());
+        }
+
+        self.write_tag(tag)?;
+        let len = ::std::mem::size_of::<M>() * v.len();
+        self.write_varint(len as u64)?;
+        let bytes = unsafe { ::std::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
+        self.inner.write_all(bytes)?;
+        Ok(())
+    }
+
     /// Writes tag then repeated field with fixed length item size
     ///
     /// If array is empty, then do nothing (do not even write the tag)
