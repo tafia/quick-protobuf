@@ -140,6 +140,32 @@ impl FieldType {
         }
     }
 
+    fn regular_default<'a, 'b>(&'a self, msgs: &'b [Message], enums: &'b [Enumerator]) -> Option<&'b str> {
+        match *self {
+            FieldType::Int32 => Some("0"),
+            FieldType::Sint32 => Some("0"),
+            FieldType::Int64 => Some("0"),
+            FieldType::Sint64 => Some("0"),
+            FieldType::Uint32 => Some("0"),
+            FieldType::Uint64 => Some("0"),
+            FieldType::Bool => Some("false"),
+            FieldType::Fixed32 => Some("0"),
+            FieldType::Sfixed32 => Some("0"),
+            FieldType::Float => Some("0.0"),
+            FieldType::Fixed64 => Some("0"),
+            FieldType::Sfixed64 => Some("0"),
+            FieldType::Double => Some("0.0"),
+            FieldType::String_ => Some(""),
+            FieldType::Bytes => Some(""),
+            FieldType::Enum(_) => self
+                .find_enum(msgs, enums)
+                .and_then(|e| e.fields.iter().find(|&&(_, i)| i == 0))
+                .map(|ref e| &*e.0),
+            FieldType::Message(_) => None,
+            FieldType::Map(_) => None,
+        }
+    }
+
     /// Searches for message corresponding to the current type
     ///
     /// Searches first basic name then within nested messages
@@ -347,6 +373,11 @@ impl Field {
         }
     }
 
+    fn has_regular_default(&self, msgs: &[Message], enums: &[Enumerator]) -> bool {
+        self.default.is_none() 
+            || self.default.as_ref().map(|d| &**d) == self.typ.regular_default(msgs, enums)
+    }
+
     fn tag(&self) -> u32 {
         tag(self.number as u32, &self.typ, self.packed())
     }
@@ -537,7 +568,7 @@ impl Message {
 
         self.write_definition(w, msgs, enums)?;
         writeln!(w, "")?;
-        self.write_impl_message_read(w, msgs)?;
+        self.write_impl_message_read(w, msgs, enums)?;
         writeln!(w, "")?;
         self.write_impl_message_write(w, msgs)?;
 
@@ -586,7 +617,7 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_message_read<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+    fn write_impl_message_read<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
         if self.has_lifetime(msgs) {
             writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
@@ -594,7 +625,19 @@ impl Message {
             writeln!(w, "impl {} {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {{")?;
         }
-        writeln!(w, "        let mut msg = Self::default();")?;
+
+        let unregular_defaults = self.fields.iter()
+            .filter(|f| !f.has_regular_default(msgs, enums)).collect::<Vec<_>>();
+        if unregular_defaults.is_empty() {
+            writeln!(w, "        let mut msg = Self::default();")?;
+        } else {
+            writeln!(w, "        let mut msg = {} {{", self.name)?;
+            for f in unregular_defaults {
+                writeln!(w, "            {}: {},", f.name, f.default.as_ref().unwrap())?;
+            }
+            writeln!(w, "            ..Self::default()")?;
+            writeln!(w, "        }};")?;
+        }
         writeln!(w, "        while !r.is_eof() {{")?;
         writeln!(w, "            match r.next_tag(bytes) {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {

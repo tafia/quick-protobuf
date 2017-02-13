@@ -85,12 +85,12 @@ pub struct FooMessage<'a> {
     pub f_uint32: Option<u32>,
     pub f_uint64: Option<u64>,
     pub f_sint32: Option<i32>,
-    pub f_sint64: Option<i64>,
-    pub f_bool: Option<bool>,
+    pub f_sint64: i64,
+    pub f_bool: bool,
     pub f_FooEnum: Option<FooEnum>,
     pub f_fixed64: Option<u64>,
     pub f_sfixed64: Option<i64>,
-    pub f_fixed32: Option<u32>,
+    pub f_fixed32: u32,
     pub f_sfixed32: Option<i32>,
     pub f_double: Option<f64>,
     pub f_float: Option<f32>,
@@ -111,7 +111,11 @@ pub struct FooMessage<'a> {
 
 impl<'a> FooMessage<'a> {
     pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
-        let mut msg = Self::default();
+        let mut msg = FooMessage {
+            f_sint64: 4,
+            f_bool: true,
+            ..Self::default()
+        };
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.f_int32 = Some(r.read_int32(bytes)?),
@@ -119,12 +123,12 @@ impl<'a> FooMessage<'a> {
                 Ok(24) => msg.f_uint32 = Some(r.read_uint32(bytes)?),
                 Ok(32) => msg.f_uint64 = Some(r.read_uint64(bytes)?),
                 Ok(40) => msg.f_sint32 = Some(r.read_sint32(bytes)?),
-                Ok(48) => msg.f_sint64 = Some(r.read_sint64(bytes)?),
-                Ok(56) => msg.f_bool = Some(r.read_bool(bytes)?),
+                Ok(48) => msg.f_sint64 = r.read_sint64(bytes)?,
+                Ok(56) => msg.f_bool = r.read_bool(bytes)?,
                 Ok(64) => msg.f_FooEnum = Some(r.read_enum(bytes)?),
                 Ok(73) => msg.f_fixed64 = Some(r.read_fixed64(bytes)?),
                 Ok(81) => msg.f_sfixed64 = Some(r.read_sfixed64(bytes)?),
-                Ok(93) => msg.f_fixed32 = Some(r.read_fixed32(bytes)?),
+                Ok(93) => msg.f_fixed32 = r.read_fixed32(bytes)?,
                 Ok(101) => msg.f_sfixed32 = Some(r.read_sfixed32(bytes)?),
                 Ok(105) => msg.f_double = Some(r.read_double(bytes)?),
                 Ok(117) => msg.f_float = Some(r.read_float(bytes)?),
@@ -161,13 +165,10 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + self.f_uint32.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
         + self.f_uint64.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
         + self.f_sint32.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-        + self.f_sint64.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-        + self.f_bool.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-        + self.f_FooEnum.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + if self.f_sint64 == 4 { 0 } else { 1 + sizeof_varint(*(&self.f_sint64) as u64) }        + if self.f_bool == true { 0 } else { 1 + sizeof_varint(*(&self.f_bool) as u64) }        + self.f_FooEnum.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
         + self.f_fixed64.as_ref().map_or(0, |_| 1 + 8)
         + self.f_sfixed64.as_ref().map_or(0, |_| 1 + 8)
-        + self.f_fixed32.as_ref().map_or(0, |_| 1 + 4)
-        + self.f_sfixed32.as_ref().map_or(0, |_| 1 + 4)
+        + if self.f_fixed32 == 0 { 0 } else { 1 + 4 }        + self.f_sfixed32.as_ref().map_or(0, |_| 1 + 4)
         + self.f_double.as_ref().map_or(0, |_| 1 + 8)
         + self.f_float.as_ref().map_or(0, |_| 1 + 4)
         + self.f_bytes.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
@@ -194,12 +195,12 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_uint32 { w.write_with_tag(24, |w| w.write_uint32(*s))?; }
         if let Some(ref s) = self.f_uint64 { w.write_with_tag(32, |w| w.write_uint64(*s))?; }
         if let Some(ref s) = self.f_sint32 { w.write_with_tag(40, |w| w.write_sint32(*s))?; }
-        if let Some(ref s) = self.f_sint64 { w.write_with_tag(48, |w| w.write_sint64(*s))?; }
-        if let Some(ref s) = self.f_bool { w.write_with_tag(56, |w| w.write_bool(*s))?; }
+        if self.f_sint64 != 4 { w.write_with_tag(48, |w| w.write_sint64(*&self.f_sint64))?; }
+        if self.f_bool != true { w.write_with_tag(56, |w| w.write_bool(*&self.f_bool))?; }
         if let Some(ref s) = self.f_FooEnum { w.write_with_tag(64, |w| w.write_enum(*s as i32))?; }
         if let Some(ref s) = self.f_fixed64 { w.write_with_tag(73, |w| w.write_fixed64(*s))?; }
         if let Some(ref s) = self.f_sfixed64 { w.write_with_tag(81, |w| w.write_sfixed64(*s))?; }
-        if let Some(ref s) = self.f_fixed32 { w.write_with_tag(93, |w| w.write_fixed32(*s))?; }
+        if self.f_fixed32 != 0 { w.write_with_tag(93, |w| w.write_fixed32(*&self.f_fixed32))?; }
         if let Some(ref s) = self.f_sfixed32 { w.write_with_tag(101, |w| w.write_sfixed32(*s))?; }
         if let Some(ref s) = self.f_double { w.write_with_tag(105, |w| w.write_double(*s))?; }
         if let Some(ref s) = self.f_float { w.write_with_tag(117, |w| w.write_float(*s))?; }
