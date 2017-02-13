@@ -15,12 +15,12 @@ message FooMessage {
     optional uint32 f_uint32 = 3;
     optional uint64 f_uint64 = 4;
     optional sint32 f_sint32 = 5;
-    optional sint64 f_sint64 = 6;
-    optional bool f_bool = 7;
+    optional sint64 f_sint64 = 6 [default=4];
+    optional bool f_bool = 7 [default=true];
     optional FooEnum f_FooEnum = 8;
     optional fixed64 f_fixed64 = 9;
     optional sfixed64 f_sfixed64 = 10;
-    optional fixed32 f_fixed32 = 11;
+    optional fixed32 f_fixed32 = 11 [default=0];
     optional sfixed32 f_sfixed32 = 12;
     optional double f_double = 13;
     optional float f_float = 14;
