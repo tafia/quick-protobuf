@@ -359,7 +359,7 @@ impl Field {
         match self.typ {
             FieldType::Message(ref s) => {
                 match self.frequency {
-                    Frequency::Repeated | Frequency::Required => true,
+                    Frequency::Repeated => true,
                     _ => {
                         let typ = match s.rfind('.') {
                             Some(p) => &s[p + 1..],
@@ -386,7 +386,7 @@ impl Field {
         write!(w, "    pub {}: ", self.name)?;
         let rust_type = self.typ.rust_type(msgs, enums);
         match self.frequency {
-            Frequency::Optional if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
+            _ if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
             Frequency::Optional if self.default.is_some() => writeln!(w, "{},", rust_type)?,
             Frequency::Optional => writeln!(w, "Option<{}>,", rust_type)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
@@ -416,8 +416,8 @@ impl Field {
         let name = &self.name;
         write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
+            _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
             Frequency::Required => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
-            Frequency::Optional if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
             Frequency::Optional if self.default.is_some() => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
             Frequency::Optional => writeln!(w, "msg.{} = Some({}?),", name, val_cow)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
@@ -618,6 +618,16 @@ impl Message {
     }
 
     fn write_impl_message_read<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+        if self.fields.is_empty() && self.oneofs.is_empty() {
+            writeln!(w, "impl {} {{", self.name)?;
+            writeln!(w, "    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{")?;
+            writeln!(w, "        r.read_to_end();")?;
+            writeln!(w, "        Self::default()")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}")?;
+            return Ok(());
+        }
+
         if self.has_lifetime(msgs) {
             writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
@@ -674,6 +684,11 @@ impl Message {
     }
 
     fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.fields.is_empty() && self.oneofs.is_empty() {
+            writeln!(w, "    fn get_size(&self) -> usize {{ 0 }}")?;
+            return Ok(());
+        }
+
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
         let mut first = true;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
@@ -687,6 +702,11 @@ impl Message {
     }
 
     fn write_write_message<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.fields.is_empty() && self.oneofs.is_empty() {
+            writeln!(w, "    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> {{ Ok(()) }}")?;
+            return Ok(());
+        }
+
         writeln!(w, "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w)?;
@@ -768,13 +788,17 @@ impl Enumerator {
     }
 
     fn write<W: Write>(&self, w: &mut W) -> Result<()> {
-            println!("Writing enum {}", self.name);
-            writeln!(w, "")?;
-            self.write_definition(w)?;
-            writeln!(w, "")?;
+        println!("Writing enum {}", self.name);
+        writeln!(w, "")?;
+        self.write_definition(w)?;
+        writeln!(w, "")?;
+        if self.fields.is_empty() {
             self.write_impl_default(w)?;
             writeln!(w, "")?;
             self.write_from_i32(w)
+        } else {
+            Ok(())
+        }
     }
 
     fn write_definition<W: Write>(&self, w: &mut W) -> Result<()> {
