@@ -431,13 +431,8 @@ impl Field {
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, is_first: &mut bool) -> Result<()> {
-        if *is_first { 
-            write!(w, "        ")?;
-            *is_first = false;
-        } else { 
-            write!(w, "        + ")?;
-        }
+    fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+        write!(w, "        + ")?;
         let tag_size = sizeof_varint(self.tag());
         match self.frequency {
             Frequency::Required if self.typ.is_map() => {
@@ -690,12 +685,12 @@ impl Message {
         }
 
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
-        let mut first = true;
+        writeln!(w, "        0")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_get_size(w, &mut first)?;
+            f.write_get_size(w)?;
         }
         for o in self.oneofs.iter() {
-            o.write_get_size(w, &mut first)?;
+            o.write_get_size(w)?;
         }
         writeln!(w, "    }}")?;
         Ok(())
@@ -907,13 +902,8 @@ impl OneOf {
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, is_first: &mut bool) -> Result<()> {
-        if *is_first { 
-            write!(w, "        match self.{} {{", self.name)?;
-            *is_first = false;
-        } else { 
-            write!(w, "        + match self.{} {{", self.name)?;
-        }
+    fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+        write!(w, "        + match self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {
