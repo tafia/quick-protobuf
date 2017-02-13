@@ -10,6 +10,10 @@ message TestRepeatedPackedInt32 {
     repeated int32 values = 1 [ packed = true ];
 }
 
+message TestRepeatedPackedFloat {
+    repeated float values = 1 [ packed = true ];
+}
+
 message TestRepeatedMessages {
     repeated TestRepeatedMessages messages1 = 1;
     repeated TestRepeatedMessages messages2 = 2;
@@ -43,7 +47,8 @@ message PerftestData {
     repeated TestOptionalMessages test_optional_messages = 4;
     repeated TestStrings test_strings = 5;
     repeated TestRepeatedPackedInt32 test_repeated_packed_int32 = 6;
-    repeated TestBytes test_small_bytearrays = 7;
-    repeated TestBytes test_large_bytearrays = 8;
-    repeated TestMap test_map = 9;
+    repeated TestRepeatedPackedFloat test_repeated_packed_float = 7;
+    repeated TestBytes test_small_bytearrays = 8;
+    repeated TestBytes test_large_bytearrays = 9;
+    repeated TestMap test_map = 10;
 }

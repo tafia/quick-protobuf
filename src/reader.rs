@@ -311,6 +311,25 @@ impl BytesReader {
         })
     }
 
+    /// Reads packed repeated field where M can directly be transmutted from raw bytes
+    ///
+    /// Note: packed field are stored as a variable length chunk of data, while regular repeated
+    /// fields behaves like an iterator, yielding their tag everytime
+    #[inline]
+    pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a[u8]) -> Result<&'a[M]> {
+        let len = self.read_varint32(bytes)? as usize;
+        if self.len() < len {
+            return Err(::std::io::Error::new(::std::io::ErrorKind::UnexpectedEof,
+                                             "Cannot read fixed packed field").into());
+        }
+        let n = len / ::std::mem::size_of::<M>();
+        let slice = unsafe {
+            ::std::slice::from_raw_parts(bytes.get_unchecked(self.start) as * const u8 as * const M, n)
+        };
+        self.start += len;
+        Ok(slice)
+    }
+
     /// Reads a nested message
     #[inline]
     pub fn read_message<'a, M, F>(&mut self, bytes: &'a[u8], read: F) -> Result<M>

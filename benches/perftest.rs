@@ -78,6 +78,13 @@ fn generate_repeated_packed_int32() -> Vec<TestRepeatedPackedInt32> {
 
 perfbench!(generate_repeated_packed_int32, TestRepeatedPackedInt32, write_repeated_packed_int32, read_repeated_packed_int32);
 
+fn generate_repeated_packed_float() -> Vec<TestRepeatedPackedFloat<'static>> {
+    (1..40).map(|j| TestRepeatedPackedFloat { values: Cow::Owned((0..100).map(|i| (i * j) as f32).collect()) })
+        .collect()
+}
+
+perfbench!(generate_repeated_packed_float, TestRepeatedPackedFloat, write_repeated_packed_float, read_repeated_packed_float);
+
 fn generate_repeated_messages() -> Vec<TestRepeatedMessages> {
     let mut messages = Vec::new();
     messages.push(TestRepeatedMessages {
@@ -86,7 +93,7 @@ fn generate_repeated_messages() -> Vec<TestRepeatedMessages> {
         messages3: vec![],
     });
 
-    for _ in 0..10 {
+    for _ in 0..5 {
         let i1 = min(messages.len() % 3, messages.len() - 1);
         let i2 = min(messages.len() % 6, messages.len() - 1);
         let i3 = min(messages.len() % 9, messages.len() - 1);
@@ -179,6 +186,7 @@ fn generate_all() -> Vec<PerftestData<'static>> {
         test_optional_messages: generate_optional_messages(),
         test_strings: generate_strings(),
         test_repeated_packed_int32: generate_repeated_packed_int32(),
+        test_repeated_packed_float: generate_repeated_packed_float(),
         test_small_bytearrays: generate_small_bytes(),
         test_large_bytearrays: generate_large_bytes(),
         test_map: generate_map(),

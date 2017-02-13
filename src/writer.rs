@@ -179,9 +179,9 @@ impl<W: Write> Writer<W> {
     /// `item_size` is internally used to compute the total length
     /// As the length is fixed (and the same as rust internal representation, we can directly dump
     /// all data at once
-    pub fn write_packed_fixed_size<M>(&mut self, v: &[M]) -> Result<()> {
+    pub fn write_packed_fixed<M>(&mut self, v: &[M]) -> Result<()> {
         let len = v.len() * ::std::mem::size_of::<M>();
-        let bytes = unsafe { ::std::slice::from_raw_parts(v as *const [M] as *const M as *const u8, len) };
+        let bytes = unsafe { ::std::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
         self.write_bytes(bytes)
     }
 
@@ -222,6 +222,21 @@ impl<W: Write> Writer<W> {
             write(self, m)?;
         }
         Ok(())
+    }
+
+    /// Writes tag then repeated field
+    ///
+    /// If array is empty, then do nothing (do not even write the tag)
+    pub fn write_packed_fixed_with_tag<M>(&mut self, tag: u32, v: &[M]) -> Result<()>
+    {
+        if v.is_empty() {
+            return Ok(());
+        }
+
+        self.write_tag(tag)?;
+        let len = ::std::mem::size_of::<M>() * v.len();
+        let bytes = unsafe { ::std::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
+        self.write_bytes(bytes)
     }
 
     /// Writes tag then repeated field with fixed length item size

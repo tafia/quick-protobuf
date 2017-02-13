@@ -31,7 +31,7 @@ impl Test1 {
 
 impl MessageWrite for Test1 {
     fn get_size(&self) -> usize {
-        self.value.as_ref().map_or(0, |m| 1 + sizeof_varint(*m as u64))
+        self.value.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -61,7 +61,7 @@ impl TestRepeatedBool {
 
 impl MessageWrite for TestRepeatedBool {
     fn get_size(&self) -> usize {
-        self.values.iter().map(|s| 1 + sizeof_varint(*s as u64)).sum::<usize>()
+        self.values.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -91,11 +91,41 @@ impl TestRepeatedPackedInt32 {
 
 impl MessageWrite for TestRepeatedPackedInt32 {
     fn get_size(&self) -> usize {
-        if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.iter().map(|s| sizeof_varint(*s as u64)).sum::<usize>()) }
+        if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        w.write_packed_with_tag(10, &self.values, |w, m| w.write_int32(*m), &|m| sizeof_varint(*m as u64))?;
+        w.write_packed_with_tag(10, &self.values, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct TestRepeatedPackedFloat<'a> {
+    pub values: Cow<'a, [f32]>,
+}
+
+impl<'a> TestRepeatedPackedFloat<'a> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+        let mut msg = Self::default();
+        while !r.is_eof() {
+            match r.next_tag(bytes) {
+                Ok(10) => msg.values = Cow::Borrowed(r.read_packed_fixed(bytes)?),
+                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(msg)
+    }
+}
+
+impl<'a> MessageWrite for TestRepeatedPackedFloat<'a> {
+    fn get_size(&self) -> usize {
+        if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.len() * 4) }
+    }
+
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        w.write_packed_fixed_with_tag(10, &self.values)?;
         Ok(())
     }
 }
@@ -125,9 +155,9 @@ impl TestRepeatedMessages {
 
 impl MessageWrite for TestRepeatedMessages {
     fn get_size(&self) -> usize {
-        self.messages1.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.messages2.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.messages3.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
+        self.messages1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.messages2.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.messages3.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -163,9 +193,9 @@ impl TestOptionalMessages {
 
 impl MessageWrite for TestOptionalMessages {
     fn get_size(&self) -> usize {
-        self.message1.as_ref().map_or(0, |m| 1 + sizeof_len(m.get_size()))
-        + self.message2.as_ref().map_or(0, |m| 1 + sizeof_len(m.get_size()))
-        + self.message3.as_ref().map_or(0, |m| 1 + sizeof_len(m.get_size()))
+        self.message1.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        + self.message2.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        + self.message3.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -201,9 +231,9 @@ impl<'a> TestStrings<'a> {
 
 impl<'a> MessageWrite for TestStrings<'a> {
     fn get_size(&self) -> usize {
-        self.s1.as_ref().map_or(0, |m| 1 + sizeof_len(m.len()))
-        + self.s2.as_ref().map_or(0, |m| 1 + sizeof_len(m.len()))
-        + self.s3.as_ref().map_or(0, |m| 1 + sizeof_len(m.len()))
+        self.s1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        + self.s2.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        + self.s3.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -235,7 +265,7 @@ impl<'a> TestBytes<'a> {
 
 impl<'a> MessageWrite for TestBytes<'a> {
     fn get_size(&self) -> usize {
-        self.b1.as_ref().map_or(0, |m| 1 + sizeof_len(m.len()))
+        self.b1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -268,11 +298,11 @@ impl<'a> TestMap<'a> {
 
 impl<'a> MessageWrite for TestMap<'a> {
     fn get_size(&self) -> usize {
-        self.value.iter().map(|(k, v)| 1 + sizeof_len(2 + sizeof_len(k.len()) + sizeof_varint(*v as u64))).sum::<usize>()
+        self.value.iter().map(|(k, v)| 1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        for (k, v) in self.value.iter() { w.write_with_tag(10, |w| w.write_map(2 + sizeof_len(k.len()) + sizeof_varint(*v as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_uint32(*v)))?; }
+        for (k, v) in self.value.iter() { w.write_with_tag(10, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_uint32(*v)))?; }
         Ok(())
     }
 }
@@ -285,6 +315,7 @@ pub struct PerftestData<'a> {
     pub test_optional_messages: Vec<TestOptionalMessages>,
     pub test_strings: Vec<TestStrings<'a>>,
     pub test_repeated_packed_int32: Vec<TestRepeatedPackedInt32>,
+    pub test_repeated_packed_float: Vec<TestRepeatedPackedFloat<'a>>,
     pub test_small_bytearrays: Vec<TestBytes<'a>>,
     pub test_large_bytearrays: Vec<TestBytes<'a>>,
     pub test_map: Vec<TestMap<'a>>,
@@ -301,9 +332,10 @@ impl<'a> PerftestData<'a> {
                 Ok(34) => msg.test_optional_messages.push(r.read_message(bytes, TestOptionalMessages::from_reader)?),
                 Ok(42) => msg.test_strings.push(r.read_message(bytes, TestStrings::from_reader)?),
                 Ok(50) => msg.test_repeated_packed_int32.push(r.read_message(bytes, TestRepeatedPackedInt32::from_reader)?),
-                Ok(58) => msg.test_small_bytearrays.push(r.read_message(bytes, TestBytes::from_reader)?),
-                Ok(66) => msg.test_large_bytearrays.push(r.read_message(bytes, TestBytes::from_reader)?),
-                Ok(74) => msg.test_map.push(r.read_message(bytes, TestMap::from_reader)?),
+                Ok(58) => msg.test_repeated_packed_float.push(r.read_message(bytes, TestRepeatedPackedFloat::from_reader)?),
+                Ok(66) => msg.test_small_bytearrays.push(r.read_message(bytes, TestBytes::from_reader)?),
+                Ok(74) => msg.test_large_bytearrays.push(r.read_message(bytes, TestBytes::from_reader)?),
+                Ok(82) => msg.test_map.push(r.read_message(bytes, TestMap::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -314,15 +346,16 @@ impl<'a> PerftestData<'a> {
 
 impl<'a> MessageWrite for PerftestData<'a> {
     fn get_size(&self) -> usize {
-        self.test1.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.test_repeated_bool.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.test_repeated_messages.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.test_optional_messages.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.test_strings.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.test_repeated_packed_int32.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.test_small_bytearrays.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.test_large_bytearrays.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
-        + self.test_map.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
+        self.test1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_repeated_bool.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_repeated_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_optional_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_strings.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_repeated_packed_int32.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_repeated_packed_float.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_small_bytearrays.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_large_bytearrays.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_map.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -332,9 +365,10 @@ impl<'a> MessageWrite for PerftestData<'a> {
         for s in &self.test_optional_messages { w.write_with_tag(34, |w| w.write_message(s))?; }
         for s in &self.test_strings { w.write_with_tag(42, |w| w.write_message(s))?; }
         for s in &self.test_repeated_packed_int32 { w.write_with_tag(50, |w| w.write_message(s))?; }
-        for s in &self.test_small_bytearrays { w.write_with_tag(58, |w| w.write_message(s))?; }
-        for s in &self.test_large_bytearrays { w.write_with_tag(66, |w| w.write_message(s))?; }
-        for s in &self.test_map { w.write_with_tag(74, |w| w.write_message(s))?; }
+        for s in &self.test_repeated_packed_float { w.write_with_tag(58, |w| w.write_message(s))?; }
+        for s in &self.test_small_bytearrays { w.write_with_tag(66, |w| w.write_message(s))?; }
+        for s in &self.test_large_bytearrays { w.write_with_tag(74, |w| w.write_message(s))?; }
+        for s in &self.test_map { w.write_with_tag(82, |w| w.write_message(s))?; }
         Ok(())
     }
 }

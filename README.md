@@ -13,20 +13,21 @@ It provides both:
   - each `.proto` file will generate a minimal rust module (one function to read, one to write, and one to compute the size of the messages)
   - each message will generate a rust struct where:
 
-    | **Proto**      | **Rust**                |
-    |----------------|-------------------------|
-    | bytes          | `Cow<'a, [u8]>`         |
-    | string         | `Cow<'a, str>`          |
-    | other scalars  | rust primitive          |
-    | repeated       | `Vec`                   |
-    | optional       | `Option`                |
-    | message        | `struct`                |
-    | enum           | `enum`                  |
-    | map            | `HashMap`               |
-    | oneof Name     | `OneOfName` enum        |
-    | nested `m1`    | `mod_m1` module         |
-    | package `a.b`  | `mod_a::mod_b` modules  |
-    | import file_a.proto | `use super::file_a::*` |
+    | **Proto**                    | **Rust**                |
+    |------------------------------|-------------------------|
+    | bytes                        | `Cow<'a, [u8]>`         |
+    | string                       | `Cow<'a, str>`          |
+    | other scalars                | rust primitive          |
+    | repeated                     | `Vec`                   |
+    | repeated, packed, fixed size | `Cow<'a, [M]>`          |
+    | optional                     | `Option`                |
+    | message                      | `struct`                |
+    | enum                         | `enum`                  |
+    | map                          | `HashMap`               |
+    | oneof Name                   | `OneOfName` enum        |
+    | nested `m1`                  | `mod_m1` module         |
+    | package `a.b`                | `mod_a::mod_b` modules  |
+    | import file_a.proto          | `use super::file_a::*` |
 
   - no need to use google `protoc` tool to generate the modules
 - **quick-protobuf**, a protobuf file parser: 
