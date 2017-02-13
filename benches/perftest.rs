@@ -78,8 +78,8 @@ fn generate_repeated_packed_int32() -> Vec<TestRepeatedPackedInt32> {
 
 perfbench!(generate_repeated_packed_int32, TestRepeatedPackedInt32, write_repeated_packed_int32, read_repeated_packed_int32);
 
-fn generate_repeated_packed_float() -> Vec<TestRepeatedPackedFloat> {
-    (1..40).map(|j| TestRepeatedPackedFloat { values: (0..100).map(|i| (i * j) as f32).collect() })
+fn generate_repeated_packed_float() -> Vec<TestRepeatedPackedFloat<'static>> {
+    (1..40).map(|j| TestRepeatedPackedFloat { values: Cow::Owned((0..100).map(|i| (i * j) as f32).collect()) })
         .collect()
 }
 

@@ -30,15 +30,16 @@ message FooMessage {
     optional BarMessage f_bar_message = 18;
     repeated int32 f_repeated_int32 = 19;
     repeated int32 f_repeated_packed_int32 = 20 [ packed = true ];
-    optional a.b.ImportedMessage f_imported = 21;
-    optional BazMessage f_baz = 22;
-    optional BazMessage.Nested f_nested = 23;
-    optional BazMessage.Nested.NestedEnum f_nested_enum = 24;
-    map<string, int32> f_map = 25;
+    repeated float f_repeated_packed_float = 21 [ packed = true ];
+    optional a.b.ImportedMessage f_imported = 22;
+    optional BazMessage f_baz = 23;
+    optional BazMessage.Nested f_nested = 24;
+    optional BazMessage.Nested.NestedEnum f_nested_enum = 25;
+    map<string, int32> f_map = 26;
     oneof test_oneof {
-        int32 f1 = 26;
-        bool f2 = 27;
-        string f3 = 28;
+        int32 f1 = 27;
+        bool f2 = 28;
+        string f3 = 29;
     }
 }
 

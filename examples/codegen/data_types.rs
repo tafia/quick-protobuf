@@ -100,6 +100,7 @@ pub struct FooMessage<'a> {
     pub f_bar_message: Option<BarMessage>,
     pub f_repeated_int32: Vec<i32>,
     pub f_repeated_packed_int32: Vec<i32>,
+    pub f_repeated_packed_float: Cow<'a, [f32]>,
     pub f_imported: Option<mod_a::mod_b::ImportedMessage>,
     pub f_baz: Option<BazMessage>,
     pub f_nested: Option<mod_BazMessage::Nested>,
@@ -133,17 +134,18 @@ impl<'a> FooMessage<'a> {
                 Ok(146) => msg.f_bar_message = Some(r.read_message(bytes, BarMessage::from_reader)?),
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
                 Ok(162) => msg.f_repeated_packed_int32 = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
-                Ok(170) => msg.f_imported = Some(r.read_message(bytes, mod_a::mod_b::ImportedMessage::from_reader)?),
-                Ok(178) => msg.f_baz = Some(r.read_message(bytes, BazMessage::from_reader)?),
-                Ok(186) => msg.f_nested = Some(r.read_message(bytes, mod_BazMessage::Nested::from_reader)?),
-                Ok(192) => msg.f_nested_enum = Some(r.read_enum(bytes)?),
-                Ok(202) => {
+                Ok(170) => msg.f_repeated_packed_float = Cow::Borrowed(r.read_packed_fixed(bytes)?),
+                Ok(178) => msg.f_imported = Some(r.read_message(bytes, mod_a::mod_b::ImportedMessage::from_reader)?),
+                Ok(186) => msg.f_baz = Some(r.read_message(bytes, BazMessage::from_reader)?),
+                Ok(194) => msg.f_nested = Some(r.read_message(bytes, mod_BazMessage::Nested::from_reader)?),
+                Ok(200) => msg.f_nested_enum = Some(r.read_enum(bytes)?),
+                Ok(210) => {
                     let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_int32(bytes))?;
                     msg.f_map.insert(key, value);
                 }
-                Ok(208) => msg.test_oneof = OneOftest_oneof::f1(r.read_int32(bytes)?),
-                Ok(216) => msg.test_oneof = OneOftest_oneof::f2(r.read_bool(bytes)?),
-                Ok(226) => msg.test_oneof = OneOftest_oneof::f3(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(216) => msg.test_oneof = OneOftest_oneof::f1(r.read_int32(bytes)?),
+                Ok(224) => msg.test_oneof = OneOftest_oneof::f2(r.read_bool(bytes)?),
+                Ok(234) => msg.test_oneof = OneOftest_oneof::f3(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -174,6 +176,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + self.f_bar_message.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_repeated_int32.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
         + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_packed_int32.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
+        + if self.f_repeated_packed_float.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_packed_float.len() * 4) }
         + self.f_imported.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_baz.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_nested.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
@@ -206,14 +209,15 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_bar_message { w.write_with_tag(146, |w| w.write_message(s))?; }
         for s in &self.f_repeated_int32 { w.write_with_tag(152, |w| w.write_int32(*s))?; }
         w.write_packed_with_tag(162, &self.f_repeated_packed_int32, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
-        if let Some(ref s) = self.f_imported { w.write_with_tag(170, |w| w.write_message(s))?; }
-        if let Some(ref s) = self.f_baz { w.write_with_tag(178, |w| w.write_message(s))?; }
-        if let Some(ref s) = self.f_nested { w.write_with_tag(186, |w| w.write_message(s))?; }
-        if let Some(ref s) = self.f_nested_enum { w.write_with_tag(192, |w| w.write_enum(*s as i32))?; }
-        for (k, v) in self.f_map.iter() { w.write_with_tag(202, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)))?; }
-        match self.test_oneof {            OneOftest_oneof::f1(ref m) => { w.write_with_tag(208, |w| w.write_int32(*m))? },
-            OneOftest_oneof::f2(ref m) => { w.write_with_tag(216, |w| w.write_bool(*m))? },
-            OneOftest_oneof::f3(ref m) => { w.write_with_tag(226, |w| w.write_string(&**m))? },
+        w.write_packed_with_tag(170, &self.f_repeated_packed_float, |w, m| w.write_float(*m), &|_| 4)?;
+        if let Some(ref s) = self.f_imported { w.write_with_tag(178, |w| w.write_message(s))?; }
+        if let Some(ref s) = self.f_baz { w.write_with_tag(186, |w| w.write_message(s))?; }
+        if let Some(ref s) = self.f_nested { w.write_with_tag(194, |w| w.write_message(s))?; }
+        if let Some(ref s) = self.f_nested_enum { w.write_with_tag(200, |w| w.write_enum(*s as i32))?; }
+        for (k, v) in self.f_map.iter() { w.write_with_tag(210, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)))?; }
+        match self.test_oneof {            OneOftest_oneof::f1(ref m) => { w.write_with_tag(216, |w| w.write_int32(*m))? },
+            OneOftest_oneof::f2(ref m) => { w.write_with_tag(224, |w| w.write_bool(*m))? },
+            OneOftest_oneof::f3(ref m) => { w.write_with_tag(234, |w| w.write_string(&**m))? },
             OneOftest_oneof::None => {},
     }        Ok(())
     }

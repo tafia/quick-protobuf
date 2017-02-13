@@ -196,13 +196,15 @@ impl FieldType {
         }
     }
 
-    fn has_lifetime(&self, msgs: &[Message]) -> bool {
+    fn has_lifetime(&self, msgs: &[Message], packed: bool) -> bool {
         match *self {
-            FieldType::String_ | FieldType::Bytes => true, // Cow
+            FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
             FieldType::Message(_) => self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs)),
+            FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double |
+            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref m) => {
                 let &(ref key, ref value) = &**m;
-                key.has_lifetime(msgs) || value.has_lifetime(msgs)
+                key.has_lifetime(msgs, false) || value.has_lifetime(msgs, false)
             }
             _ => false,
         }
@@ -356,6 +358,9 @@ impl Field {
             Frequency::Optional if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
             Frequency::Optional if self.default.is_some() => writeln!(w, "{},", rust_type)?,
             Frequency::Optional => writeln!(w, "Option<{}>,", rust_type)?,
+            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
+                writeln!(w, "Cow<'a, [{}]>,", rust_type)?;
+            },
             Frequency::Repeated => writeln!(w, "Vec<{}>,", rust_type)?,
             Frequency::Required => writeln!(w, "{},", rust_type)?,
         }
@@ -384,6 +389,9 @@ impl Field {
             Frequency::Optional if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
             Frequency::Optional if self.default.is_some() => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
             Frequency::Optional => writeln!(w, "msg.{} = Some({}?),", name, val_cow)?,
+            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
+                writeln!(w, "msg.{} = Cow::Borrowed(r.read_packed_fixed(bytes)?),", name)?;
+            },
             Frequency::Repeated if self.packed() => {
                 writeln!(w, "msg.{} = r.read_packed(bytes, |r, bytes| {})?,", name, val)?;
             },
@@ -505,7 +513,7 @@ impl Message {
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
             .any(|f| match f.typ {
                 FieldType::Message(ref m) if &m[..] == self.name => false,
-                ref t => t.has_lifetime(msgs),
+                ref t => t.has_lifetime(msgs, f.packed()),
             })
     }
 
@@ -768,7 +776,7 @@ pub struct OneOf {
 impl OneOf {
 
     fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        self.fields.iter().any(|f| !f.deprecated && f.typ.has_lifetime(msgs))
+        self.fields.iter().any(|f| !f.deprecated && f.typ.has_lifetime(msgs, f.packed()))
     }
 
     fn write<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {

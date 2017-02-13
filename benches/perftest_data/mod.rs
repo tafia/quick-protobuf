@@ -101,16 +101,16 @@ impl MessageWrite for TestRepeatedPackedInt32 {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct TestRepeatedPackedFloat {
-    pub values: Vec<f32>,
+pub struct TestRepeatedPackedFloat<'a> {
+    pub values: Cow<'a, [f32]>,
 }
 
-impl TestRepeatedPackedFloat {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> TestRepeatedPackedFloat<'a> {
+    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.values = r.read_packed(bytes, |r, bytes| r.read_float(bytes))?,
+                Ok(10) => msg.values = Cow::Borrowed(r.read_packed_fixed(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -119,7 +119,7 @@ impl TestRepeatedPackedFloat {
     }
 }
 
-impl MessageWrite for TestRepeatedPackedFloat {
+impl<'a> MessageWrite for TestRepeatedPackedFloat<'a> {
     fn get_size(&self) -> usize {
         if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.len() * 4) }
     }
@@ -315,7 +315,7 @@ pub struct PerftestData<'a> {
     pub test_optional_messages: Vec<TestOptionalMessages>,
     pub test_strings: Vec<TestStrings<'a>>,
     pub test_repeated_packed_int32: Vec<TestRepeatedPackedInt32>,
-    pub test_repeated_packed_float: Vec<TestRepeatedPackedFloat>,
+    pub test_repeated_packed_float: Vec<TestRepeatedPackedFloat<'a>>,
     pub test_small_bytearrays: Vec<TestBytes<'a>>,
     pub test_large_bytearrays: Vec<TestBytes<'a>>,
     pub test_map: Vec<TestMap<'a>>,
