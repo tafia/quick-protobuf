@@ -329,6 +329,22 @@ pub enum NestedEnum {
     Baz = 2,
 }
 
+impl Default for NestedEnum {
+    fn default() -> Self {
+        NestedEnum::Foo
+    }
+}
+
+impl From<i32> for NestedEnum {
+    fn from(i: i32) -> Self {
+        match i {
+            0 => NestedEnum::Foo,
+            1 => NestedEnum::Bar,
+            2 => NestedEnum::Baz,
+            _ => Self::default(),
+        }
+    }
+}
 
 }
 
