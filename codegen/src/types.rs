@@ -424,9 +424,9 @@ impl Field {
                 writeln!(w, "msg.{} = Cow::Borrowed(r.read_packed_fixed(bytes)?),", name)?;
             },
             Frequency::Repeated if self.packed() => {
-                writeln!(w, "msg.{} = r.read_packed(bytes, |r, bytes| {})?,", name, val)?;
+                writeln!(w, "msg.{} = r.read_packed(bytes, |r, bytes| {})?,", name, val_cow)?;
             },
-            Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val)?,
+            Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val_cow)?,
         }
         Ok(())
     }
@@ -622,7 +622,7 @@ impl Message {
             writeln!(w, "impl {} {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{")?;
             writeln!(w, "        r.read_to_end();")?;
-            writeln!(w, "        Self::default()")?;
+            writeln!(w, "        Ok(Self::default())")?;
             writeln!(w, "    }}")?;
             writeln!(w, "}}")?;
             return Ok(());
@@ -793,11 +793,11 @@ impl Enumerator {
         self.write_definition(w)?;
         writeln!(w, "")?;
         if self.fields.is_empty() {
+            Ok(())
+        } else {
             self.write_impl_default(w)?;
             writeln!(w, "")?;
             self.write_from_i32(w)
-        } else {
-            Ok(())
         }
     }
 
@@ -1202,6 +1202,7 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
                     .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
                 {
                     if !f.is_leaf(&leaf_messages) {
+                        f.frequency = Frequency::Optional;
                         f.boxed = true;
                     }
                 }
