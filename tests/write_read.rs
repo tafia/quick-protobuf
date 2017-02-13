@@ -214,6 +214,18 @@ fn wr_packed_uint32(){
 }
 
 #[test]
+fn wr_packed_float(){
+    let v = vec![43, 54, 64, 234, 6123, 643];
+    let mut buf = Vec::new();
+    {
+        let mut w = Writer::new(&mut buf);
+        w.write_packed_fixed(&v).unwrap();
+    }
+    let mut r = BytesReader::from_bytes(&buf);
+    assert_eq!(v, r.read_packed_fixed(&buf).unwrap());
+}
+
+#[test]
 fn wr_map(){
     let v = {
         let mut v = HashMap::new();
