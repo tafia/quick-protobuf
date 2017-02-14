@@ -7,11 +7,11 @@
 //!
 //! It is advised, for convenience to directly work with a `Reader`.
 
-use std::io::Read;
+use std::io::{self, Read};
 use std::path::Path;
 use std::fs::File;
 
-use errors::{Result, ErrorKind};
+use errors::{Result, ErrorKind, Error};
 
 use byteorder::LittleEndian as LE;
 use byteorder::ByteOrder;
@@ -83,38 +83,41 @@ impl BytesReader {
     }
 
     #[inline(always)]
-    fn read_u8(&mut self, bytes: &[u8]) -> u8 {
-        let b = bytes[self.start];
+    fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
+        let b = bytes
+            .get(self.start)
+            .ok_or_else::<Error, _>(|| io::Error::new(io::ErrorKind::UnexpectedEof,
+                                                      "Cannot read next bytes").into())?;
         self.start += 1;
-        b
+        Ok(*b)
     }
 
     /// Reads the next varint encoded u64
     #[inline(always)]
     pub fn read_varint32(&mut self, bytes: &[u8]) -> Result<u32> {
-        let mut b = self.read_u8(bytes);
+        let mut b = self.read_u8(bytes)?;
         if b & 0x80 == 0 { return Ok(b as u32); }
         let mut r = (b & 0x7f) as u32;
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r |= ((b & 0x7f) as u32) << 7;
         if b & 0x80 == 0 { return Ok(r); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r |= ((b & 0x7f) as u32) << 14;
         if b & 0x80 == 0 { return Ok(r); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r |= ((b & 0x7f) as u32) << 21;
         if b & 0x80 == 0 { return Ok(r); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r |= ((b & 0xf) as u32) << 28;
         if b & 0x80 == 0 { return Ok(r); }
 
         // discards extra bytes
         for _ in 0..5 {
-            if self.read_u8(bytes) & 0x80 == 0 { return Ok(r); }
+            if self.read_u8(bytes)? & 0x80 == 0 { return Ok(r); }
         }
 
         // cannot read more than 10 bytes
@@ -126,45 +129,45 @@ impl BytesReader {
     pub fn read_varint64(&mut self, bytes: &[u8]) -> Result<u64> {
 
         // part0
-        let mut b = self.read_u8(bytes);
+        let mut b = self.read_u8(bytes)?;
         if b & 0x80 == 0 { return Ok(b as u64); }
         let mut r0 = (b & 0x7f) as u32;
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r0 |= ((b & 0x7f) as u32) << 7;
         if b & 0x80 == 0 { return Ok(r0 as u64); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r0 |= ((b & 0x7f) as u32) << 14;
         if b & 0x80 == 0 { return Ok(r0 as u64); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r0 |= ((b & 0x7f) as u32) << 21;
         if b & 0x80 == 0 { return Ok(r0 as u64); }
 
         // part1
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         let mut r1 = (b & 0x7f) as u32;
         if b & 0x80 == 0 { return Ok((r0 as u64 | (r1 as u64) << 28)); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 7;
         if b & 0x80 == 0 { return Ok((r0 as u64 | (r1 as u64) << 28)); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 14;
         if b & 0x80 == 0 { return Ok((r0 as u64 | (r1 as u64) << 28)); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 21;
         if b & 0x80 == 0 { return Ok((r0 as u64 | (r1 as u64) << 28)); }
 
         // part2
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         let mut r2 = (b & 0x7f) as u32;
         if b & 0x80 == 0 { return Ok(((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56)); }
 
-        b = self.read_u8(bytes);
+        b = self.read_u8(bytes)?;
         r2 |= (b as u32) << 7;
         if b & 0x80 == 0 { return Ok(((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56)); }
 
@@ -319,8 +322,8 @@ impl BytesReader {
     pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a[u8]) -> Result<&'a[M]> {
         let len = self.read_varint32(bytes)? as usize;
         if self.len() < len {
-            return Err(::std::io::Error::new(::std::io::ErrorKind::UnexpectedEof,
-                                             "Cannot read fixed packed field").into());
+            return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
+                                      "Cannot read fixed packed field").into());
         }
         let n = len / ::std::mem::size_of::<M>();
         let slice = unsafe {
@@ -339,6 +342,7 @@ impl BytesReader {
     }
 
     /// Reads a map item: (key, value)
+    #[inline]
     pub fn read_map<'a, K, V, F, G>(&mut self,
                                     bytes: &'a[u8],
                                     mut read_key: F,
@@ -352,7 +356,7 @@ impl BytesReader {
             let mut k = K::default();
             let mut v = V::default();
             while !r.is_eof() {
-                let t = r.read_u8(bytes);
+                let t = r.read_u8(bytes)?;
                 match t >> 3 {
                     1 => k = read_key(r, bytes)?,
                     2 => v = read_val(r, bytes)?,
@@ -383,13 +387,13 @@ impl BytesReader {
     }
 
     /// Gets the remaining length of bytes not read yet
-    #[inline]
+    #[inline(always)]
     pub fn len(&self) -> usize {
         self.end - self.start
     }
 
     /// Checks if `self.len == 0`
-    #[inline]
+    #[inline(always)]
     pub fn is_eof(&self) -> bool {
         self.start == self.end
     }
