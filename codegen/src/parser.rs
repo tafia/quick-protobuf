@@ -53,8 +53,8 @@ named!(reserved_names<Vec<String>>,
 named!(key_val<(&str, &str)>, 
        do_parse!(tag!("[") >> many0!(br) >> 
                  key: word_ref >> many0!(br) >> tag!("=") >> many0!(br) >> 
-                 value: word_ref >> many0!(br) >> tag!("]") >> many0!(br) >>
-                 ((key, value)) ));
+                 value: map_res!(is_not!("]"), str::from_utf8) >> tag!("]") >> many0!(br) >>
+                 ((key, value.trim())) ));
 
 named!(frequency<Frequency>,
        alt!(tag!("optional") => { |_| Frequency::Optional } |
