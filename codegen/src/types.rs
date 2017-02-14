@@ -290,9 +290,10 @@ impl FieldType {
 
     fn get_size(&self, s: &str) -> String {
         match *self {
-            FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
-            FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
+            FieldType::Int32 | FieldType::Int64 | FieldType::Uint32 | FieldType::Uint64 |
             FieldType::Bool | FieldType::Enum(_) => format!("sizeof_varint(*({}) as u64)", s),
+            FieldType::Sint32 => format!("sizeof_sint32(*({}))", s),
+            FieldType::Sint64 => format!("sizeof_sint64(*({}))", s),
 
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
