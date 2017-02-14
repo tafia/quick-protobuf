@@ -58,24 +58,6 @@ pub enum FieldType {
 
 impl FieldType {
 
-    fn is_numeric(&self) -> bool {
-        match *self {
-            FieldType::Int32 |
-            FieldType::Int64 |
-            FieldType::Uint32 |
-            FieldType::Uint64 |
-            FieldType::Sint32 |
-            FieldType::Sint64 |
-            FieldType::Fixed64 |
-            FieldType::Sfixed64 |
-            FieldType::Double |
-            FieldType::Fixed32 |
-            FieldType::Sfixed32 |
-            FieldType::Float => true,
-            _ => false,
-        }
-    }
-
     fn is_cow(&self) -> bool {
         match *self {
             FieldType::Bytes | FieldType::String_ => true,
@@ -142,21 +124,21 @@ impl FieldType {
 
     fn regular_default<'a, 'b>(&'a self, msgs: &'b [Message], enums: &'b [Enumerator]) -> Option<&'b str> {
         match *self {
-            FieldType::Int32 => Some("0"),
-            FieldType::Sint32 => Some("0"),
-            FieldType::Int64 => Some("0"),
-            FieldType::Sint64 => Some("0"),
-            FieldType::Uint32 => Some("0"),
-            FieldType::Uint64 => Some("0"),
+            FieldType::Int32 => Some("0i32"),
+            FieldType::Sint32 => Some("0i32"),
+            FieldType::Int64 => Some("0i64"),
+            FieldType::Sint64 => Some("0i64"),
+            FieldType::Uint32 => Some("0u32"),
+            FieldType::Uint64 => Some("0u64"),
             FieldType::Bool => Some("false"),
-            FieldType::Fixed32 => Some("0"),
-            FieldType::Sfixed32 => Some("0"),
-            FieldType::Float => Some("0.0"),
-            FieldType::Fixed64 => Some("0"),
-            FieldType::Sfixed64 => Some("0"),
-            FieldType::Double => Some("0.0"),
-            FieldType::String_ => Some(""),
-            FieldType::Bytes => Some(""),
+            FieldType::Fixed32 => Some("0u32"),
+            FieldType::Sfixed32 => Some("0i32"),
+            FieldType::Float => Some("0f32"),
+            FieldType::Fixed64 => Some("0u64"),
+            FieldType::Sfixed64 => Some("0i64"),
+            FieldType::Double => Some("0f64"),
+            FieldType::String_ => Some("Cow::Borrowed(\"\")"),
+            FieldType::Bytes => Some("Cow::Borrowed(b\"\")"),
             FieldType::Enum(_) => self
                 .find_enum(msgs, enums)
                 .and_then(|e| e.fields.iter().find(|&&(_, i)| i == 0))
@@ -374,6 +356,33 @@ impl Field {
         }
     }
 
+    fn sanitize_default(&mut self, msgs: &[Message], enums: &[Enumerator]) {
+        if let Some(ref mut d) = self.default {
+            *d = match &*self.typ.rust_type(msgs, enums) {
+                "u32" => format!("{}u32", *d),
+                "u64" => format!("{}u64", *d),
+                "i32" => format!("{}i32", *d),
+                "i64" => format!("{}i64", *d),
+                "f32" => match &*d.to_lowercase() {
+                    "inf" => "::std::f32::INFINITY".to_string(),
+                    "-inf" => "::std::f32::NEG_INFINITY".to_string(),
+                    "nan" => "::std::f32::NAN".to_string(),
+                    _ => format!("{}f32", *d),
+                },
+                "f64" => match &*d.to_lowercase() {
+                    "inf" => "::std::f64::INFINITY".to_string(),
+                    "-inf" => "::std::f64::NEG_INFINITY".to_string(),
+                    "nan" => "::std::f64::NAN".to_string(),
+                    _ => format!("{}f64", *d),
+                },
+                "Cow<'a, str>" => format!("Cow::Borrowed({})", d),
+                "Cow<'a, [u8]>" => format!("Cow::Borrowed(b{})", d),
+                "bool" => format!("{}", d.parse::<bool>().unwrap()),
+                e => format!("{}::{}", e, d), // enum, as message and map do not have defaults
+            }
+        }
+    }
+
     fn has_regular_default(&self, msgs: &[Message], enums: &[Enumerator]) -> bool {
         self.default.is_none() 
             || self.default.as_ref().map(|d| &**d) == self.typ.regular_default(msgs, enums)
@@ -452,7 +461,7 @@ impl Field {
                         }
                     }
                     Some(d) => {
-                        write!(w, "if self.{} == {} {{ 0 }} else {{ {} + {} }}", 
+                        writeln!(w, "if self.{} == {} {{ 0 }} else {{ {} + {} }}", 
                                self.name, d, tag_size, self.typ.get_size(&format!("&self.{}", self.name)))?;
                     }
                 }
@@ -760,6 +769,41 @@ impl Message {
             m.set_enums(msgs);
         }
     }
+
+    fn set_map_required(&mut self) {
+        for f in self.fields.iter_mut()
+            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+        {
+            if let FieldType::Map(_) = f.typ {
+                f.frequency = Frequency::Required;
+            }
+        }
+        for m in &mut self.messages {
+            m.set_map_required();
+        }
+    }
+
+    fn set_repeated_as_packed(&mut self) {
+        for f in self.fields.iter_mut()
+            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+        {
+            if f.packed.is_none() { 
+                if let Frequency::Repeated = f.frequency { 
+                    f.packed = Some(true); 
+                }
+            }
+        }
+    }
+
+    fn sanitize_defaults(&mut self, msgs: &[Message], enums: &[Enumerator]) {
+        for f in self.fields.iter_mut()
+            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut())) {
+            f.sanitize_default(msgs, enums);
+        }
+        for m in &mut self.messages {
+            m.sanitize_defaults(msgs, enums);
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1020,30 +1064,18 @@ impl FileDescriptor {
     fn set_defaults(&mut self) {
         // set map fields as required (they are equivalent to repeated message)
         for m in &mut self.messages {
-            for f in m.fields.iter_mut()
-                .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-            {
-                if let FieldType::Map(_) = f.typ {
-                    f.frequency = Frequency::Required;
-                }
-            }
+            m.set_map_required();
         }
         // if proto3, then changes several defaults
         if let Syntax::Proto3 = self.syntax {
             for m in &mut self.messages {
-                for f in m.fields.iter_mut()
-                    .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-                {
-                    if f.packed.is_none() { 
-                        if let Frequency::Repeated = f.frequency { 
-                            f.packed = Some(true); 
-                        }
-                    }
-                    if f.default.is_none() && f.typ.is_numeric() { 
-                        f.default = Some("0".to_string());
-                    }
-                }
+                m.set_repeated_as_packed();
             }
+        }
+        // this is very inefficient but we don't care ...
+        let msgs = self.messages.clone();
+        for m in &mut self.messages {
+            m.sanitize_defaults(&msgs, &self.enums);
         }
     }
 
