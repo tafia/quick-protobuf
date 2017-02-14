@@ -13,8 +13,9 @@ install:
 build: false
 
 test_script:
+  - cd tests/rust_protobuf
+  - ./generate.sh
   - cargo build
   - cargo test
-  - cd benches/perftest_data
-  - sh generate_mod.sh
-  - rustup run nightly cargo bench
+  - cd ../../examples/codegen
+  - ./generate_module.sh
