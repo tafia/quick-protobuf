@@ -566,18 +566,13 @@ impl Message {
         println!("Writing message {}{}", self.get_modules(), self.name);
         writeln!(w, "")?;
 
-        // write oneofs Enums, if any
-        for o in &self.oneofs {
-            o.write(w, msgs, enums)?;
-        }
-
         self.write_definition(w, msgs, enums)?;
         writeln!(w, "")?;
         self.write_impl_message_read(w, msgs, enums)?;
         writeln!(w, "")?;
         self.write_impl_message_write(w, msgs)?;
 
-        if !self.messages.is_empty() {
+        if !self.messages.is_empty() || !self.enums.is_empty() || !self.oneofs.is_empty() {
             writeln!(w, "")?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w, "")?;
@@ -598,6 +593,10 @@ impl Message {
             for e in &self.enums {
                 e.write(w)?;
             }
+            for o in &self.oneofs {
+                o.write(w, msgs, enums)?;
+            }
+
             writeln!(w, "")?;
             writeln!(w, "}}")?;
         }
@@ -744,11 +743,13 @@ impl Message {
         if package.is_empty() {
             for m in &mut self.messages { m.set_package(&self.name); }
             for m in &mut self.enums { m.set_package(&self.name); }
+            for m in &mut self.oneofs { m.set_package(&self.name); }
         } else {
             self.package = package.to_string();
             let child_package = format!("{}.{}", package, self.name);
             for m in &mut self.messages { m.set_package(&child_package); }
             for m in &mut self.enums { m.set_package(&child_package); }
+            for m in &mut self.oneofs { m.set_package(&child_package); }
         }
     }
 
@@ -881,6 +882,7 @@ impl Enumerator {
 pub struct OneOf {
     pub name: String,
     pub fields: Vec<Field>,
+    pub package: String,
 }
 
 impl OneOf {
@@ -889,11 +891,22 @@ impl OneOf {
         self.fields.iter().any(|f| !f.deprecated && f.typ.has_lifetime(msgs, f.packed()))
     }
 
+    fn set_package(&mut self, package: &str) {
+        self.package = package.to_string();
+    }
+
+    fn get_modules(&self) -> String {
+        self.package
+            .split('.').filter(|p| !p.is_empty())
+            .map(|p| format!("mod_{}::", p))
+            .collect()
+    }
+
     fn write<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+        writeln!(w, "")?;
         self.write_definition(w, msgs, enums)?;
         writeln!(w, "")?;
         self.write_impl_default(w, msgs)?;
-        writeln!(w, "")?;
         Ok(())
     }
 
@@ -927,9 +940,9 @@ impl OneOf {
 
     fn write_message_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
         if self.has_lifetime(msgs) {
-            writeln!(w, "    pub {0}: OneOf{0}<'a>,", self.name)?;
+            writeln!(w, "    pub {0}: {1}OneOf{0}<'a>,", self.name, self.get_modules())?;
         } else {
-            writeln!(w, "    pub {0}: OneOf{0},", self.name)?;
+            writeln!(w, "    pub {0}: {1}OneOf{0},", self.name, self.get_modules())?;
         }
         Ok(())
     }
@@ -938,11 +951,11 @@ impl OneOf {
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let (val, val_cow) = f.typ.read_fn(msgs);
             if f.boxed {
-                writeln!(w, "                Ok({}) => msg.{} = OneOf{1}::{}(Box::new({}?)),", 
-                       f.tag(), self.name, f.name, val)?;
+                writeln!(w, "                Ok({}) => msg.{} = {}OneOf{1}::{}(Box::new({}?)),", 
+                       f.tag(), self.name, self.get_modules(), f.name, val)?;
             } else {
-                writeln!(w, "                Ok({}) => msg.{} = OneOf{1}::{}({}?),", 
-                       f.tag(), self.name, f.name, val_cow)?;
+                writeln!(w, "                Ok({}) => msg.{} = {}OneOf{1}::{}({}?),", 
+                       f.tag(), self.name, self.get_modules(), f.name, val_cow)?;
             }
         }
         Ok(())
@@ -953,14 +966,14 @@ impl OneOf {
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {
-                writeln!(w, "            OneOf{}::{}(_) => {} + {},", 
-                         self.name, f.name, tag_size, f.typ.get_size(""))?;
+                writeln!(w, "            {}OneOf{}::{}(_) => {} + {},", 
+                         self.get_modules(), self.name, f.name, tag_size, f.typ.get_size(""))?;
             } else {
-                writeln!(w, "            OneOf{}::{}(ref m) => {} + {},", 
-                         self.name, f.name, tag_size, f.typ.get_size("m"))?;
+                writeln!(w, "            {}OneOf{}::{}(ref m) => {} + {},", 
+                         self.get_modules(), self.name, f.name, tag_size, f.typ.get_size("m"))?;
             }
         }
-        writeln!(w, "            OneOf{}::None => 0,", self.name)?;
+        writeln!(w, "            {}OneOf{}::None => 0,", self.get_modules(), self.name)?;
         write!(w, "    }}")?;
         Ok(())
     }
@@ -968,10 +981,10 @@ impl OneOf {
     fn write_write<W: Write>(&self, w: &mut W) -> Result<()> {
         write!(w, "        match self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            writeln!(w, "            OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},", 
-                     self.name, f.name, f.tag(), f.typ.get_write("m", f.boxed))?;
+            writeln!(w, "            {}OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},", 
+                     self.get_modules(), self.name, f.name, f.tag(), f.typ.get_write("m", f.boxed))?;
         }
-        writeln!(w, "            OneOf{}::None => {{}},", self.name)?;
+        writeln!(w, "            {}OneOf{}::None => {{}},", self.get_modules(), self.name)?;
         write!(w, "    }}")?;
         Ok(())
     }
