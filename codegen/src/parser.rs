@@ -93,6 +93,7 @@ named!(one_of<OneOf>,
                  (OneOf {
                      name: name,
                      fields: fields,
+                     package: "".to_string(),
                  }) ));
 
 named!(message_field<Field>, 

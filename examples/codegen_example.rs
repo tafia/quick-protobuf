@@ -4,7 +4,8 @@ mod codegen;
 
 use std::borrow::Cow;
 
-use codegen::data_types::{self, FooMessage, OneOftest_oneof};
+use codegen::data_types::{self, FooMessage};
+use codegen::data_types::mod_FooMessage::OneOftest_oneof;
 
 // Imported fields contain package a.b, which is translated into
 // mod_a::mod_b rust module
