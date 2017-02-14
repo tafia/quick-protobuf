@@ -743,6 +743,7 @@ impl Message {
         // set package = current_package.package.name to nested messages
         if package.is_empty() {
             for m in &mut self.messages { m.set_package(&self.name); }
+            for m in &mut self.enums { m.set_package(&self.name); }
         } else {
             self.package = package.to_string();
             let child_package = format!("{}.{}", package, self.name);
