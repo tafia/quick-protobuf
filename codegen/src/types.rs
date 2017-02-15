@@ -563,6 +563,10 @@ impl Message {
             .collect()
     }
 
+    fn is_unit(&self) -> bool {
+        self.fields.is_empty() && self.oneofs.is_empty()
+    }
+
     fn write<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
         println!("Writing message {}{}", self.get_modules(), self.name);
         writeln!(w, "")?;
@@ -573,7 +577,7 @@ impl Message {
         writeln!(w, "")?;
         self.write_impl_message_write(w, msgs)?;
 
-        if !self.messages.is_empty() || !self.enums.is_empty() || !self.oneofs.is_empty() {
+        if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
             writeln!(w, "")?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w, "")?;
@@ -607,6 +611,11 @@ impl Message {
 
     fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
         writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
+        if self.is_unit() {
+            writeln!(w, "pub struct {} {{ }}", self.name)?;
+            return Ok(());
+        }
+
         if self.has_lifetime(msgs) {
             writeln!(w, "pub struct {}<'a> {{", self.name)?;
         } else {
@@ -623,7 +632,7 @@ impl Message {
     }
 
     fn write_impl_message_read<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
-        if self.fields.is_empty() && self.oneofs.is_empty() {
+        if self.is_unit() {
             writeln!(w, "impl {} {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{")?;
             writeln!(w, "        r.read_to_end();")?;
@@ -676,6 +685,11 @@ impl Message {
     }
 
     fn write_impl_message_write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+        if self.is_unit() {
+            writeln!(w, "impl MessageWrite for {} {{ }}", self.name)?;
+            return Ok(());
+        }
+
         if self.has_lifetime(msgs) {
             writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
         } else {
@@ -689,11 +703,6 @@ impl Message {
     }
 
     fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
-        if self.fields.is_empty() && self.oneofs.is_empty() {
-            writeln!(w, "    fn get_size(&self) -> usize {{ 0 }}")?;
-            return Ok(());
-        }
-
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
         writeln!(w, "        0")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
@@ -707,11 +716,6 @@ impl Message {
     }
 
     fn write_write_message<W: Write>(&self, w: &mut W) -> Result<()> {
-        if self.fields.is_empty() && self.oneofs.is_empty() {
-            writeln!(w, "    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> {{ Ok(()) }}")?;
-            return Ok(());
-        }
-
         writeln!(w, "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w)?;
@@ -1179,6 +1183,13 @@ impl FileDescriptor {
     }
 
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.messages.is_empty() {
+            return Ok(());
+        }
+        if self.messages.iter().all(|m| m.is_unit()) {
+            writeln!(w, "use quick_protobuf::{{BytesReader, Result}};")?;
+            return Ok(());
+        }
         writeln!(w, "use std::io::{{Write}};")?;
         if self.messages.iter().any(|m| m.fields.iter()
                                     .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
