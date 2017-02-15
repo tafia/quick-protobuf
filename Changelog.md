@@ -8,7 +8,7 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
-## master
+## 0.3.0 - 0.4.0
 - docs: add examples, more details about message to struct conversion
 - refactor: update dependencies
 - fix: remove some warning on codegen fixed size types + non camel names
@@ -17,6 +17,10 @@
 - feat: support packages by encapsulating into rust modules
 - feat: support map
 - refactor: major refatorings of codegen
+- feat: rename rust keywords
+- feat: normalize file names
+- feat: packed fixed size fields are now `Cow`
+- test: migrated most rust-protobuf tests
 
 ## 0.2.0
 - feat: do not allocate for bytes and string field types

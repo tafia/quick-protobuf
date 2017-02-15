@@ -50,7 +50,7 @@ cd ../../protobuf_example
 ```toml
 # Cargo.toml
 [dependencies]
-quick-protobuf = "0.3.0"
+quick-protobuf = "0.4.0"
 ```
 
  - 3. Have fun
@@ -218,17 +218,17 @@ This library is an alternative to the widely used [rust-protobuf](https://github
 #### Pros / Cons
 
 - Pros
-  - No need to install anything on your machine but rust
+  - [Much faster](benches/rust-protobuf), in particular when working with string, bytes and repeated packed fixed size fields (no extra allocation)
+  - No need to install `protoc` on your machine
   - No trait objects: faster/simpler parser
-  - Very simple generated modules (~10x smaller)
-  - Less allocations (bytes and string are converted respectively to `Cow<[u8]>` and `Cow<str>`)
+  - Very simple generated modules (~10x smaller) so you can easily understand what is happening
 
 - Cons
-  - Immature library, [several missing functionalities](https://github.com/tafia/quick-protobuf/issues/12)
+  - Younger library
+    - not battle tested, even if most rust-protobuf tests have been migrated here (see [v2](tests/rust_protobuf/v2/mod.rs) and [v3](tests/rust_protobuf/v3/mod.rs))
+    - [some missing functionalities](https://github.com/tafia/quick-protobuf/issues/12)
   - Not a drop-in replacement of rust-protobuf
-    - you have to handle `Option`s unwrapping yourself
-    - you may need to handle `Cow` as well if you want to modify it
-  - Very little tests in comparison
+    - everything being explicit you have to handle more things yourself (e.g. `Option` unwrapping, `Cow` management)
 
 #### Codegen
 

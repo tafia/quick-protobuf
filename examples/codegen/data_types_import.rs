@@ -7,7 +7,7 @@
 pub mod mod_a {
 pub mod mod_b {
 
-use std::io::{Write};
+use std::io::Write;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 

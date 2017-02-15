@@ -4,7 +4,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-use std::io::{Write};
+use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
@@ -174,7 +174,8 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + self.f_nested.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_nested_enum.as_ref().map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
         + self.f_map.iter().map(|(k, v)| 2 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))).sum::<usize>()
-        + match self.test_oneof {            mod_FooMessage::OneOftest_oneof::f1(ref m) => 2 + sizeof_varint(*(m) as u64),
+        + match self.test_oneof {
+            mod_FooMessage::OneOftest_oneof::f1(ref m) => 2 + sizeof_varint(*(m) as u64),
             mod_FooMessage::OneOftest_oneof::f2(ref m) => 2 + sizeof_varint(*(m) as u64),
             mod_FooMessage::OneOftest_oneof::f3(ref m) => 2 + sizeof_len((m).len()),
             mod_FooMessage::OneOftest_oneof::None => 0,
