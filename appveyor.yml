@@ -6,15 +6,15 @@ install:
   - curl -sSf -o rustup-init.exe https://win.rustup.rs/
   - rustup-init.exe -y --default-host %TARGET%
   - set PATH=%PATH%;C:\Users\appveyor\.cargo\bin
-  - rustup install nightly
   - rustc -V
   - cargo -V
 
 build: false
 
 test_script:
+  - cd tests/rust_protobuf
+  - sh generate.sh
   - cargo build
   - cargo test
-  - cd benches/perftest_data
-  - sh generate_mod.sh
-  - rustup run nightly cargo bench
+  - cd ../../examples/codegen
+  - sh generate_module.sh

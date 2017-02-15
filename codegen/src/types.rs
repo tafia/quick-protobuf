@@ -59,9 +59,13 @@ pub enum FieldType {
 
 impl FieldType {
 
-    fn is_cow(&self) -> bool {
+    fn has_cow(&self) -> bool {
         match *self {
             FieldType::Bytes | FieldType::String_ => true,
+            FieldType::Map(ref m) => {
+                let &(ref k, ref v) = &**m;
+                k.has_cow() || v.has_cow()
+            }
             _ => false,
         }
     }
@@ -583,7 +587,7 @@ impl Message {
             writeln!(w, "")?;
             if self.messages.iter().any(|m| m.fields.iter()
                                         .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                                        .any(|f| f.typ.is_cow())) {
+                                        .any(|f| f.typ.has_cow())) {
                 writeln!(w, "use std::borrow::Cow;")?;
             }
             if self.messages.iter().any(|m| m.fields.iter()
@@ -591,7 +595,9 @@ impl Message {
                                         .any(|f| f.typ.is_map())) {
                 writeln!(w, "use std::collections::HashMap;")?;
             }
-            writeln!(w, "use super::*;")?;
+            if !self.messages.is_empty() || !self.oneofs.is_empty() {
+                writeln!(w, "use super::*;")?;
+            }
             for m in &self.messages {
                 m.write(w, msgs, enums)?;
             }
@@ -1000,7 +1006,7 @@ impl OneOf {
     }
 
     fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
-        write!(w, "        + match self.{} {{", self.name)?;
+        writeln!(w, "        + match self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {
@@ -1059,6 +1065,10 @@ impl FileDescriptor {
                 .map(|s| s.to_string())
                 .ok_or_else::<Error, _>(|| ErrorKind::OutputFile(out_file.as_ref().to_owned()).into())?;
 
+            file_stem = file_stem.chars().map(|c| match c {
+                'a'...'z' | 'A'...'Z' | '0'...'9' | '_' => c,
+                _ => '_',
+            }).collect();
             sanitize_keyword(&mut file_stem);
             out_file.as_ref().with_file_name(format!("{}.rs", file_stem))
         };
@@ -1190,10 +1200,10 @@ impl FileDescriptor {
             writeln!(w, "use quick_protobuf::{{BytesReader, Result, MessageWrite}};")?;
             return Ok(());
         }
-        writeln!(w, "use std::io::{{Write}};")?;
+        writeln!(w, "use std::io::Write;")?;
         if self.messages.iter().any(|m| m.fields.iter()
                                     .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                                    .any(|f| f.typ.is_cow())) {
+                                    .any(|f| f.typ.has_cow())) {
             writeln!(w, "use std::borrow::Cow;")?;
         }
         if self.messages.iter().any(|m| m.fields.iter()
@@ -1213,6 +1223,10 @@ impl FileDescriptor {
         writeln!(w, "")?;
         for i in &self.import_paths {
             write!(w, "use super::")?;
+            // exit from current package encapsulation
+            for _ in self.package.split('.').filter(|p| !p.is_empty()) {
+                write!(w, "super::")?;
+            }
             for c in i.components() {
                 match c {
                     Component::RootDir | Component::Prefix(_) => return Err(ErrorKind::InvalidImport(
