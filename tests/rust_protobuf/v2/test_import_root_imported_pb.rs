@@ -4,9 +4,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-use std::io::{Write};
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, Result, MessageWrite};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ImportedEnum {
@@ -29,8 +27,7 @@ impl From<i32> for ImportedEnum {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct ImportedMessage {
-}
+pub struct ImportedMessage { }
 
 impl ImportedMessage {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -39,8 +36,4 @@ impl ImportedMessage {
     }
 }
 
-impl MessageWrite for ImportedMessage {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for ImportedMessage { }

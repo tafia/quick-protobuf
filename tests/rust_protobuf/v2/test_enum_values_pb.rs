@@ -4,9 +4,6 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-use std::io::{Write};
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TestEnumValuesEnum {

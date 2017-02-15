@@ -7,13 +7,10 @@
 pub mod mod_foo {
 pub mod mod_baz {
 
-use std::io::{Write};
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, Result, MessageWrite};
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct ContainerForNested {
-}
+pub struct ContainerForNested { }
 
 impl ContainerForNested {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -22,19 +19,14 @@ impl ContainerForNested {
     }
 }
 
-impl MessageWrite for ContainerForNested {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for ContainerForNested { }
 
 pub mod mod_ContainerForNested {
 
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct NestedMessage {
-}
+pub struct NestedMessage { }
 
 impl NestedMessage {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -43,11 +35,7 @@ impl NestedMessage {
     }
 }
 
-impl MessageWrite for NestedMessage {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for NestedMessage { }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum NestedEnum {

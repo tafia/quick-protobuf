@@ -4,13 +4,10 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-use std::io::{Write};
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, Result, MessageWrite};
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct KeepTheFile {
-}
+pub struct KeepTheFile { }
 
 impl KeepTheFile {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -19,8 +16,4 @@ impl KeepTheFile {
     }
 }
 
-impl MessageWrite for KeepTheFile {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for KeepTheFile { }

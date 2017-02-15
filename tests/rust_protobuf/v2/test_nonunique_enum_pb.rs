@@ -4,13 +4,10 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-use std::io::{Write};
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, Result, MessageWrite};
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct MessageA {
-}
+pub struct MessageA { }
 
 impl MessageA {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -19,11 +16,7 @@ impl MessageA {
     }
 }
 
-impl MessageWrite for MessageA {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for MessageA { }
 
 pub mod mod_MessageA {
 
@@ -52,8 +45,7 @@ impl From<i32> for EnumA {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct MessageB {
-}
+pub struct MessageB { }
 
 impl MessageB {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -62,11 +54,7 @@ impl MessageB {
     }
 }
 
-impl MessageWrite for MessageB {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for MessageB { }
 
 pub mod mod_MessageB {
 

@@ -6,8 +6,5 @@
 
 pub mod mod_test_enum_alias {
 
-use std::io::{Write};
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
 
 }

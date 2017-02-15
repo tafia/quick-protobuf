@@ -691,8 +691,7 @@ impl<'a> MessageWrite for TestTypesRepeatedPacked<'a> {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct TestInvalidTag {
-}
+pub struct TestInvalidTag { }
 
 impl TestInvalidTag {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -701,11 +700,7 @@ impl TestInvalidTag {
     }
 }
 
-impl MessageWrite for TestInvalidTag {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for TestInvalidTag { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestTruncated<'a> {

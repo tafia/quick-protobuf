@@ -6,13 +6,10 @@
 
 pub mod mod_nonunique_1 {
 
-use std::io::{Write};
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, Result, MessageWrite};
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct Nonunique {
-}
+pub struct Nonunique { }
 
 impl Nonunique {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -21,10 +18,6 @@ impl Nonunique {
     }
 }
 
-impl MessageWrite for Nonunique {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for Nonunique { }
 
 }

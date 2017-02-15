@@ -10,8 +10,7 @@ use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct Vec_pb {
-}
+pub struct Vec_pb { }
 
 impl Vec_pb {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -20,15 +19,10 @@ impl Vec_pb {
     }
 }
 
-impl MessageWrite for Vec_pb {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for Vec_pb { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct String_pb {
-}
+pub struct String_pb { }
 
 impl String_pb {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -37,15 +31,10 @@ impl String_pb {
     }
 }
 
-impl MessageWrite for String_pb {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for String_pb { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct Option_pb {
-}
+pub struct Option_pb { }
 
 impl Option_pb {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -54,15 +43,10 @@ impl Option_pb {
     }
 }
 
-impl MessageWrite for Option_pb {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for Option_pb { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct None_pb {
-}
+pub struct None_pb { }
 
 impl None_pb {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -71,15 +55,10 @@ impl None_pb {
     }
 }
 
-impl MessageWrite for None_pb {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for None_pb { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct Some_pb {
-}
+pub struct Some_pb { }
 
 impl Some_pb {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -88,15 +67,10 @@ impl Some_pb {
     }
 }
 
-impl MessageWrite for Some_pb {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for Some_pb { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct Message {
-}
+pub struct Message { }
 
 impl Message {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -105,11 +79,7 @@ impl Message {
     }
 }
 
-impl MessageWrite for Message {
-    fn get_size(&self) -> usize { 0 }
-
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
-}
+impl MessageWrite for Message { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestType<'a> {
