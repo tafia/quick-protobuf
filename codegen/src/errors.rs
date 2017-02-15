@@ -8,6 +8,10 @@ error_chain! {
         Nom(::nom::simple_errors::Err);
     }
     errors {
+        OutputFile(out: ::std::path::PathBuf) {
+            description("output file name is invalid")
+            display("cannot read output file name {}", out.display())
+        }
         InvalidMessage(desc: String) {
             description("message if invalid")
             display("message checks errored: {}", desc)

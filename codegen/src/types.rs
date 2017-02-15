@@ -2,7 +2,7 @@ use std::io::{Read, Write, BufReader, BufWriter};
 use std::path::{Path, PathBuf, Component};
 use std::fs::File;
 
-use errors::{Result, ErrorKind};
+use errors::{Result, Error, ErrorKind};
 use parser::file_descriptor;
 use keywords::sanitize_keyword;
 
@@ -1046,8 +1046,18 @@ impl FileDescriptor {
         desc.sanity_checks(in_file.as_ref())?;
         desc.set_enums();
         desc.set_defaults();
+        desc.sanitize_names();
 
         let name = in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
+        let out_file = {
+            let mut file_stem: String = out_file.as_ref().file_stem()
+                .and_then(|f| f.to_str())
+                .map(|s| s.to_string())
+                .ok_or_else::<Error, _>(|| ErrorKind::OutputFile(out_file.as_ref().to_owned()).into())?;
+
+            sanitize_keyword(&mut file_stem);
+            out_file.as_ref().with_file_name(format!("{}.rs", file_stem))
+        };
         let mut w = BufWriter::new(File::create(out_file)?);
         desc.write(&mut w, name)
     }
@@ -1125,7 +1135,9 @@ impl FileDescriptor {
         for m in &mut self.messages {
             m.sanitize_defaults(&msgs, &self.enums);
         }
-        // sanitize names
+    }
+
+    fn sanitize_names(&mut self) {
         for m in &mut self.messages {
             m.sanitize_names();
         }
@@ -1198,9 +1210,14 @@ impl FileDescriptor {
                     Component::ParentDir => { write!(w, "super::")?; },
                     Component::Normal(path) => {
                         if path.to_str().map_or(false, |s| s.contains('.')) {
-                            writeln!(w, "{}::*;", Path::new(path).file_stem().unwrap().to_string_lossy())?;
+                            let mut file_stem = Path::new(path).file_stem().unwrap()
+                                .to_string_lossy().to_string();
+                            sanitize_keyword(&mut file_stem);
+                            writeln!(w, "{}::*;", file_stem)?;
                         } else {
-                            write!(w, "{}::", path.to_string_lossy())?;
+                            let mut file_stem = path.to_string_lossy().to_string();
+                            sanitize_keyword(&mut file_stem);
+                            write!(w, "{}::", file_stem)?;
                         }
                     }
                 }
