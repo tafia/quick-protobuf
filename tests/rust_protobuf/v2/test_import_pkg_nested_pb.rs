@@ -7,11 +7,11 @@
 pub mod mod_foo {
 pub mod mod_bar {
 
-use std::io::{Write};
+use std::io::Write;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 
-use super::test_import_pkg_nested_imported_pb::*;
+use super::super::super::test_import_pkg_nested_imported_pb::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ContainsImportedNested {

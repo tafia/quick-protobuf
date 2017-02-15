@@ -1190,7 +1190,7 @@ impl FileDescriptor {
             writeln!(w, "use quick_protobuf::{{BytesReader, Result, MessageWrite}};")?;
             return Ok(());
         }
-        writeln!(w, "use std::io::{{Write}};")?;
+        writeln!(w, "use std::io::Write;")?;
         if self.messages.iter().any(|m| m.fields.iter()
                                     .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
                                     .any(|f| f.typ.is_cow())) {
@@ -1213,6 +1213,10 @@ impl FileDescriptor {
         writeln!(w, "")?;
         for i in &self.import_paths {
             write!(w, "use super::")?;
+            // exit from current package encapsulation
+            for _ in self.package.split('.').filter(|p| !p.is_empty()) {
+                write!(w, "super::")?;
+            }
             for c in i.components() {
                 match c {
                     Component::RootDir | Component::Prefix(_) => return Err(ErrorKind::InvalidImport(

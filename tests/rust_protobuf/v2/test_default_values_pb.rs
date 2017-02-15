@@ -6,7 +6,7 @@
 
 pub mod mod_test_default_values {
 
-use std::io::{Write};
+use std::io::Write;
 use std::borrow::Cow;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;

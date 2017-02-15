@@ -9,7 +9,7 @@ mod test_group_pb;
 mod test_ident_pb;
 mod test_import_nested_pb;
 mod test_import_nested_imported_pb;
-// mod test_import_pkg_nested_pb;
+mod test_import_pkg_nested_pb;
 mod test_import_pkg_nested_imported_pb;
 mod test_import_root_pb;
 mod test_import_root_imported_pb;

@@ -6,7 +6,7 @@
 
 pub mod mod_test_required {
 
-use std::io::{Write};
+use std::io::Write;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 
