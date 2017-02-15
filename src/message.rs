@@ -13,10 +13,14 @@ use writer::Writer;
 pub trait MessageWrite: Sized {
 
     /// Writes `Self` into W writer
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()>;
+    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> {
+        Ok(())
+    }
 
     /// Computes necessary binary size of self once serialized in protobuf
-    fn get_size(&self) -> usize;
+    fn get_size(&self) -> usize {
+        0
+    }
 
     /// Writes self into a file
     fn write_file<P: AsRef<Path>>(&self, p: P) -> Result<()> {
