@@ -1064,6 +1064,10 @@ impl FileDescriptor {
         desc.set_defaults();
         desc.sanitize_names();
 
+        if config.single_module {
+            desc.package = "".to_string();
+        }
+
         let name = config.in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
         let out_file = {
             let mut file_stem: String = config.out_file.as_ref().file_stem()
