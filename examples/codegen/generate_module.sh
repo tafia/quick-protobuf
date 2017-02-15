@@ -1,5 +1,6 @@
 cd ../../codegen
-cargo run ../examples/codegen/data_types_import.proto
-cargo run ../examples/codegen/data_types.proto
+for f in ../examples/codegen/*.proto; do
+    cargo run $f
+done
 cd ../examples/codegen
 cargo run --example codegen_example

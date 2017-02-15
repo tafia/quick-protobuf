@@ -1187,7 +1187,7 @@ impl FileDescriptor {
             return Ok(());
         }
         if self.messages.iter().all(|m| m.is_unit()) {
-            writeln!(w, "use quick_protobuf::{{BytesReader, Result}};")?;
+            writeln!(w, "use quick_protobuf::{{BytesReader, Result, MessageWrite}};")?;
             return Ok(());
         }
         writeln!(w, "use std::io::{{Write}};")?;
