@@ -34,3 +34,16 @@ error_chain! {
         }
     }
 }
+
+impl Into<::std::io::Error> for Error {
+    fn into(self) -> ::std::io::Error {
+        use ::std::io;
+        match self {
+            Error(ErrorKind::Io(x), _) => x,
+            Error(ErrorKind::Eof, _) => io::ErrorKind::UnexpectedEof.into(),
+            Error(ErrorKind::Utf8(x), _) => io::Error::new(io::ErrorKind::InvalidData, x.utf8_error()),
+            Error(ErrorKind::StrUtf8(x), _) => io::Error::new(io::ErrorKind::InvalidData, x),
+            x => io::Error::new(io::ErrorKind::Other, x),
+        }
+    }
+}
