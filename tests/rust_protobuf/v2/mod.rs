@@ -30,8 +30,8 @@ mod test_required;
 mod test_default_values;
 mod test_lite_runtime;
 
-// mod test_text_format_pb;
-// mod test_text_format;
+mod test_text_format_pb;
+mod test_text_format;
 
 mod test_oneof;
 // mod test_enum_values;

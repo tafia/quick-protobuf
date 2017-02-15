@@ -1000,7 +1000,7 @@ impl OneOf {
     }
 
     fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
-        write!(w, "        + match self.{} {{", self.name)?;
+        writeln!(w, "        + match self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {

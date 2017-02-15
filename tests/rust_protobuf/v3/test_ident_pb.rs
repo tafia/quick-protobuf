@@ -109,7 +109,8 @@ impl<'a> MessageWrite for TestType<'a> {
         0
         + if self.struct_pb.is_empty() { 0 } else { 1 + sizeof_len(self.struct_pb.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
         + if self.ref_pb.is_empty() { 0 } else { 1 + sizeof_len(self.ref_pb.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
-        + match self.type_pb {            mod_TestType::OneOftype_pb::s(ref m) => 1 + sizeof_len((m).len()),
+        + match self.type_pb {
+            mod_TestType::OneOftype_pb::s(ref m) => 1 + sizeof_len((m).len()),
             mod_TestType::OneOftype_pb::None => 0,
     }    }
 

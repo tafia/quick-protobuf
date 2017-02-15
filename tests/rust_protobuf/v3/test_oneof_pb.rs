@@ -103,7 +103,8 @@ impl<'a> MessageWrite for TestOneof<'a> {
     fn get_size(&self) -> usize {
         0
         + self.s.as_ref().map_or(0, |m| 2 + sizeof_len((m).len()))
-        + match self.one {            mod_TestOneof::OneOfone::double_field(_) => 1 + 8,
+        + match self.one {
+            mod_TestOneof::OneOfone::double_field(_) => 1 + 8,
             mod_TestOneof::OneOfone::float_field(_) => 1 + 4,
             mod_TestOneof::OneOfone::int32_field(ref m) => 1 + sizeof_varint(*(m) as u64),
             mod_TestOneof::OneOfone::int64_field(ref m) => 1 + sizeof_varint(*(m) as u64),
