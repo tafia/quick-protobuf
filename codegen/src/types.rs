@@ -1059,6 +1059,10 @@ impl FileDescriptor {
                 .map(|s| s.to_string())
                 .ok_or_else::<Error, _>(|| ErrorKind::OutputFile(out_file.as_ref().to_owned()).into())?;
 
+            file_stem = file_stem.chars().map(|c| match c {
+                'a'...'z' | 'A'...'Z' | '0'...'9' | '_' => c,
+                _ => '_',
+            }).collect();
             sanitize_keyword(&mut file_stem);
             out_file.as_ref().with_file_name(format!("{}.rs", file_stem))
         };

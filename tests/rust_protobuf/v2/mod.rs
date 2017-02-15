@@ -20,9 +20,9 @@ mod test_lite_runtime_pb;
 mod test_nonunique_enum_pb;
 mod test_required_pb;
 // mod test_root_pb;
-// mod test_sanitize_file_name_pb;
+mod test_sanitize_file_name_pb;
 mod test_oneof_pb;
-// mod test_special_characters_file_name__pb;
+mod test_special_characters_file_name__pb;
 mod test_enum_alias_pb;
 
 mod test_basic;
