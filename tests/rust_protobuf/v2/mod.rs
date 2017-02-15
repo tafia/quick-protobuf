@@ -1,8 +1,12 @@
+//! A module to import many generated files plus some custom tests
+//!
+//! For most generated files, the 'test' is just making sure it compiles!
+
 mod test_basic_pb;
 mod test_default_values_pb;
 mod test_enum_values_pb;
 mod test_group_pb;
-// mod test_ident_pb;
+mod test_ident_pb;
 mod test_import_nested_pb;
 mod test_import_nested_imported_pb;
 // mod test_import_pkg_nested_pb;
@@ -34,4 +38,4 @@ mod test_oneof;
 // mod test_enum_alias;
 mod test_sync;
 
-// mod struct_pb;
+mod struct_pb;

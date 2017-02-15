@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 // utility module from rust-protobuf to decode/encode in hexadecimal
 // ... used only for tests
 mod hex;

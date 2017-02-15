@@ -227,7 +227,7 @@ impl<'a> MessageWrite for TestTypes<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestTextFormatRustIdentifier {
-    pub const: Option<bool>,
+    pub const_pb: Option<bool>,
 }
 
 impl TestTextFormatRustIdentifier {
@@ -235,7 +235,7 @@ impl TestTextFormatRustIdentifier {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(8) => msg.const = Some(r.read_bool(bytes)?),
+                Ok(8) => msg.const_pb = Some(r.read_bool(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -247,11 +247,11 @@ impl TestTextFormatRustIdentifier {
 impl MessageWrite for TestTextFormatRustIdentifier {
     fn get_size(&self) -> usize {
         0
-        + self.const.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.const_pb.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.const { w.write_with_tag(8, |w| w.write_bool(*s))?; }
+        if let Some(ref s) = self.const_pb { w.write_with_tag(8, |w| w.write_bool(*s))?; }
         Ok(())
     }
 }
