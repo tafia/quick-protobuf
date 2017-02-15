@@ -172,7 +172,7 @@ impl TestPackedUnpacked {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(34) => msg.unpacked = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
+                Ok(32) => msg.unpacked.push(r.read_int32(bytes)?),
                 Ok(42) => msg.packed = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -185,12 +185,12 @@ impl TestPackedUnpacked {
 impl MessageWrite for TestPackedUnpacked {
     fn get_size(&self) -> usize {
         0
-        + if self.unpacked.is_empty() { 0 } else { 1 + sizeof_len(self.unpacked.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
+        + self.unpacked.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
         + if self.packed.is_empty() { 0 } else { 1 + sizeof_len(self.packed.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        w.write_packed_with_tag(34, &self.unpacked, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
+        for s in &self.unpacked { w.write_with_tag(32, |w| w.write_int32(*s))?; }
         w.write_packed_with_tag(42, &self.packed, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
         Ok(())
     }

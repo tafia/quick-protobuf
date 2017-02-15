@@ -5,6 +5,7 @@
 #![allow(non_camel_case_types)]
 
 use std::io::Write;
+use std::borrow::Cow;
 use std::collections::HashMap;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;

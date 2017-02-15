@@ -20,8 +20,8 @@ message Test4 {
 
 
 message TestPackedUnpacked {
-    repeated int32 unpacked = 4;
-    repeated int32 packed = 5 [packed=true];
+    repeated int32 unpacked = 4 [packed=false];
+    repeated int32 packed = 5;
 }
 
 message TestEmpty {

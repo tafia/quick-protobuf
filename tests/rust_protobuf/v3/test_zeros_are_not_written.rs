@@ -1,12 +1,13 @@
-use test::*;
+use quick_protobuf::*;
 
-use super::test_basic_pb::*;
+use rust_protobuf::hex::{encode_hex, decode_hex};
+use super::test_basic_pb::mod_basic::*;
 
 #[test]
 fn test_zeros_are_not_written() {
-    let mut m = TestTypesSingular::new();
-    m.set_bool_field(false);
-    m.set_enum_field(TestEnumDescriptor::UNKNOWN);
-    m.set_fixed32_field(0);
-    test_serialize("", &m);
+    let mut m = TestTypesSingular::default();
+    m.bool_field = Some(false);
+    m.enum_field = Some(TestEnumDescriptor::UNKNOWN);
+    m.fixed32_field = Some(0);
+    test_serialize!("", &m);
 }
