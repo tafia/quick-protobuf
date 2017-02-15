@@ -4,6 +4,7 @@ use std::fs::File;
 
 use errors::{Result, ErrorKind};
 use parser::file_descriptor;
+use keywords::sanitize_keyword;
 
 fn sizeof_varint(v: u32) -> usize {
     match v {
@@ -806,6 +807,23 @@ impl Message {
             m.sanitize_defaults(msgs, enums);
         }
     }
+
+    fn sanitize_names(&mut self) {
+        sanitize_keyword(&mut self.name);
+        sanitize_keyword(&mut self.package);
+        for f in self.fields.iter_mut() {
+            sanitize_keyword(&mut f.name);
+        }
+        for m in &mut self.messages {
+            m.sanitize_names();
+        }
+        for e in &mut self.enums {
+            e.sanitize_names();
+        }
+        for o in &mut self.oneofs {
+            o.sanitize_names();
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -820,6 +838,14 @@ impl Enumerator {
 
     fn set_package(&mut self, package: &str) {
         self.package = package.to_string();
+    }
+
+    fn sanitize_names(&mut self) {
+        sanitize_keyword(&mut self.name);
+        sanitize_keyword(&mut self.package);
+        for f in self.fields.iter_mut() {
+            sanitize_keyword(&mut f.0);
+        }
     }
 
     fn get_modules(&self) -> String {
@@ -895,6 +921,14 @@ impl OneOf {
         self.package = package.to_string();
     }
 
+    fn sanitize_names(&mut self) {
+        sanitize_keyword(&mut self.name);
+        sanitize_keyword(&mut self.package);
+        for f in self.fields.iter_mut() {
+            sanitize_keyword(&mut f.name);
+        }
+    }
+
     fn get_modules(&self) -> String {
         self.package
             .split('.').filter(|p| !p.is_empty())
@@ -940,9 +974,9 @@ impl OneOf {
 
     fn write_message_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
         if self.has_lifetime(msgs) {
-            writeln!(w, "    pub {0}: {1}OneOf{0}<'a>,", self.name, self.get_modules())?;
+            writeln!(w, "    pub {}: {}OneOf{}<'a>,", self.name, self.get_modules(), self.name)?;
         } else {
-            writeln!(w, "    pub {0}: {1}OneOf{0},", self.name, self.get_modules())?;
+            writeln!(w, "    pub {}: {}OneOf{},", self.name, self.get_modules(), self.name)?;
         }
         Ok(())
     }
@@ -951,11 +985,11 @@ impl OneOf {
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let (val, val_cow) = f.typ.read_fn(msgs);
             if f.boxed {
-                writeln!(w, "                Ok({}) => msg.{} = {}OneOf{1}::{}(Box::new({}?)),", 
-                       f.tag(), self.name, self.get_modules(), f.name, val)?;
+                writeln!(w, "                Ok({}) => msg.{} = {}OneOf{}::{}(Box::new({}?)),", 
+                       f.tag(), self.name, self.get_modules(), self.name, f.name, val)?;
             } else {
-                writeln!(w, "                Ok({}) => msg.{} = {}OneOf{1}::{}({}?),", 
-                       f.tag(), self.name, self.get_modules(), f.name, val_cow)?;
+                writeln!(w, "                Ok({}) => msg.{} = {}OneOf{}::{}({}?),", 
+                       f.tag(), self.name, self.get_modules(), self.name, f.name, val_cow)?;
             }
         }
         Ok(())
@@ -1090,6 +1124,13 @@ impl FileDescriptor {
         let msgs = self.messages.clone();
         for m in &mut self.messages {
             m.sanitize_defaults(&msgs, &self.enums);
+        }
+        // sanitize names
+        for m in &mut self.messages {
+            m.sanitize_names();
+        }
+        for e in &mut self.enums {
+            e.sanitize_names();
         }
     }
 

@@ -6,6 +6,7 @@ extern crate error_chain;
 mod parser;
 mod types;
 mod errors;
+mod keywords;
 
 use std::env;
 use std::path::PathBuf;
