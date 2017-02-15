@@ -1183,6 +1183,13 @@ impl FileDescriptor {
     }
 
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
+        if self.messages.is_empty() {
+            return Ok(());
+        }
+        if self.messages.iter().all(|m| m.is_unit()) {
+            writeln!(w, "use quick_protobuf::{{BytesReader, Result}};")?;
+            return Ok(());
+        }
         writeln!(w, "use std::io::{{Write}};")?;
         if self.messages.iter().any(|m| m.fields.iter()
                                     .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
