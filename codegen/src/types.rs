@@ -59,9 +59,13 @@ pub enum FieldType {
 
 impl FieldType {
 
-    fn is_cow(&self) -> bool {
+    fn has_cow(&self) -> bool {
         match *self {
             FieldType::Bytes | FieldType::String_ => true,
+            FieldType::Map(ref m) => {
+                let &(ref k, ref v) = &**m;
+                k.has_cow() || v.has_cow()
+            }
             _ => false,
         }
     }
@@ -583,7 +587,7 @@ impl Message {
             writeln!(w, "")?;
             if self.messages.iter().any(|m| m.fields.iter()
                                         .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                                        .any(|f| f.typ.is_cow())) {
+                                        .any(|f| f.typ.has_cow())) {
                 writeln!(w, "use std::borrow::Cow;")?;
             }
             if self.messages.iter().any(|m| m.fields.iter()
@@ -1197,7 +1201,7 @@ impl FileDescriptor {
         writeln!(w, "use std::io::Write;")?;
         if self.messages.iter().any(|m| m.fields.iter()
                                     .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                                    .any(|f| f.typ.is_cow())) {
+                                    .any(|f| f.typ.has_cow())) {
             writeln!(w, "use std::borrow::Cow;")?;
         }
         if self.messages.iter().any(|m| m.fields.iter()
