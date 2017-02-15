@@ -1188,6 +1188,11 @@ impl FileDescriptor {
         writeln!(w, "#![allow(non_snake_case)]")?;
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
         writeln!(w, "#![allow(non_camel_case_types)]")?;
+
+        writeln!(w, "#![allow(unknown_lints)]")?;
+        writeln!(w, "#![allow(clippy)]")?;
+
+        writeln!(w, "#[cfg_attr(rustfmt, rustfmt_skip)]")?;
         writeln!(w, "")?;
         Ok(())
     }
