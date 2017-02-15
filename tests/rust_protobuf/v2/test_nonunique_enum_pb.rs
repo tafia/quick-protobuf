@@ -20,7 +20,6 @@ impl MessageWrite for MessageA { }
 
 pub mod mod_MessageA {
 
-use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EnumA {
@@ -58,7 +57,6 @@ impl MessageWrite for MessageB { }
 
 pub mod mod_MessageB {
 
-use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EnumB {

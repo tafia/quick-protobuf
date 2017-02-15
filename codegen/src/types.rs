@@ -595,7 +595,9 @@ impl Message {
                                         .any(|f| f.typ.is_map())) {
                 writeln!(w, "use std::collections::HashMap;")?;
             }
-            writeln!(w, "use super::*;")?;
+            if !self.messages.is_empty() || !self.oneofs.is_empty() {
+                writeln!(w, "use super::*;")?;
+            }
             for m in &self.messages {
                 m.write(w, msgs, enums)?;
             }

@@ -1,7 +1,7 @@
-use super::test_lite_runtime_pb::mod_test_lite_runtime::*;
 use quick_protobuf::*;
-use std::borrow::Cow;
 use rust_protobuf::hex::{encode_hex, decode_hex};
+
+use super::test_lite_runtime_pb::mod_test_lite_runtime::*;
 
 #[test]
 fn test_lite_runtime() {
