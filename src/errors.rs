@@ -5,7 +5,6 @@
 error_chain! {
     foreign_links {
         Io(::std::io::Error);
-        Utf8(::std::string::FromUtf8Error);
         StrUtf8(::std::str::Utf8Error);
     }
     errors {
@@ -20,17 +19,24 @@ error_chain! {
         Varint {
             description("cannot decode varint")
         }
-        Eof {
-            description("unexpected end of file")
-        }
         ParseMessage(s: String) {
             description("error while parsing message")
             display("error while parsing message: {}", s)
-
         }
         Map(tag: u8) {
             description("unexpected map tag")
             display("expecting a tag number 1 or 2, got {}", tag)
+        }
+    }
+}
+
+impl Into<::std::io::Error> for Error {
+    fn into(self) -> ::std::io::Error {
+        use ::std::io;
+        match self {
+            Error(ErrorKind::Io(x), _) => x,
+            Error(ErrorKind::StrUtf8(x), _) => io::Error::new(io::ErrorKind::InvalidData, x),
+            x => io::Error::new(io::ErrorKind::Other, x),
         }
     }
 }
