@@ -370,7 +370,6 @@ impl BytesReader {
     /// Reads unknown data, based on its tag value (which itself gives us the wire_type value)
     #[inline]
     pub fn read_unknown(&mut self, bytes: &[u8], tag_value: u32) -> Result<()> {
-        println!("reading unknown {}", tag_value);
         match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => { self.read_varint64(bytes)?; },
             WIRE_TYPE_FIXED64 => self.start += 8,
