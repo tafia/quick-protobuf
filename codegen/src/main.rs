@@ -16,9 +16,23 @@ use types::{FileDescriptor, Config};
 
 fn main() {
     let matches = App::new("pb-rs").version(crate_version!())
-        .arg(Arg::with_name("OUTPUT").required(false).long("output").short("o").takes_value(true).help("Generated file name, defaults to INPUT with 'rs' extension").validator(|x| extension_matches(x, "rs")))
-        .arg(Arg::with_name("SINGLE_MOD").required(false).long("single-mod").short("s").help("Omit generation of modules for each package when there is only one package"))
-        .arg(Arg::with_name("INPUT").required(true).index(1).help("The .proto file used to generate quick-protobuf code").validator(|x| extension_matches(x, "proto")))
+        .arg(Arg::with_name("OUTPUT")
+                .required(false)
+                .long("output")
+                .short("o")
+                .takes_value(true)
+                .help("Generated file name, defaults to INPUT with 'rs' extension")
+                .validator(|x| extension_matches(x, "rs")))
+        .arg(Arg::with_name("SINGLE_MOD")
+                .required(false)
+                .long("single-mod")
+                .short("s")
+                .help("Omit generation of modules for each package when there is only one package"))
+        .arg(Arg::with_name("INPUT")
+                .required(true)
+                .index(1)
+                .help("The .proto file used to generate quick-protobuf code")
+                .validator(|x| extension_matches(x, "proto")))
         .get_matches();
 
     let in_file: PathBuf = matches.value_of("INPUT").map(|a| a.to_string().into()).unwrap();
