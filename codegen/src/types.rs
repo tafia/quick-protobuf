@@ -1050,6 +1050,11 @@ impl FileDescriptor {
         let mut desc = FileDescriptor::read_proto(&in_file)?;
         desc.fetch_imports(in_file.as_ref())?;
 
+        if desc.messages.is_empty() && desc.enums.is_empty() {
+            // There could had been unsupported structures, so bail early
+            bail!(ErrorKind::EmptyRead);
+        }
+
         let mut leaf_messages = Vec::new();
         break_cycles(&mut desc.messages, &mut leaf_messages);
 
