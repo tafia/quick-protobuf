@@ -38,8 +38,12 @@ fn main() {
                 .validator(|x| extension_matches(x, "proto")))
         .get_matches();
 
-    let in_file: PathBuf = matches.value_of("INPUT").map(|a| a.to_string().into()).unwrap();
-    let out_file: PathBuf = matches.value_of("OUTPUT").map(|a| a.to_string().into()).unwrap_or(in_file.with_extension("rs"));
+    let in_file: PathBuf = matches.value_of("INPUT")
+        .map(|a| a.to_string().into()).unwrap();
+
+    let out_file: PathBuf = matches.value_of("OUTPUT")
+        .map(|a| a.to_string().into())
+        .unwrap_or(in_file.with_extension("rs"));
 
     let config = Config {
         in_file: in_file,
