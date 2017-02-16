@@ -15,7 +15,10 @@ use clap::{App, Arg};
 use types::{FileDescriptor, Config};
 
 fn main() {
-    let matches = App::new("pb-rs").version(crate_version!())
+    let matches = App::new(crate_name!())
+        .about(crate_description!())
+        .author(crate_authors!("\n"))
+        .version(crate_version!())
         .arg(Arg::with_name("OUTPUT")
                 .required(false)
                 .long("output")
