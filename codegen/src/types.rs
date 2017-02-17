@@ -1197,7 +1197,7 @@ impl FileDescriptor {
         writeln!(w, "#![allow(unknown_lints)]")?;
         writeln!(w, "#![allow(clippy)]")?;
 
-        writeln!(w, "#[cfg_attr(rustfmt, rustfmt_skip)]")?;
+        writeln!(w, "#![cfg_attr(rustfmt, rustfmt_skip)]")?;
         writeln!(w, "")?;
         Ok(())
     }
