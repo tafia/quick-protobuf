@@ -5,7 +5,7 @@
 #![allow(non_camel_case_types)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
 
 use std::io::Write;
 use std::borrow::Cow;

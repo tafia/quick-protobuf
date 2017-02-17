@@ -5,7 +5,7 @@
 #![allow(non_camel_case_types)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
 
 pub mod mod_a {
 pub mod mod_b {
