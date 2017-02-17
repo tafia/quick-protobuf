@@ -15,6 +15,10 @@ have_failures=""
 declare -A must_fail
 
 must_fail["../tests/rust_protobuf/v2/test_group_pb.proto"]="expected failure (empty read)"
+must_fail["../tests/rust_protobuf/v2/test_root_pb.proto"]="root search is not implemented yet"
+must_fail["../tests/rust_protobuf/v3/test_enum_alias_pb.proto"]="enum alias not implemented"
+must_fail["../tests/rust_protobuf/v2/test_enum_alias_pb.proto"]="enum alias not implemented"
+must_fail["../tests/rust_protobuf/v2/test_expose_oneof_pb.proto"]="missing file"
 
 # Combined stdout and stderr for codegen of unexpectedly failed file.
 declare -A outs
