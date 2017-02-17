@@ -8,6 +8,11 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## 0.5.0
+- fix: removed one unwanting println
+- feat: add automatic `std::io::Error` conversion
+- refactor:  add clap-rs to pb-rs
+
 ## 0.3.0 - 0.4.0
 - docs: add examples, more details about message to struct conversion
 - refactor: update dependencies
