@@ -35,30 +35,13 @@ success_msg() {
 	fi
 }
 
-for f in ../tests/rust_protobuf/v2/*.proto; do
+for f in ../tests/rust_protobuf/v[23]/*.proto; do
 	ret=0
 	out="$(cargo run --quiet -- "$f" 2>&1)" || ret=$?
 
 	if expecting_failure "$f" && [ "$ret" -eq 0 ]; then
 		outs["$f"]="$out"
 		have_failures="true"
-		echo "$f: unexpected success"
-	elif expecting_success "$f" && [ "$ret" -ne 0 ]; then
-		have_failures="true"
-		outs["$f"]="$out"
-		echo "$f: unexpected failure $ret"
-	else
-		echo "$f: $(success_msg "$f")"
-	fi
-done
-
-for f in ../tests/rust_protobuf/v3/*.proto; do
-	ret=0
-	out="$(cargo run --quiet -- "$f" 2>&1)" || ret=$?
-
-	if expecting_failure "$f" && [ "$ret" -eq 0 ]; then
-		have_failures="true"
-		outs["$f"]="$out"
 		echo "$f: unexpected success"
 	elif expecting_success "$f" && [ "$ret" -ne 0 ]; then
 		have_failures="true"
