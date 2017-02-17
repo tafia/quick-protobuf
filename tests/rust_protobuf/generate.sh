@@ -37,6 +37,7 @@ success_msg() {
 
 for f in ../tests/rust_protobuf/v[23]/*.proto; do
 	ret=0
+	rm -f "${f%.proto}.rs"
 	out="$(cargo run --quiet -- "$f" 2>&1)" || ret=$?
 
 	if expecting_failure "$f" && [ "$ret" -eq 0 ]; then
