@@ -1,13 +1,22 @@
 #!/bin/bash
+#
+# Test harness for generating files under tests/rust_protobuf/v[23]
+# and expecting them either to succeed or fail for some known reason.
+#
 
 cd ../../codegen
 
-failures=0
+# Checked in the end for non-empty value which serves as a boolean flag
 have_failures=""
 
+# Expected codegen failures are marked in the associative array `must_fail`
+# with the relative path as the key and reason as value.
+# When adding new, remember not to add any whitespace around `=`.
 declare -A must_fail
+
 must_fail["../tests/rust_protobuf/v2/test_group_pb.proto"]="expected failure (empty read)"
 
+# Combined stdout and stderr for codegen of unexpectedly failed file.
 declare -A outs
 
 expecting_failure() {
