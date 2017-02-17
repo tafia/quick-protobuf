@@ -69,13 +69,16 @@ for f in ../tests/rust_protobuf/v3/*.proto; do
 	fi
 done
 
+echo
+
 if [ "$have_failures" ]; then
-	echo
-	echo "There were code generation failures:" >&2
+	echo "There were code generation failures:"
 	for f in "${!outs[@]}"; do
 		echo
 		echo "$f:"
 		echo "${outs["$f"]}"
 	done
 	exit 1
+else
+	echo "All files generated as expected"
 fi
