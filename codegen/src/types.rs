@@ -1035,6 +1035,12 @@ impl OneOf {
 
 }
 
+pub struct Config<P: AsRef<Path>> {
+    pub in_file: P,
+    pub out_file: P,
+    pub single_module: bool,
+}
+
 #[derive(Debug, Default)]
 pub struct FileDescriptor {
     pub import_paths: Vec<PathBuf>,
@@ -1046,31 +1052,35 @@ pub struct FileDescriptor {
 
 impl FileDescriptor {
 
-    pub fn write_proto<P: AsRef<Path>>(in_file: P, out_file: P) -> Result<()> {
-        let mut desc = FileDescriptor::read_proto(&in_file)?;
-        desc.fetch_imports(in_file.as_ref())?;
+    pub fn write_proto<P: AsRef<Path>>(config: &Config<P>) -> Result<()> {
+        let mut desc = FileDescriptor::read_proto(&config.in_file)?;
+        desc.fetch_imports(config.in_file.as_ref())?;
 
         let mut leaf_messages = Vec::new();
         break_cycles(&mut desc.messages, &mut leaf_messages);
 
-        desc.sanity_checks(in_file.as_ref())?;
+        desc.sanity_checks(config.in_file.as_ref())?;
         desc.set_enums();
         desc.set_defaults();
         desc.sanitize_names();
 
-        let name = in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
+        if config.single_module {
+            desc.package = "".to_string();
+        }
+
+        let name = config.in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
         let out_file = {
-            let mut file_stem: String = out_file.as_ref().file_stem()
+            let mut file_stem: String = config.out_file.as_ref().file_stem()
                 .and_then(|f| f.to_str())
                 .map(|s| s.to_string())
-                .ok_or_else::<Error, _>(|| ErrorKind::OutputFile(out_file.as_ref().to_owned()).into())?;
+                .ok_or_else::<Error, _>(|| ErrorKind::OutputFile(config.out_file.as_ref().to_owned()).into())?;
 
             file_stem = file_stem.chars().map(|c| match c {
                 'a'...'z' | 'A'...'Z' | '0'...'9' | '_' => c,
                 _ => '_',
             }).collect();
             sanitize_keyword(&mut file_stem);
-            out_file.as_ref().with_file_name(format!("{}.rs", file_stem))
+            config.out_file.as_ref().with_file_name(format!("{}.rs", file_stem))
         };
         let mut w = BufWriter::new(File::create(out_file)?);
         desc.write(&mut w, name)

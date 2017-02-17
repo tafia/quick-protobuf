@@ -7,3 +7,4 @@ description = "A converter from proto files into quick-protobuf compatible rust 
 [dependencies]
 nom = "2.0.1"
 error-chain = "0.8.1"
+clap = "2"
