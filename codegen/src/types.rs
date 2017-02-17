@@ -1056,6 +1056,11 @@ impl FileDescriptor {
         let mut desc = FileDescriptor::read_proto(&config.in_file)?;
         desc.fetch_imports(config.in_file.as_ref())?;
 
+        if desc.messages.is_empty() && desc.enums.is_empty() {
+            // There could had been unsupported structures, so bail early
+            bail!(ErrorKind::EmptyRead);
+        }
+
         let mut leaf_messages = Vec::new();
         break_cycles(&mut desc.messages, &mut leaf_messages);
 
@@ -1198,6 +1203,11 @@ impl FileDescriptor {
         writeln!(w, "#![allow(non_snake_case)]")?;
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
         writeln!(w, "#![allow(non_camel_case_types)]")?;
+
+        writeln!(w, "#![allow(unknown_lints)]")?;
+        writeln!(w, "#![allow(clippy)]")?;
+
+        writeln!(w, "#![cfg_attr(rustfmt, rustfmt_skip)]")?;
         writeln!(w, "")?;
         Ok(())
     }

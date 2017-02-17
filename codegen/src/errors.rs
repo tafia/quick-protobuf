@@ -22,5 +22,8 @@ error_chain! {
             display("cannot convert protobuf import into module import: {}", desc)
             cause("import definition might be invalid, some characters may not be supported")
         }
+        EmptyRead {
+            description("No messages or enums were read; either there was no input or there were only unsupported structures")
+        }
     }
 }

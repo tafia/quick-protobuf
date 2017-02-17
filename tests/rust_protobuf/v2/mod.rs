@@ -5,7 +5,7 @@
 mod test_basic_pb;
 mod test_default_values_pb;
 mod test_enum_values_pb;
-mod test_group_pb;
+// mod test_group_pb;
 mod test_ident_pb;
 mod test_import_nested_pb;
 mod test_import_nested_imported_pb;
@@ -23,7 +23,7 @@ mod test_required_pb;
 mod test_sanitize_file_name_pb;
 mod test_oneof_pb;
 mod test_special_characters_file_name__pb;
-mod test_enum_alias_pb;
+// mod test_enum_alias_pb;
 
 mod test_basic;
 mod test_required;
