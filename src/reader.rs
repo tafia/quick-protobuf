@@ -57,6 +57,12 @@ const WIRE_TYPE_FIXED32: u8 = 5;
 ///
 ///     // now using the generated module decoding is as easy as:
 ///     let foobar = FooBar::from_reader(&mut reader, &bytes).expect("Cannot read FooBar");
+///
+///     // if instead the buffer contains a length delimited stream of message we could use:
+///     // while !r.is_eof() {
+///     //     let foobar = r.read_message(&bytes, FooBar::from_reader).expect(...);
+///     //     ...
+///     // }
 ///     println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
 /// }
 /// ```
@@ -428,18 +434,29 @@ impl BytesReader {
 /// use quick_protobuf::Reader;
 ///
 /// fn main() {
-///     // read an entire file into memory
-///     let mut reader = Reader::from_file("/myproject/resources/my_file.bin")
-///         .expect("Cannot read binary encoded file");
-///
-///     // now using the generated module decoding is as easy as:
-///     let foobar = reader.read(FooBar::from_reader).expect("Cannot read FooBar");
-///     println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
+///     // create a reader, which will parse the protobuf binary file and pop events
+///     // this reader will read the entire file into an internal buffer
+///     let mut reader = Reader::from_file("/path/to/binary/protobuf.bin")
+///         .expect("Cannot read input file");
+///     
+///     // Use the generated module fns with the reader to convert your data into rust structs.
+///     //
+///     // Depending on your input file, the message can or not be prefixed with the encoded length
+///     // for instance, a *stream* which contains several messages generally split them using this 
+///     // technique (see https://developers.google.com/protocol-buffers/docs/techniques#streaming)
+///     //
+///     // To read a message without a length prefix you can directly call `FooBar::from_reader`:
+///     // let foobar = reader.read(FooBar::from_reader).expect("Cannot read FooBar message");
+///     // 
+///     // Else to read a length then a message, you can use:
+///     let foobar = reader.read(|r, b| r.read_message(b, FooBar::from_reader))
+///         .expect("Cannot read FooBar message");
+///     println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
 /// }
 /// ```
 pub struct Reader {
-    buf: Vec<u8>,
-    reader: BytesReader,
+    buffer: Vec<u8>,
+    inner: BytesReader,
 }
 
 impl Reader {
@@ -450,14 +467,7 @@ impl Reader {
         unsafe { buf.set_len(capacity); }
         buf.shrink_to_fit();
         r.read_exact(&mut buf)?;
-        let reader = BytesReader {
-            start: 0,
-            end: capacity,
-        };
-        Ok(Reader {
-            buf: buf,
-            reader: reader,
-        })
+        Ok(Reader::from_bytes(buf))
     }
 
     /// Creates a new `Reader` out of a file path
@@ -467,12 +477,45 @@ impl Reader {
         Reader::from_reader(f, len)
     }
 
+    /// Creates a new reader consuming the bytes
+    pub fn from_bytes(bytes: Vec<u8>) -> Reader {
+        let reader = BytesReader {
+            start: 0,
+            end: bytes.len(),
+        };
+        Reader {
+            buffer: bytes,
+            inner: reader,
+        }
+    }
+
     /// Run a `BytesReader` dependent function
     #[inline]
     pub fn read<'a, M, F>(&'a mut self, mut read: F) -> Result<M>
         where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M> 
     {
-        read(&mut self.reader, &self.buf)
+        read(&mut self.inner, &self.buffer)
+    }
+// 
+//     /// Run a `BytesReader` dependent function
+//     #[inline]
+//     pub fn read_len<'a, M, F>(&'a mut self, mut read: F) -> Result<M>
+//         where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M> 
+//     {
+//         let len = self.read(|r, b| r.read_varint64(b))?;
+//         let mut remaining = self.buffer.split_off(len as usize + ::sizeofs::sizeof_varint(len));
+//         ::std::mem::swap(&mut self.buffer, &mut remaining);
+//         read(&mut self.inner, &remaining)
+//     }
+
+    /// Gets the inner `BytesReader`
+    pub fn inner(&mut self) -> &mut BytesReader {
+        &mut self.inner
+    }
+
+    /// Gets the buffer used internally
+    pub fn buffer(&self) -> &[u8] {
+        &self.buffer
     }
 
 }
