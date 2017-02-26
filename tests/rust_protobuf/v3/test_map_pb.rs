@@ -7,6 +7,7 @@
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
+
 use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;

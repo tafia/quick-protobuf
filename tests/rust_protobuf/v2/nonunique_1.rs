@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'struct.proto' file
+//! Automatically generated rust module for 'test_import_nonunique_1_pb.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -11,13 +11,13 @@
 use quick_protobuf::{BytesReader, Result, MessageWrite};
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct KeepTheFile { }
+pub struct Nonunique { }
 
-impl KeepTheFile {
+impl Nonunique {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
 }
 
-impl MessageWrite for KeepTheFile { }
+impl MessageWrite for Nonunique { }

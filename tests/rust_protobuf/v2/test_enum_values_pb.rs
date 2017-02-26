@@ -8,6 +8,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TestEnumValuesEnum {
     WINTER = 11,

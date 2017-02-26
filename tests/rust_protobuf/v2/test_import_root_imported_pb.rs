@@ -7,6 +7,7 @@
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
+
 use quick_protobuf::{BytesReader, Result, MessageWrite};
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

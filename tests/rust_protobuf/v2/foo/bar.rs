@@ -7,19 +7,16 @@
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-pub mod mod_foo {
-pub mod mod_bar {
 
 use std::io::Write;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
-
-use super::super::super::test_import_pkg_nested_imported_pb::*;
+use super::super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ContainsImportedNested {
-    pub m: Option<mod_foo::mod_baz::mod_ContainerForNested::NestedMessage>,
-    pub e: Option<mod_foo::mod_baz::mod_ContainerForNested::NestedEnum>,
+    pub m: Option<foo::baz::mod_ContainerForNested::NestedMessage>,
+    pub e: Option<foo::baz::mod_ContainerForNested::NestedEnum>,
 }
 
 impl ContainsImportedNested {
@@ -27,7 +24,7 @@ impl ContainsImportedNested {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.m = Some(r.read_message(bytes, mod_foo::mod_baz::mod_ContainerForNested::NestedMessage::from_reader)?),
+                Ok(10) => msg.m = Some(r.read_message(bytes, foo::baz::mod_ContainerForNested::NestedMessage::from_reader)?),
                 Ok(16) => msg.e = Some(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -49,7 +46,4 @@ impl MessageWrite for ContainsImportedNested {
         if let Some(ref s) = self.e { w.write_with_tag(16, |w| w.write_enum(*s as i32))?; }
         Ok(())
     }
-}
-
-}
 }

@@ -7,7 +7,6 @@
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-pub mod mod_nonunique_2 {
 
 use quick_protobuf::{BytesReader, Result, MessageWrite};
 
@@ -22,5 +21,3 @@ impl Nonunique {
 }
 
 impl MessageWrite for Nonunique { }
-
-}

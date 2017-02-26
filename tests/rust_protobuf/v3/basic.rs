@@ -7,7 +7,6 @@
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-pub mod mod_basic {
 
 use std::io::Write;
 use std::borrow::Cow;
@@ -769,6 +768,4 @@ impl MessageWrite for TestBugSint {
         if let Some(ref s) = self.s64 { w.write_with_tag(16, |w| w.write_sint64(*s))?; }
         Ok(())
     }
-}
-
 }
