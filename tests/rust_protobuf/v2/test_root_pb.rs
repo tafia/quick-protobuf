@@ -7,6 +7,7 @@
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
+
 use std::io::Write;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;

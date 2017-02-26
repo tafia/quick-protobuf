@@ -7,8 +7,6 @@
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-pub mod mod_foo {
-pub mod mod_baz {
 
 use quick_protobuf::{BytesReader, Result, MessageWrite};
 
@@ -60,7 +58,4 @@ impl From<i32> for NestedEnum {
     }
 }
 
-}
-
-}
 }

@@ -9,7 +9,7 @@ use codegen::data_types::mod_FooMessage::OneOftest_oneof;
 
 // Imported fields contain package a.b, which is translated into
 // mod_a::mod_b rust module
-use codegen::data_types_import::mod_a::mod_b::ImportedMessage;
+use codegen::a::b::ImportedMessage;
 
 use quick_protobuf::{BytesReader, Writer};
 
@@ -21,8 +21,8 @@ fn main() {
     let message = FooMessage {
 
         // Regular field work as expected, optional leverages on rust Option<>
-        f_int32: Some(54), 
-        
+        f_int32: Some(54),
+
         // strings are borrowed (Cow)
         f_string: Some(Cow::Borrowed("Hello world from example!")),
 
@@ -33,7 +33,7 @@ fn main() {
         f_imported: Some(ImportedMessage { i: Some(true) }),
 
         // nested messages are encapsulated into a rust module mod_Message
-        f_nested: Some(data_types::mod_BazMessage::Nested { 
+        f_nested: Some(data_types::mod_BazMessage::Nested {
             f_nested: data_types::mod_BazMessage::mod_Nested::NestedMessage { f_nested: 2 }
         }),
 
@@ -62,8 +62,8 @@ fn main() {
     //
     // In general, if we had written the data to say, a file, or if someone else have written that
     // data, it would be more convenient to use a `Reader` which will feed an internal, owned, buffer
-    // Here, on the contrary, we already hold the `out` buffer. Thus it is more efficient 
-    // to directly use a `BytesWriter`. 
+    // Here, on the contrary, we already hold the `out` buffer. Thus it is more efficient
+    // to directly use a `BytesWriter`.
     let read_message = {
         let mut reader = BytesReader::from_bytes(&out);
         reader.read_message(&out, FooMessage::from_reader).expect("Cannot read message")
