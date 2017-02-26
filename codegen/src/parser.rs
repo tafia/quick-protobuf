@@ -20,16 +20,16 @@ named!(block_comment<()>, do_parse!(tag!("/*") >> take_until_and_consume!("*/") 
 /// word break: multispace or comment
 named!(br<()>, alt!(map!(multispace, |_| ()) | comment | block_comment));
 
-named!(syntax<Syntax>, 
+named!(syntax<Syntax>,
        do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >> many0!(br) >>
-                 proto: alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } | 
-                             tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >> 
+                 proto: alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } |
+                             tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >>
                  many0!(br) >> tag!(";") >>
                  (proto) ));
 
 named!(import<PathBuf>,
-       do_parse!(tag!("import")>> many1!(br) >> tag!("\"") >> 
-                 path: map!(map_res!(take_until!("\""), str::from_utf8), |s| Path::new(s).into()) >> tag!("\"") >> 
+       do_parse!(tag!("import")>> many1!(br) >> tag!("\"") >>
+                 path: map!(map_res!(take_until!("\""), str::from_utf8), |s| Path::new(s).into()) >> tag!("\"") >>
                  many0!(br) >> tag!(";") >>
                  (path) ));
 
@@ -37,22 +37,22 @@ named!(package<String>,
        do_parse!(tag!("package") >> many1!(br) >> package: word >> many0!(br) >> tag!(";") >>
                  (package) ));
 
-named!(reserved_nums<Vec<i32>>, 
-       do_parse!(tag!("reserved") >> many1!(br) >> 
+named!(reserved_nums<Vec<i32>>,
+       do_parse!(tag!("reserved") >> many1!(br) >>
                  nums: many1!(do_parse!(num: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >>
                                         many0!(alt!(br | tag!(",") => { |_| () })) >> (num))) >>
                 (nums) ));
-                              
-named!(reserved_names<Vec<String>>, 
-       do_parse!(tag!("reserved") >> many1!(br) >> 
+
+named!(reserved_names<Vec<String>>,
+       do_parse!(tag!("reserved") >> many1!(br) >>
                  names: many1!(do_parse!(tag!("\"") >> name: word >> tag!("\"") >>
                                         many0!(alt!(br | tag!(",") => { |_| () })) >>
                                         (name))) >>
                 (names) ));
 
-named!(key_val<(&str, &str)>, 
-       do_parse!(tag!("[") >> many0!(br) >> 
-                 key: word_ref >> many0!(br) >> tag!("=") >> many0!(br) >> 
+named!(key_val<(&str, &str)>,
+       do_parse!(tag!("[") >> many0!(br) >>
+                 key: word_ref >> many0!(br) >> tag!("=") >> many0!(br) >>
                  value: map_res!(is_not!("]"), str::from_utf8) >> tag!("]") >> many0!(br) >>
                  ((key, value.trim())) ));
 
@@ -94,13 +94,14 @@ named!(one_of<OneOf>,
                      name: name,
                      fields: fields,
                      package: "".to_string(),
+                     module: "".to_string()
                  }) ));
 
-named!(message_field<Field>, 
+named!(message_field<Field>,
        do_parse!(frequency: opt!(frequency) >> many0!(br) >>
                  typ: field_type >> many1!(br) >>
                  name: word >> many0!(br) >> tag!("=") >> many0!(br) >>
-                 number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >> 
+                 number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >>
                  key_vals: many0!(key_val) >> tag!(";") >>
                  (Field {
                       name: name,
@@ -139,9 +140,9 @@ named!(message_event<MessageEvent>, alt!(reserved_nums => { |r| MessageEvent::Re
                                          one_of => { |o| MessageEvent::OneOf(o) } |
                                          br => { |_| MessageEvent::Ignore }));
 
-named!(message_events<(String, Vec<MessageEvent>)>, 
-       do_parse!(tag!("message") >> many0!(br) >> 
-                 name: word >> many0!(br) >> 
+named!(message_events<(String, Vec<MessageEvent>)>,
+       do_parse!(tag!("message") >> many0!(br) >>
+                 name: word >> many0!(br) >>
                  tag!("{") >> many0!(br) >>
                  events: many0!(message_event) >>
                  many0!(br) >> tag!("}") >>
@@ -164,27 +165,28 @@ named!(message<Message>,
            msg
        }));
 
-named!(enum_field<(String, i32)>, 
+named!(enum_field<(String, i32)>,
        do_parse!(name: word >> many0!(br) >>
                  tag!("=") >> many0!(br) >>
                  number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >>
                  tag!(";") >> many0!(br) >>
                  ((name, number))));
-    
-named!(enumerator<Enumerator>, 
+
+named!(enumerator<Enumerator>,
        do_parse!(tag!("enum") >> many1!(br) >> name: word >> many0!(br) >>
                  tag!("{") >> many0!(br) >> fields: many0!(enum_field) >> many0!(br) >> tag!("}") >>
-                 (Enumerator { 
-                     name: name, 
+                 (Enumerator {
+                     name: name,
                      fields: fields,
                      imported: false,
                      package: "".to_string(),
+                     module: "".to_string()
                  })));
 
-named!(option_ignore<()>, 
+named!(option_ignore<()>,
        do_parse!(tag!("option") >> many1!(br) >> take_until_and_consume!(";") >> ()));
 
-named!(service_ignore<()>, 
+named!(service_ignore<()>,
        do_parse!(tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{") >>
                  take_until_and_consume!("}") >> ()));
 
@@ -201,13 +203,13 @@ named!(event<Event>,
        alt!(syntax => { |s| Event::Syntax(s) } |
             import => { |i| Event::Import(i) } |
             package => { |p| Event::Package(p) } |
-            message => { |m| Event::Message(m) } | 
+            message => { |m| Event::Message(m) } |
             enumerator => { |e| Event::Enum(e) } |
             option_ignore => { |_| Event::Ignore } |
             service_ignore => { |_| Event::Ignore } |
             br => { |_| Event::Ignore }));
 
-named!(pub file_descriptor<FileDescriptor>, 
+named!(pub file_descriptor<FileDescriptor>,
        map!(many0!(event), |events: Vec<Event>| {
            let mut desc = FileDescriptor::default();
            for event in events {
@@ -229,10 +231,10 @@ mod test {
 
     #[test]
     fn test_message() {
-        let msg = r#"message ReferenceData 
+        let msg = r#"message ReferenceData
     {
         repeated ScenarioInfo  scenarioSet = 1;
-        repeated CalculatedObjectInfo calculatedObjectSet = 2;  
+        repeated CalculatedObjectInfo calculatedObjectSet = 2;
         repeated RiskFactorList riskFactorListSet = 3;
         repeated RiskMaturityInfo riskMaturitySet = 4;
         repeated IndicatorInfo indicatorSet = 5;
