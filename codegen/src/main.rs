@@ -63,8 +63,9 @@ fn run() -> Result<()> {
     }
 
     let mut include_path = path_vec(values_t!(matches,"INCLUDE_PATH",String));
-    if include_path.is_empty() {
-        include_path.push(".".into());
+    let default = PathBuf::from(".");
+    if include_path.is_empty() || ! include_path.contains(&default) {
+        include_path.push(default);
     }
 
     if in_files.len() > 1 && matches.value_of("OUTPUT").is_some() {
