@@ -1152,7 +1152,7 @@ impl FileDescriptor {
             // this is the same logic as the C preprocessor;
             // if the include path item is absolute, then append the filename,
             // otherwise it is always relative to the file.
-            let mut candidates = Vec::new();
+            let mut matching_file = None;
             for path in import_search_path {
                 let candidate = if path.is_absolute() {
                     path.join(&import)
@@ -1162,20 +1162,16 @@ impl FileDescriptor {
                          |p| p.join(path).join(&import))
                 };
                 if candidate.exists() {
-                    candidates.push(candidate);
+                    matching_file = Some(candidate);
                 }
             }
-            if candidates.is_empty() {
+            if matching_file.is_none() {
                 return Err(ErrorKind::InvalidImport(
                         format!("file {} not found on import path", import.display())).into());
             }
-            if candidates.len() > 1 { // ambiguity!
-                return Err(ErrorKind::InvalidImport(
-                        format!("file {} matches both {} and {}",
-                            import.display(),candidates[0].display(),candidates[1].display())).into());
-            }
-            let mut f = FileDescriptor::read_proto(&candidates[0])?;
-            f.fetch_imports(&candidates[0], import_search_path)?;
+            let proto_file = matching_file.unwrap();
+            let mut f = FileDescriptor::read_proto(&proto_file)?;
+            f.fetch_imports(&proto_file, import_search_path)?;
 
             // if the proto has a packge then the names will be prefixed
             let package = f.package.clone();
