@@ -3,7 +3,7 @@ extern crate quick_protobuf;
 use std::collections::HashMap;
 use std::borrow::Cow;
 use std::io::{Write};
-use quick_protobuf::{BytesReader, Writer, MessageWrite, Result};
+use quick_protobuf::{BytesReader, Reader, Writer, MessageWrite, Result};
 use quick_protobuf::sizeofs::*;
 
 macro_rules! write_read_primitive {
@@ -181,7 +181,7 @@ impl<'a> MessageWrite for TestMessageBorrow<'a> {
 }
 
 #[test]
-fn wr_message_borrow(){
+fn wr_message_length_prefixed(){
 
     let test = "eajhawbdkjblncljbdskjbclas";
 
@@ -191,14 +191,77 @@ fn wr_message_borrow(){
     };
     let mut buf = Vec::new();
     {
-        let mut w = Writer::new(&mut buf);
-        w.write_message(&v).unwrap();
+        let mut writer = Writer::new(&mut buf);
+        writer.write_message(&v).unwrap();
     }
     let mut r = BytesReader::from_bytes(&buf);
     assert_eq!(v, r.read_message(&buf, TestMessageBorrow::from_reader).unwrap());
 
     // test get_size!
     assert_eq!(buf.len(), sizeof_varint(8) + v.get_size());
+}
+
+#[test]
+fn wr_message_wo_prefix(){
+
+    let test = "eajhawbdkjblncljbdskjbclas";
+
+    let v = TestMessageBorrow {
+        id: Some(63),
+        val: vec![&test[0..2], &test[3..7], &test[7..10]],
+    };
+    let mut buf = Vec::new();
+    {
+        let mut writer = Writer::new(&mut buf);
+        v.write_message(&mut writer).unwrap();
+    }
+    let mut r = BytesReader::from_bytes(&buf);
+    assert_eq!(v, TestMessageBorrow::from_reader(&mut r, &buf).unwrap());
+
+    // test get_size!
+    assert_eq!(buf.len(), v.get_size());
+}
+
+#[test]
+fn wr_message_with_prefix_wrapper(){
+
+    let test = "eajhawbdkjblncljbdskjbclas";
+
+    let v = TestMessageBorrow {
+        id: Some(63),
+        val: vec![&test[0..2], &test[3..7], &test[7..10]],
+    };
+    let mut buf = Vec::new();
+    {
+        let mut writer = Writer::new(&mut buf);
+        writer.write_message(&v).unwrap();
+    }
+    let mut r = Reader::from_bytes(buf);
+    assert_eq!(v, r.read(|r, b| r.read_message(b, TestMessageBorrow::from_reader)).unwrap());
+
+    // test get_size!
+    assert_eq!(r.buffer().len(), sizeof_varint(8) + v.get_size());
+}
+
+#[test]
+fn wr_message_wo_prefix_wrapper(){
+
+    let test = "eajhawbdkjblncljbdskjbclas";
+
+    let v = TestMessageBorrow {
+        id: Some(63),
+        val: vec![&test[0..2], &test[3..7], &test[7..10]],
+    };
+    let mut buf = Vec::new();
+    {
+        let mut writer = Writer::new(&mut buf);
+        v.write_message(&mut writer).unwrap();
+    }
+    let mut r = Reader::from_bytes(buf);
+    assert_eq!(v, r.read(TestMessageBorrow::from_reader).unwrap());
+
+    // test get_size!
+    assert_eq!(r.buffer().len(), v.get_size());
 }
 
 #[test]
