@@ -1115,9 +1115,20 @@ impl FileDescriptor {
             }
             out_file.push(file);
         }
+        /*
+        for m in &desc.messages {
+            println!("message {} module {} imported {}",m.name,m.package,m.imported);
+        }
+        for e in &desc.enums {
+            println!("enum {} module {} imported {}",e.name,e.package,e.imported);
+        }
+        Ok(())
+        */
+        
         update_mod_file(&out_file)?;
         let mut w = BufWriter::new(File::create(out_file)?);
         desc.write(&mut w, name)
+        
     }
 
     /// Opens a proto file, reads it and returns raw parsed data
@@ -1176,12 +1187,12 @@ impl FileDescriptor {
             // if the proto has a packge then the names will be prefixed
             let package = f.package.clone();
             self.messages.extend(f.messages.drain(..).map(|mut m| {
-                m.set_package(&package,&package);
+                if m.package.is_empty() { m.set_package(&package,&package); }
                 m.imported = true;
                 m
             }));
             self.enums.extend(f.enums.drain(..).map(|mut e| {
-                e.set_package(&package,&package);
+                if e.package.is_empty() { e.set_package(&package,&package); }
                 e.imported = true;
                 e
             }));
