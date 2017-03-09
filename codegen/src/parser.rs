@@ -2,7 +2,7 @@ use std::str;
 use std::path::{Path, PathBuf};
 
 use types::{Frequency, Field, Message, Enumerator, OneOf, FileDescriptor, Syntax, FieldType};
-use nom::{multispace, digit};
+use nom::{multispace, digit, hex_digit};
 
 fn is_word(b: u8) -> bool {
     match b {
@@ -146,6 +146,7 @@ named!(message_events<(String, Vec<MessageEvent>)>,
                  tag!("{") >> many0!(br) >>
                  events: many0!(message_event) >>
                  many0!(br) >> tag!("}") >>
+                 many0!(br) >> many0!(tag!(";")) >>
                  ((name, events)) ));
 
 named!(message<Message>,
@@ -165,16 +166,29 @@ named!(message<Message>,
            msg
        }));
 
+named!(hex_integer<i32>,
+    do_parse!(
+        tag!("0x") >>
+        num: map_res!(
+            map_res!(hex_digit,str::from_utf8),
+            |s| i32::from_str_radix(s,16)
+        ) >> (num)
+    ));
+
+named!(integer<i32>,  map_res!( map_res!(digit,str::from_utf8), str::FromStr::from_str));
+
 named!(enum_field<(String, i32)>,
        do_parse!(name: word >> many0!(br) >>
                  tag!("=") >> many0!(br) >>
-                 number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >>
+                 number: alt!(hex_integer | integer) >> many0!(br) >>
                  tag!(";") >> many0!(br) >>
                  ((name, number))));
+
 
 named!(enumerator<Enumerator>,
        do_parse!(tag!("enum") >> many1!(br) >> name: word >> many0!(br) >>
                  tag!("{") >> many0!(br) >> fields: many0!(enum_field) >> many0!(br) >> tag!("}") >>
+                 many0!(br) >> many0!(tag!(";")) >>
                  (Enumerator {
                      name: name,
                      fields: fields,
