@@ -45,6 +45,11 @@ fn run() -> Result<()> {
                 .long("single-mod")
                 .short("s")
                 .help("Omit generation of modules for each package when there is only one package"))
+        .arg(Arg::with_name("NO_OUTPUT")
+                .required(false)
+                .long("no-output")
+                .short("n")
+                .help("Show enums and messages in this .proto file, including those imported. No code generated"))
         .arg(Arg::with_name("INPUT")
                 .multiple(true)
                 .help("The .proto files used to generate quick-protobuf code")
@@ -93,6 +98,7 @@ fn run() -> Result<()> {
             out_file: out_file,
             single_module: matches.is_present("SINGLE_MOD"),
             import_search_path: include_path.clone(),
+            no_output: matches.is_present("NO_OUTPUT"),
         };
 
         FileDescriptor::write_proto(&config)
