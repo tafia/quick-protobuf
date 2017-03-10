@@ -1042,11 +1042,12 @@ impl OneOf {
 
 }
 
-pub struct Config<P: AsRef<Path>> {
-    pub in_file: P,
-    pub out_file: P,
+pub struct Config {
+    pub in_file: PathBuf,
+    pub out_file: PathBuf,
     pub single_module: bool,
     pub import_search_path: Vec<PathBuf>,
+    pub no_output: bool,
 }
 
 #[derive(Debug, Default)]
@@ -1060,7 +1061,7 @@ pub struct FileDescriptor {
 
 impl FileDescriptor {
 
-    pub fn write_proto<P: AsRef<Path>>(config: &Config<P>) -> Result<()> {
+    pub fn write_proto(config: &Config) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&config.in_file)?;
         desc.fetch_imports(config.in_file.as_ref(), &config.import_search_path)?;
 
@@ -1084,21 +1085,20 @@ impl FileDescriptor {
         let (prefix,file_package) = split_package(&desc.package);
         let mut file_stem = file_package.to_string();
 
-        let name = config.in_file.as_ref().file_name().and_then(|e| e.to_str()).unwrap();
-        let out_file_ref = config.out_file.as_ref();
+        let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
         let mut out_file = {
             // if no package, extract file_stem from file name
             if file_package.is_empty() {
-                 file_stem = out_file_ref.file_stem()
+                 file_stem = config.out_file.file_stem()
                     .and_then(|f| f.to_str())
                     .map(|s| s.to_string())
-                    .ok_or_else(|| Error::from(ErrorKind::OutputFile(out_file_ref.to_owned())))?;
+                    .ok_or_else(|| Error::from(ErrorKind::OutputFile(config.out_file.to_owned())))?;
 
                 file_stem = file_stem.replace(|c: char| ! c.is_alphanumeric(),"_");
             }
             // will now be properly alphanumeric, but may be a keyword!
             sanitize_keyword(&mut file_stem);
-            out_file_ref.with_file_name(format!("{}.rs", file_stem))
+            config.out_file.with_file_name(format!("{}.rs", file_stem))
         };
 
         if ! prefix.is_empty() {
@@ -1115,20 +1115,20 @@ impl FileDescriptor {
             }
             out_file.push(file);
         }
-        /*
-        for m in &desc.messages {
-            println!("message {} module {} imported {}",m.name,m.package,m.imported);
+        if config.no_output {
+            let imported = |b| if b {" imported"} else {""};
+            println!("source will be written to {}\n",out_file.display());
+            for m in &desc.messages {
+                println!("message {} module {}{}",m.name,m.package,imported(m.imported));
+            }
+            for e in &desc.enums {
+                println!("enum {} module {}{}",e.name,e.package,imported(e.imported));
+            }
+            return Ok(());
         }
-        for e in &desc.enums {
-            println!("enum {} module {} imported {}",e.name,e.package,e.imported);
-        }
-        Ok(())
-        */
-        
         update_mod_file(&out_file)?;
         let mut w = BufWriter::new(File::create(out_file)?);
         desc.write(&mut w, name)
-        
     }
 
     /// Opens a proto file, reads it and returns raw parsed data
