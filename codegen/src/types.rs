@@ -749,21 +749,20 @@ impl Message {
             }
         }
         Ok(())
-    }
+    }    
 
     fn set_package(&mut self, package: &str, module: &str) {
         // set package = current_package.package.name to nested messages
-        let sub = format!("mod_{}",self.name);
-        let (prefix,module) = if package.is_empty() {
-            (self.name.clone(),sub)
+        let (child_package, child_module) = if package.is_empty() {
+            (self.name.clone(), format!("mod_{}", self.name))
         } else {
             self.package = package.to_string();
             self.module = module.to_string();
-            (format!("{}.{}", package, self.name),format!("{}.{}", module, sub))
+            (format!("{}.{}", package, self.name), format!("{}.mod_{}", module, self.name))
         };
-        for m in &mut self.messages { m.set_package(&prefix,&module); }
-        for m in &mut self.enums { m.set_package(&prefix,&module); }
-        for m in &mut self.oneofs { m.set_package(&prefix,&module); }
+        for m in &mut self.messages { m.set_package(&child_package,&child_module); }
+        for m in &mut self.enums { m.set_package(&child_package,&child_module); }
+        for m in &mut self.oneofs { m.set_package(&child_package,&child_module); }
     }
 
     /// Searches for a matching message in all message
