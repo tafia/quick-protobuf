@@ -665,7 +665,7 @@ impl Message {
         } else {
             writeln!(w, "        let mut msg = {} {{", self.name)?;
             for f in unregular_defaults {
-                writeln!(w, "            {}: {},", f.name, f.default.as_ref().unwrap())?;
+            writeln!(w, "            {}: {},", f.name, f.default.as_ref().unwrap())?;
             }
             writeln!(w, "            ..Self::default()")?;
             writeln!(w, "        }};")?;
@@ -749,17 +749,21 @@ impl Message {
             }
         }
         Ok(())
-    }    
+    }
 
     fn set_package(&mut self, package: &str, module: &str) {
         // set package = current_package.package.name to nested messages
-        let (child_package, child_module) = if package.is_empty() {
+        let (child_package, child_module) = if package.is_empty() && module.is_empty() {
             (self.name.clone(), format!("mod_{}", self.name))
+        } else if package.is_empty() {
+            self.module = module.to_string();
+            (self.name.clone(), format!("{}.mod_{}", module, self.name))
         } else {
             self.package = package.to_string();
             self.module = module.to_string();
             (format!("{}.{}", package, self.name), format!("{}.mod_{}", module, self.name))
         };
+
         for m in &mut self.messages { m.set_package(&child_package,&child_module); }
         for m in &mut self.enums { m.set_package(&child_package,&child_module); }
         for m in &mut self.oneofs { m.set_package(&child_package,&child_module); }
@@ -1056,13 +1060,27 @@ pub struct FileDescriptor {
     pub syntax: Syntax,
     pub messages: Vec<Message>,
     pub enums: Vec<Enumerator>,
+    pub module: String,
 }
+
+fn get_file_stem(path: &Path) -> Result<String> {
+     let mut file_stem = path.file_stem()
+        .and_then(|f| f.to_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| Error::from(ErrorKind::OutputFile(path.to_owned())))?;
+
+    file_stem = file_stem.replace(|c: char| ! c.is_alphanumeric(),"_");
+    // will now be properly alphanumeric, but may be a keyword!
+    sanitize_keyword(&mut file_stem);
+    Ok(file_stem)
+}
+
 
 impl FileDescriptor {
 
+
     pub fn write_proto(config: &Config) -> Result<()> {
-        let mut desc = FileDescriptor::read_proto(&config.in_file)?;
-        desc.fetch_imports(config.in_file.as_ref(), &config.import_search_path)?;
+        let mut desc = FileDescriptor::read_proto(&config.in_file, &config.import_search_path)?;
 
         if desc.messages.is_empty() && desc.enums.is_empty() {
             // There could had been unsupported structures, so bail early
@@ -1081,24 +1099,14 @@ impl FileDescriptor {
             desc.package = "".to_string();
         }
 
+        let mut file_stem = get_file_stem(&config.out_file)?;
+
         let (prefix,file_package) = split_package(&desc.package);
-        let mut file_stem = file_package.to_string();
-
-        let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
-        let mut out_file = {
-            // if no package, extract file_stem from file name
-            if file_package.is_empty() {
-                 file_stem = config.out_file.file_stem()
-                    .and_then(|f| f.to_str())
-                    .map(|s| s.to_string())
-                    .ok_or_else(|| Error::from(ErrorKind::OutputFile(config.out_file.to_owned())))?;
-
-                file_stem = file_stem.replace(|c: char| ! c.is_alphanumeric(),"_");
-            }
-            // will now be properly alphanumeric, but may be a keyword!
+        if ! file_package.is_empty() {
+            file_stem = file_package.to_string();
             sanitize_keyword(&mut file_stem);
-            config.out_file.with_file_name(format!("{}.rs", file_stem))
-        };
+        }
+        let mut out_file = config.out_file.with_file_name(format!("{}.rs", file_stem));
 
         if ! prefix.is_empty() {
             use std::fs::create_dir_all;
@@ -1118,27 +1126,36 @@ impl FileDescriptor {
             let imported = |b| if b {" imported"} else {""};
             println!("source will be written to {}\n",out_file.display());
             for m in &desc.messages {
-                println!("message {} module {}{}",m.name,m.package,imported(m.imported));
+                println!("message {} module {}{}",m.name,m.module,imported(m.imported));
             }
             for e in &desc.enums {
-                println!("enum {} module {}{}",e.name,e.package,imported(e.imported));
+                println!("enum {} module {}{}",e.name,e.module,imported(e.imported));
             }
             return Ok(());
         }
         update_mod_file(&out_file)?;
+        let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
         let mut w = BufWriter::new(File::create(out_file)?);
         desc.write(&mut w, name)
     }
 
     /// Opens a proto file, reads it and returns raw parsed data
-    fn read_proto<P: AsRef<Path>>(in_file: P) -> Result<FileDescriptor> {
+    fn read_proto(in_file: &Path, import_search_path: &[PathBuf]) -> Result<FileDescriptor> {
         let mut buf = Vec::new();
         {
-            let f = File::open(&in_file)?;
+            let f = File::open(in_file)?;
             let mut reader = BufReader::new(f);
             reader.read_to_end(&mut buf)?;
         }
-        let desc = file_descriptor(&buf).to_result()?;
+        let mut desc = file_descriptor(&buf).to_result()?;
+
+        desc.module = if desc.package.is_empty() {
+            get_file_stem(in_file)?.clone()
+        } else {
+            desc.package.clone()
+        };
+
+        desc.fetch_imports(&in_file, import_search_path)?;
         Ok(desc)
     }
 
@@ -1149,13 +1166,14 @@ impl FileDescriptor {
         Ok(())
     }
 
+
     /// Get messages and enums from imports
     fn fetch_imports(&mut self, in_file: &Path, import_search_path: &[PathBuf]) -> Result<()> {
         for m in &mut self.messages {
-            m.set_package("","");
+            m.set_package("",&self.module);
         }
         for m in &mut self.enums {
-            m.set_package("","");
+            m.set_package("",&self.module);
         }
 
         for import in &self.import_paths {
@@ -1180,18 +1198,18 @@ impl FileDescriptor {
                         format!("file {} not found on import path", import.display())).into());
             }
             let proto_file = matching_file.unwrap();
-            let mut f = FileDescriptor::read_proto(&proto_file)?;
-            f.fetch_imports(&proto_file, import_search_path)?;
+            let mut f = FileDescriptor::read_proto(&proto_file, import_search_path)?;
 
             // if the proto has a packge then the names will be prefixed
             let package = f.package.clone();
+            let module = f.module.clone();
             self.messages.extend(f.messages.drain(..).map(|mut m| {
-                if m.package.is_empty() { m.set_package(&package,&package); }
+                if m.package.is_empty() { m.set_package(&package,&module); }
                 m.imported = true;
                 m
             }));
             self.enums.extend(f.enums.drain(..).map(|mut e| {
-                if e.package.is_empty() { e.set_package(&package,&package); }
+                if e.package.is_empty() { e.set_package(&package,&module); }
                 e.imported = true;
                 e
             }));
@@ -1289,9 +1307,9 @@ impl FileDescriptor {
     }
 
     fn write_imports<W: Write>(&self, w: &mut W) -> Result<()> {
-        if self.import_paths.is_empty() {
-            return Ok(());
-        }
+        //~ if self.import_paths.is_empty() {
+            //~ return Ok(());
+        //~ }
         // even if we don't have an explicit package, there is an implicit Rust module
         // This `use` allows us to refer to the package root.
         let mut depth = self.package.split('.').count();
