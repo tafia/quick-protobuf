@@ -561,7 +561,7 @@ impl Message {
                 ref t => t.has_lifetime(msgs, f.packed()),
             })
     }
-    
+
     fn get_modules(&self) -> String {
         self.module
             .split('.').filter(|p| !p.is_empty())
@@ -755,7 +755,7 @@ impl Message {
         // The complication here is that the _package_ (as declared in the proto file) does
         // not directly map to the _module_. For example, the package 'a.A' where A is a
         // message will be the module 'a.mod_A', since we can't reuse the message name A as
-        // the submodule containing nested items. Also, protos with empty packages always        
+        // the submodule containing nested items. Also, protos with empty packages always
         // have a module corresponding to the file name.
         let (child_package, child_module) = if package.is_empty() && module.is_empty() {
             (self.name.clone(), format!("mod_{}", self.name))
@@ -1124,10 +1124,11 @@ impl FileDescriptor {
             }
             return Ok(());
         }
-        update_mod_file(&out_file)?;
+
         let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
-        let mut w = BufWriter::new(File::create(out_file)?);
-        desc.write(&mut w, name)
+        let mut w = BufWriter::new(File::create(&out_file)?);
+        desc.write(&mut w, name)?;
+        update_mod_file(&out_file)
     }
 
     /// Opens a proto file, reads it and returns raw parsed data
