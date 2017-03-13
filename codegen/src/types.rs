@@ -561,7 +561,7 @@ impl Message {
                 ref t => t.has_lifetime(msgs, f.packed()),
             })
     }
-
+    
     fn get_modules(&self) -> String {
         self.module
             .split('.').filter(|p| !p.is_empty())
@@ -752,7 +752,11 @@ impl Message {
     }
 
     fn set_package(&mut self, package: &str, module: &str) {
-        // set package = current_package.package.name to nested messages
+        // The complication here is that the _package_ (as declared in the proto file) does
+        // not directly map to the _module_. For example, the package 'a.A' where A is a
+        // message will be the module 'a.mod_A', since we can't reuse the message name A as
+        // the submodule containing nested items. Also, protos with empty packages always        
+        // have a module corresponding to the file name.
         let (child_package, child_module) = if package.is_empty() && module.is_empty() {
             (self.name.clone(), format!("mod_{}", self.name))
         } else if package.is_empty() {
@@ -1063,19 +1067,6 @@ pub struct FileDescriptor {
     pub module: String,
 }
 
-fn get_file_stem(path: &Path) -> Result<String> {
-     let mut file_stem = path.file_stem()
-        .and_then(|f| f.to_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| Error::from(ErrorKind::OutputFile(path.to_owned())))?;
-
-    file_stem = file_stem.replace(|c: char| ! c.is_alphanumeric(),"_");
-    // will now be properly alphanumeric, but may be a keyword!
-    sanitize_keyword(&mut file_stem);
-    Ok(file_stem)
-}
-
-
 impl FileDescriptor {
 
 
@@ -1149,6 +1140,8 @@ impl FileDescriptor {
         }
         let mut desc = file_descriptor(&buf).to_result()?;
 
+        // proto files with no packages are given an implicit module,
+        // since every generated Rust source file represents a module
         desc.module = if desc.package.is_empty() {
             get_file_stem(in_file)?.clone()
         } else {
@@ -1273,7 +1266,7 @@ impl FileDescriptor {
         writeln!(w, "#![allow(non_snake_case)]")?;
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
         writeln!(w, "#![allow(non_camel_case_types)]")?;
-
+        writeln!(w, "#![allow(unused_imports)]")?;
         writeln!(w, "#![allow(unknown_lints)]")?;
         writeln!(w, "#![allow(clippy)]")?;
 
@@ -1283,9 +1276,6 @@ impl FileDescriptor {
     }
 
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
-        if self.messages.is_empty() {
-            return Ok(());
-        }
         if self.messages.iter().all(|m| m.is_unit()) {
             writeln!(w, "use quick_protobuf::{{BytesReader, Result, MessageWrite}};")?;
             return Ok(());
@@ -1307,11 +1297,9 @@ impl FileDescriptor {
     }
 
     fn write_imports<W: Write>(&self, w: &mut W) -> Result<()> {
-        //~ if self.import_paths.is_empty() {
-            //~ return Ok(());
-        //~ }
         // even if we don't have an explicit package, there is an implicit Rust module
         // This `use` allows us to refer to the package root.
+        // NOTE! I'm suppressing not-needed 'use super::*' errors currently!
         let mut depth = self.package.split('.').count();
         if depth == 0 {
             depth = 1;
@@ -1448,4 +1436,17 @@ fn update_mod_file(path: &Path) -> Result<()> {
         write!(f,"pub mod {};\n",name)?;
     }
     Ok(())
+}
+
+/// get the proper sanitized file stem from an input file path
+fn get_file_stem(path: &Path) -> Result<String> {
+     let mut file_stem = path.file_stem()
+        .and_then(|f| f.to_str())
+        .map(|s| s.to_string())
+        .ok_or_else(|| Error::from(ErrorKind::OutputFile(path.to_owned())))?;
+
+    file_stem = file_stem.replace(|c: char| ! c.is_alphanumeric(),"_");
+    // will now be properly alphanumeric, but may be a keyword!
+    sanitize_keyword(&mut file_stem);
+    Ok(file_stem)
 }
