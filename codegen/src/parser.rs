@@ -94,7 +94,8 @@ named!(one_of<OneOf>,
                      name: name,
                      fields: fields,
                      package: "".to_string(),
-                     module: "".to_string()
+                     module: "".to_string(),
+                     imported: false
                  }) ));
 
 named!(message_field<Field>,
