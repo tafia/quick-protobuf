@@ -127,7 +127,7 @@ impl FieldType {
         }
     }
 
-    fn regular_default<'a, 'b>(&'a self, msgs: &'b [Message], enums: &'b [Enumerator]) -> Option<&'b str> {
+    fn regular_default<'a, 'b>(&'a self, desc: &'b FileDescriptor) -> Option<&'b str> {
         match *self {
             FieldType::Int32 => Some("0i32"),
             FieldType::Sint32 => Some("0i32"),
@@ -145,7 +145,7 @@ impl FieldType {
             FieldType::String_ => Some("Cow::Borrowed(\"\")"),
             FieldType::Bytes => Some("Cow::Borrowed(b\"\")"),
             FieldType::Enum(_) => self
-                .find_enum(msgs, enums)
+                .find_enum(&desc.messages, &desc.enums)
                 .and_then(|e| e.fields.iter().find(|&&(_, i)| i == 0))
                 .map(|ref e| &*e.0),
             FieldType::Message(_) => None,
@@ -170,7 +170,7 @@ impl FieldType {
 
                 if found.is_none() {
                     // recursively search into nested messages
-                    for m in msgs {
+                    for m in msgs.iter() {
                         found = self.find_message(&m.messages);
                         if found.is_some() { break; }
                     }
@@ -197,8 +197,8 @@ impl FieldType {
 
                 if found.is_none() {
                     // recursively search into nested messages
-                    for m in msgs {
-                        found = self.find_enum(&m.messages, &m.enums);
+                    for m in msgs.iter() {
+                        found = self.find_enum(&m.messages,&m.enums);
                         if found.is_some() { break; }
                     }
                 }
@@ -209,21 +209,21 @@ impl FieldType {
         }
     }
 
-    fn has_lifetime(&self, msgs: &[Message], packed: bool) -> bool {
+    fn has_lifetime(&self, desc: &FileDescriptor, packed: bool) -> bool {
         match *self {
             FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
-            FieldType::Message(_) => self.find_message(msgs).map_or(false, |m| m.has_lifetime(msgs)),
+            FieldType::Message(_) => self.find_message(&desc.messages).map_or(false, |m| m.has_lifetime(desc)),
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double |
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref m) => {
                 let &(ref key, ref value) = &**m;
-                key.has_lifetime(msgs, false) || value.has_lifetime(msgs, false)
+                key.has_lifetime(desc, false) || value.has_lifetime(desc, false)
             }
             _ => false,
         }
     }
 
-    fn rust_type(&self, msgs: &[Message], enums: &[Enumerator]) -> Result<String> {
+    fn rust_type(&self, desc: &FileDescriptor) -> Result<String> {
         Ok(match *self {
             FieldType::Int32 | FieldType::Sint32 | FieldType::Sfixed32 => "i32".to_string(),
             FieldType::Int64 | FieldType::Sint64 | FieldType::Sfixed64 => "i64".to_string(),
@@ -234,30 +234,30 @@ impl FieldType {
             FieldType::String_ => "Cow<'a, str>".to_string(),
             FieldType::Bytes => "Cow<'a, [u8]>".to_string(),
             FieldType::Bool => "bool".to_string(),
-            FieldType::Enum(ref e) => match self.find_enum(msgs, enums) {
-                Some(e) => format!("{}{}", e.get_modules(), e.name),
-                None => bail!(format!("Could not find enum {} in {:?}", e, enums))
+            FieldType::Enum(ref e) => match self.find_enum(&desc.messages, &desc.enums) {
+                Some(e) => format!("{}{}", e.get_modules(desc), e.name),
+                None => bail!(format!("Could not find enum {} in {:?}", e, desc.enums))
             },
-            FieldType::Message(ref msg) => match self.find_message(msgs) {
+            FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
                 Some(m) => {
-                    let lifetime = if m.has_lifetime(msgs) { "<'a>" } else { "" };
-                    format!("{}{}{}", m.get_modules(), m.name, lifetime)
+                    let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
+                    format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
                 },
-                None => bail!(format!("Could not find message {} in {:?}", msg, msgs))
+                None => bail!(format!("Could not find message {} in {:?}", msg, desc.messages))
             },
             FieldType::Map(ref t) => {
                 let &(ref key, ref value) = &**t;
-                format!("HashMap<{}, {}>", key.rust_type(msgs, enums)?, value.rust_type(msgs, enums)?)
+                format!("HashMap<{}, {}>", key.rust_type(desc)?, value.rust_type(desc)?)
             }
         })
     }
 
     /// Returns the relevant function to read the data, both for regular and Cow wrapped
-    fn read_fn(&self, msgs: &[Message]) -> Result<(String, String)> {
+    fn read_fn(&self, desc: &FileDescriptor) -> Result<(String, String)> {
         Ok(match *self {
-            FieldType::Message(ref msg) => match self.find_message(msgs) {
+            FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
                 Some(m) => {
-                    let m = format!("r.read_message(bytes, {}{}::from_reader)", m.get_modules(), m.name);
+                    let m = format!("r.read_message(bytes, {}{}::from_reader)", m.get_modules(desc), m.name);
                     (m.clone(), m)
                 }
                 None => bail!(format!("Could not find message {}", msg))
@@ -361,9 +361,9 @@ impl Field {
         }
     }
 
-    fn sanitize_default(&mut self, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+    fn sanitize_default(&mut self, desc: &FileDescriptor) -> Result<()> {
         if let Some(ref mut d) = self.default {
-            *d = match &*self.typ.rust_type(msgs, enums)? {
+            *d = match &*self.typ.rust_type(desc)? {
                 "u32" => format!("{}u32", *d),
                 "u64" => format!("{}u64", *d),
                 "i32" => format!("{}i32", *d),
@@ -389,18 +389,18 @@ impl Field {
         Ok(())
     }
 
-    fn has_regular_default(&self, msgs: &[Message], enums: &[Enumerator]) -> bool {
+    fn has_regular_default(&self, desc: &FileDescriptor) -> bool {
         self.default.is_none()
-            || self.default.as_ref().map(|d| &**d) == self.typ.regular_default(msgs, enums)
+            || self.default.as_ref().map(|d| &**d) == self.typ.regular_default(desc)
     }
 
     fn tag(&self) -> u32 {
         tag(self.number as u32, &self.typ, self.packed())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         write!(w, "    pub {}: ", self.name)?;
-        let rust_type = self.typ.rust_type(msgs, enums)?;
+        let rust_type = self.typ.rust_type(desc)?;
         match self.frequency {
             _ if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
             Frequency::Optional if self.default.is_some() => writeln!(w, "{},", rust_type)?,
@@ -414,7 +414,7 @@ impl Field {
         Ok(())
     }
 
-    fn write_match_tag<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+    fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
 
         // special case for FieldType::Map: destructure tuple before inserting in HashMap
         if let FieldType::Map(ref m) = self.typ {
@@ -422,13 +422,13 @@ impl Field {
 
             writeln!(w, "                Ok({}) => {{", self.tag())?;
             writeln!(w, "                    let (key, value) = r.read_map(bytes, |r, bytes| {}, |r, bytes| {})?;",
-                     key.read_fn(msgs)?.1, value.read_fn(msgs)?.1)?;
+                     key.read_fn(desc)?.1, value.read_fn(desc)?.1)?;
             writeln!(w, "                    msg.{}.insert(key, value);", self.name)?;
             writeln!(w, "                }}")?;
             return Ok(());
         }
 
-        let (val, val_cow) = self.typ.read_fn(msgs)?;
+        let (val, val_cow) = self.typ.read_fn(desc)?;
         let name = &self.name;
         write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
@@ -530,6 +530,16 @@ impl Field {
     }
 }
 
+fn get_modules(module: &str, imported: bool, desc: &FileDescriptor) -> String {
+    let skip = if desc.package.is_empty() && ! imported { 1 } else { 0 };
+    module
+        .split('.').filter(|p| !p.is_empty())
+        .skip(skip)
+        .map(|p| format!("{}::", p))
+        .collect()
+}
+
+
 #[derive(Debug, Clone, Default)]
 pub struct Message {
     pub name: String,
@@ -541,7 +551,7 @@ pub struct Message {
     pub package: String,        // package from imports + nested items
     pub messages: Vec<Message>, // nested messages
     pub enums: Vec<Enumerator>, // nested enums
-    pub module: String,
+    pub module: String, // 'package' corresponding to actual generated Rust module
 }
 
 impl Message {
@@ -553,35 +563,46 @@ impl Message {
             .all(|f| f.is_leaf(leaf_messages) || f.deprecated)
     }
 
-    fn has_lifetime(&self, msgs: &[Message]) -> bool {
+    fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
         self.fields.iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
             .any(|f| match f.typ {
                 FieldType::Message(ref m) if &m[..] == self.name => false,
-                ref t => t.has_lifetime(msgs, f.packed()),
+                ref t => t.has_lifetime(desc, f.packed()),
             })
     }
 
-    fn get_modules(&self) -> String {
-        self.module
-            .split('.').filter(|p| !p.is_empty())
-            .map(|p| format!("{}::", p))
-            .collect()
+    fn set_imported(&mut self) {
+        self.imported = true;
+        for o in self.oneofs.iter_mut() {
+            o.imported = true;
+        }
+        for m in self.messages.iter_mut() {
+            m.set_imported();
+        }
+        for e in self.enums.iter_mut() {
+            e.imported = true;
+        }
+    }
+
+
+    fn get_modules(&self, desc: &FileDescriptor) -> String {
+        get_modules(&self.module,self.imported,desc)
     }
 
     fn is_unit(&self) -> bool {
         self.fields.is_empty() && self.oneofs.is_empty()
     }
 
-    fn write<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
-        println!("Writing message {}{}", self.get_modules(), self.name);
+    fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+        println!("Writing message {}{}", self.get_modules(desc), self.name);
         writeln!(w, "")?;
 
-        self.write_definition(w, msgs, enums)?;
+        self.write_definition(w, desc)?;
         writeln!(w, "")?;
-        self.write_impl_message_read(w, msgs, enums)?;
+        self.write_impl_message_read(w, desc)?;
         writeln!(w, "")?;
-        self.write_impl_message_write(w, msgs)?;
+        self.write_impl_message_write(w, desc)?;
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
             writeln!(w, "")?;
@@ -601,13 +622,13 @@ impl Message {
                 writeln!(w, "use super::*;")?;
             }
             for m in &self.messages {
-                m.write(w, msgs, enums)?;
+                m.write(w, desc)?;
             }
             for e in &self.enums {
                 e.write(w)?;
             }
             for o in &self.oneofs {
-                o.write(w, msgs, enums)?;
+                o.write(w, desc)?;
             }
 
             writeln!(w, "")?;
@@ -617,29 +638,29 @@ impl Message {
         Ok(())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
         if self.is_unit() {
             writeln!(w, "pub struct {} {{ }}", self.name)?;
             return Ok(());
         }
 
-        if self.has_lifetime(msgs) {
+        if self.has_lifetime(desc) {
             writeln!(w, "pub struct {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "pub struct {} {{", self.name)?;
         }
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_definition(w, msgs, enums)?;
+            f.write_definition(w, desc)?;
         }
         for o in &self.oneofs {
-            o.write_message_definition(w, msgs)?;
+            o.write_message_definition(w, desc)?;
         }
         writeln!(w, "}}")?;
         Ok(())
     }
 
-    fn write_impl_message_read<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+    fn write_impl_message_read<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         if self.is_unit() {
             writeln!(w, "impl {} {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{")?;
@@ -650,7 +671,7 @@ impl Message {
             return Ok(());
         }
 
-        if self.has_lifetime(msgs) {
+        if self.has_lifetime(desc) {
             writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
             writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
         } else {
@@ -659,13 +680,14 @@ impl Message {
         }
 
         let unregular_defaults = self.fields.iter()
-            .filter(|f| !f.has_regular_default(msgs, enums)).collect::<Vec<_>>();
+            .filter(|f| !f.has_regular_default(desc))
+            .collect::<Vec<_>>();
         if unregular_defaults.is_empty() {
             writeln!(w, "        let mut msg = Self::default();")?;
         } else {
             writeln!(w, "        let mut msg = {} {{", self.name)?;
             for f in unregular_defaults {
-            writeln!(w, "            {}: {},", f.name, f.default.as_ref().unwrap())?;
+                writeln!(w, "            {}: {},", f.name, f.default.as_ref().unwrap())?;
             }
             writeln!(w, "            ..Self::default()")?;
             writeln!(w, "        }};")?;
@@ -673,10 +695,10 @@ impl Message {
         writeln!(w, "        while !r.is_eof() {{")?;
         writeln!(w, "            match r.next_tag(bytes) {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_match_tag(w, msgs)?;
+            f.write_match_tag(w, desc)?;
         }
         for o in &self.oneofs {
-            o.write_match_tag(w, msgs)?;
+            o.write_match_tag(w, desc)?;
         }
         writeln!(w, "                Ok(t) => {{ r.read_unknown(bytes, t)?; }}")?;
         writeln!(w, "                Err(e) => return Err(e),")?;
@@ -692,44 +714,44 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_message_write<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+    fn write_impl_message_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         if self.is_unit() {
             writeln!(w, "impl MessageWrite for {} {{ }}", self.name)?;
             return Ok(());
         }
 
-        if self.has_lifetime(msgs) {
+        if self.has_lifetime(desc) {
             writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
         }
-        self.write_get_size(w)?;
+        self.write_get_size(w,desc)?;
         writeln!(w, "")?;
-        self.write_write_message(w)?;
+        self.write_write_message(w,desc)?;
         writeln!(w, "}}")?;
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
         writeln!(w, "        0")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_get_size(w)?;
         }
         for o in self.oneofs.iter() {
-            o.write_get_size(w)?;
+            o.write_get_size(w,desc)?;
         }
         writeln!(w, "    }}")?;
         Ok(())
     }
 
-    fn write_write_message<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_write_message<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(w, "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w)?;
         }
         for o in &self.oneofs {
-            o.write_write(w)?;
+            o.write_write(w,desc)?;
         }
         writeln!(w, "        Ok(())")?;
         writeln!(w, "    }}")?;
@@ -776,11 +798,11 @@ impl Message {
     /// Searches for a matching message in all message
     ///
     /// If none is found,
-    fn set_enums(&mut self, msgs: &[Message]) {
+    fn set_enums(&mut self, desc: &FileDescriptor) {
         for f in self.fields.iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
-            if f.typ.find_message(&msgs).is_none() {
+            if f.typ.find_message(&desc.messages).is_none() {
                 if let FieldType::Message(m) = f.typ.clone() {
                     f.typ = FieldType::Enum(m);
                     f.boxed = false;
@@ -788,7 +810,7 @@ impl Message {
             }
         }
         for m in &mut self.messages {
-            m.set_enums(msgs);
+            m.set_enums(desc);
         }
     }
 
@@ -817,13 +839,13 @@ impl Message {
         }
     }
 
-    fn sanitize_defaults(&mut self, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+    fn sanitize_defaults(&mut self, desc: &FileDescriptor) -> Result<()> {
         for f in self.fields.iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut())) {
-            f.sanitize_default(msgs, enums)?;
+            f.sanitize_default(desc)?;
         }
         for m in &mut self.messages {
-            m.sanitize_defaults(msgs, enums)?;
+            m.sanitize_defaults(desc)?;
         }
         Ok(())
     }
@@ -870,11 +892,8 @@ impl Enumerator {
         }
     }
 
-    fn get_modules(&self) -> String {
-        self.module
-            .split('.').filter(|p| !p.is_empty())
-            .map(|p| format!("{}::", p))
-            .collect()
+    fn get_modules(&self, desc: &FileDescriptor) -> String {
+        get_modules(&self.module,self.imported,desc)
     }
 
     fn write<W: Write>(&self, w: &mut W) -> Result<()> {
@@ -932,12 +951,13 @@ pub struct OneOf {
     pub fields: Vec<Field>,
     pub package: String,
     pub module: String,
+    pub imported: bool,
 }
 
 impl OneOf {
 
-    fn has_lifetime(&self, msgs: &[Message]) -> bool {
-        self.fields.iter().any(|f| !f.deprecated && f.typ.has_lifetime(msgs, f.packed()))
+    fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
+        self.fields.iter().any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed()))
     }
 
     fn set_package(&mut self, package: &str, module: &str) {
@@ -953,38 +973,35 @@ impl OneOf {
         }
     }
 
-    fn get_modules(&self) -> String {
-        self.module
-            .split('.').filter(|p| !p.is_empty())
-            .map(|p| format!("{}::", p))
-            .collect()
+    fn get_modules(&self, desc: &FileDescriptor) -> String {
+        get_modules(&self.module,self.imported,desc)
     }
 
-    fn write<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+    fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(w, "")?;
-        self.write_definition(w, msgs, enums)?;
+        self.write_definition(w, desc)?;
         writeln!(w, "")?;
-        self.write_impl_default(w, msgs)?;
+        self.write_impl_default(w, desc)?;
         Ok(())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, msgs: &[Message], enums: &[Enumerator]) -> Result<()> {
+    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(w, "#[derive(Debug, PartialEq, Clone)]")?;
-        if self.has_lifetime(msgs) {
+        if self.has_lifetime(desc) {
             writeln!(w, "pub enum OneOf{}<'a> {{", self.name)?;
         } else {
             writeln!(w, "pub enum OneOf{} {{", self.name)?;
         }
         for f in &self.fields {
-            writeln!(w, "    {}({}),", f.name, f.typ.rust_type(msgs, enums)?)?;
+            writeln!(w, "    {}({}),", f.name, f.typ.rust_type(desc)?)?;
         }
         writeln!(w, "    None,")?;
         writeln!(w, "}}")?;
         Ok(())
     }
 
-    fn write_impl_default<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        if self.has_lifetime(msgs) {
+    fn write_impl_default<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+        if self.has_lifetime(desc) {
             writeln!(w, "impl<'a> Default for OneOf{}<'a> {{", self.name)?;
         } else {
             writeln!(w, "impl Default for OneOf{} {{", self.name)?;
@@ -996,53 +1013,53 @@ impl OneOf {
         Ok(())
     }
 
-    fn write_message_definition<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
-        if self.has_lifetime(msgs) {
-            writeln!(w, "    pub {}: {}OneOf{}<'a>,", self.name, self.get_modules(), self.name)?;
+    fn write_message_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+        if self.has_lifetime(desc) {
+            writeln!(w, "    pub {}: {}OneOf{}<'a>,", self.name, self.get_modules(desc), self.name)?;
         } else {
-            writeln!(w, "    pub {}: {}OneOf{},", self.name, self.get_modules(), self.name)?;
+            writeln!(w, "    pub {}: {}OneOf{},", self.name, self.get_modules(desc), self.name)?;
         }
         Ok(())
     }
 
-    fn write_match_tag<W: Write>(&self, w: &mut W, msgs: &[Message]) -> Result<()> {
+    fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            let (val, val_cow) = f.typ.read_fn(msgs)?;
+            let (val, val_cow) = f.typ.read_fn(desc)?;
             if f.boxed {
                 writeln!(w, "                Ok({}) => msg.{} = {}OneOf{}::{}(Box::new({}?)),",
-                       f.tag(), self.name, self.get_modules(), self.name, f.name, val)?;
+                       f.tag(), self.name, self.get_modules(desc), self.name, f.name, val)?;
             } else {
                 writeln!(w, "                Ok({}) => msg.{} = {}OneOf{}::{}({}?),",
-                       f.tag(), self.name, self.get_modules(), self.name, f.name, val_cow)?;
+                       f.tag(), self.name, self.get_modules(desc), self.name, f.name, val_cow)?;
             }
         }
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(w, "        + match self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {
                 writeln!(w, "            {}OneOf{}::{}(_) => {} + {},",
-                         self.get_modules(), self.name, f.name, tag_size, f.typ.get_size(""))?;
+                         self.get_modules(desc), self.name, f.name, tag_size, f.typ.get_size(""))?;
             } else {
                 writeln!(w, "            {}OneOf{}::{}(ref m) => {} + {},",
-                         self.get_modules(), self.name, f.name, tag_size, f.typ.get_size("m"))?;
+                         self.get_modules(desc), self.name, f.name, tag_size, f.typ.get_size("m"))?;
             }
         }
-        writeln!(w, "            {}OneOf{}::None => 0,", self.get_modules(), self.name)?;
+        writeln!(w, "            {}OneOf{}::None => 0,", self.get_modules(desc), self.name)?;
         write!(w, "    }}")?;
         Ok(())
     }
 
-    fn write_write<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         write!(w, "        match self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             writeln!(w, "            {}OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},",
-                     self.get_modules(), self.name, f.name, f.tag(), f.typ.get_write("m", f.boxed))?;
+                     self.get_modules(desc), self.name, f.name, f.tag(), f.typ.get_write("m", f.boxed))?;
         }
-        writeln!(w, "            {}OneOf{}::None => {{}},", self.get_modules(), self.name)?;
+        writeln!(w, "            {}OneOf{}::None => {{}},", self.get_modules(desc), self.name)?;
         write!(w, "    }}")?;
         Ok(())
     }
@@ -1057,7 +1074,7 @@ pub struct Config {
     pub no_output: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct FileDescriptor {
     pub import_paths: Vec<PathBuf>,
     pub package: String,
@@ -1185,6 +1202,7 @@ impl FileDescriptor {
                 };
                 if candidate.exists() {
                     matching_file = Some(candidate);
+                    break;
                 }
             }
             if matching_file.is_none() {
@@ -1199,7 +1217,7 @@ impl FileDescriptor {
             let module = f.module.clone();
             self.messages.extend(f.messages.drain(..).map(|mut m| {
                 if m.package.is_empty() { m.set_package(&package,&module); }
-                m.imported = true;
+                m.set_imported();
                 m
             }));
             self.enums.extend(f.enums.drain(..).map(|mut e| {
@@ -1223,9 +1241,10 @@ impl FileDescriptor {
             }
         }
         // this is very inefficient but we don't care ...
-        let msgs = self.messages.clone();
+        //let msgs = self.messages.clone();
+        let copy = self.clone();
         for m in &mut self.messages {
-            m.sanitize_defaults(&msgs, &self.enums)?;
+            m.sanitize_defaults(&copy)?; //&msgs, &self.enums)?; ???
         }
         Ok(())
     }
@@ -1241,10 +1260,11 @@ impl FileDescriptor {
 
     fn set_enums(&mut self) {
         // this is very inefficient but we don't care ...
-        let msgs = self.messages.clone();
+        //let msgs = self.messages.clone();
+        let copy = self.clone();
 
         for m in &mut self.messages {
-            m.set_enums(&msgs);
+            m.set_enums(&copy);
         }
     }
 
@@ -1338,7 +1358,7 @@ impl FileDescriptor {
 
     fn write_messages<W: Write>(&self, w: &mut W) -> Result<()> {
         for m in self.messages.iter().filter(|m| !m.imported) {
-            m.write(w, &self.messages, &self.enums)?;
+            m.write(w, &self)?;
         }
         Ok(())
     }
