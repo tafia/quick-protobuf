@@ -85,8 +85,8 @@ pub struct TestTypes<'a> {
     pub bool_singular: Option<bool>,
     pub string_singular: Option<Cow<'a, str>>,
     pub bytes_singular: Option<Cow<'a, [u8]>>,
-    pub test_enum_singular: Option<test_text_format_pb::TestEnum>,
-    pub test_message_singular: Option<test_text_format_pb::TestMessage>,
+    pub test_enum_singular: Option<TestEnum>,
+    pub test_message_singular: Option<TestMessage>,
     pub double_repeated: Vec<f64>,
     pub float_repeated: Vec<f32>,
     pub int32_repeated: Vec<i32>,
@@ -102,8 +102,8 @@ pub struct TestTypes<'a> {
     pub bool_repeated: Vec<bool>,
     pub string_repeated: Vec<Cow<'a, str>>,
     pub bytes_repeated: Vec<Cow<'a, [u8]>>,
-    pub test_enum_repeated: Vec<test_text_format_pb::TestEnum>,
-    pub test_message_repeated: Vec<test_text_format_pb::TestMessage>,
+    pub test_enum_repeated: Vec<TestEnum>,
+    pub test_message_repeated: Vec<TestMessage>,
 }
 
 impl<'a> TestTypes<'a> {
@@ -127,7 +127,7 @@ impl<'a> TestTypes<'a> {
                 Ok(114) => msg.string_singular = Some(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(122) => msg.bytes_singular = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(128) => msg.test_enum_singular = Some(r.read_enum(bytes)?),
-                Ok(138) => msg.test_message_singular = Some(r.read_message(bytes, test_text_format_pb::TestMessage::from_reader)?),
+                Ok(138) => msg.test_message_singular = Some(r.read_message(bytes, TestMessage::from_reader)?),
                 Ok(249) => msg.double_repeated.push(r.read_double(bytes)?),
                 Ok(261) => msg.float_repeated.push(r.read_float(bytes)?),
                 Ok(264) => msg.int32_repeated.push(r.read_int32(bytes)?),
@@ -144,7 +144,7 @@ impl<'a> TestTypes<'a> {
                 Ok(354) => msg.string_repeated.push(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(362) => msg.bytes_repeated.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(368) => msg.test_enum_repeated.push(r.read_enum(bytes)?),
-                Ok(378) => msg.test_message_repeated.push(r.read_message(bytes, test_text_format_pb::TestMessage::from_reader)?),
+                Ok(378) => msg.test_message_repeated.push(r.read_message(bytes, TestMessage::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
