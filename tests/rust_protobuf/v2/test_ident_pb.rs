@@ -3,14 +3,17 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
+
 
 use std::io::Write;
 use std::borrow::Cow;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Vec_pb { }
@@ -88,7 +91,7 @@ impl MessageWrite for Message { }
 pub struct TestType<'a> {
     pub struct_pb: Vec<Cow<'a, str>>,
     pub ref_pb: Vec<u32>,
-    pub type_pb: mod_TestType::OneOftype_pb<'a>,
+    pub type_pb: test_ident_pb::mod_TestType::OneOftype_pb<'a>,
 }
 
 impl<'a> TestType<'a> {
@@ -98,7 +101,7 @@ impl<'a> TestType<'a> {
             match r.next_tag(bytes) {
                 Ok(18) => msg.struct_pb.push(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(24) => msg.ref_pb.push(r.read_uint32(bytes)?),
-                Ok(10) => msg.type_pb = mod_TestType::OneOftype_pb::s(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.type_pb = test_ident_pb::mod_TestType::OneOftype_pb::s(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -113,15 +116,15 @@ impl<'a> MessageWrite for TestType<'a> {
         + self.struct_pb.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
         + self.ref_pb.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
         + match self.type_pb {
-            mod_TestType::OneOftype_pb::s(ref m) => 1 + sizeof_len((m).len()),
-            mod_TestType::OneOftype_pb::None => 0,
+            test_ident_pb::mod_TestType::OneOftype_pb::s(ref m) => 1 + sizeof_len((m).len()),
+            test_ident_pb::mod_TestType::OneOftype_pb::None => 0,
     }    }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
         for s in &self.struct_pb { w.write_with_tag(18, |w| w.write_string(&**s))?; }
         for s in &self.ref_pb { w.write_with_tag(24, |w| w.write_uint32(*s))?; }
-        match self.type_pb {            mod_TestType::OneOftype_pb::s(ref m) => { w.write_with_tag(10, |w| w.write_string(&**m))? },
-            mod_TestType::OneOftype_pb::None => {},
+        match self.type_pb {            test_ident_pb::mod_TestType::OneOftype_pb::s(ref m) => { w.write_with_tag(10, |w| w.write_string(&**m))? },
+            test_ident_pb::mod_TestType::OneOftype_pb::None => {},
     }        Ok(())
     }
 }
@@ -143,3 +146,4 @@ impl<'a> Default for OneOftype_pb<'a> {
 }
 
 }
+

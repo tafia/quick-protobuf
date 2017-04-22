@@ -1,26 +1,26 @@
-//! Automatically generated rust module for 'test_special~characters file{name}_pb.proto' file
+//! Automatically generated rust module for 'test_import_nonunique_1_pb.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-pub mod mod_special {
 
 use quick_protobuf::{BytesReader, Result, MessageWrite};
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct Outer { }
+pub struct Nonunique { }
 
-impl Outer {
+impl Nonunique {
     pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
 }
 
-impl MessageWrite for Outer { }
+impl MessageWrite for Nonunique { }
 
-}

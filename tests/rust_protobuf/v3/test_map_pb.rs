@@ -3,20 +3,23 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
+
 
 use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestMap<'a> {
     pub m: HashMap<Cow<'a, str>, u32>,
-    pub mm: HashMap<Cow<'a, str>, TestMapEntry>,
+    pub mm: HashMap<Cow<'a, str>, test_map_pb::TestMapEntry>,
 }
 
 impl<'a> TestMap<'a> {
@@ -29,7 +32,7 @@ impl<'a> TestMap<'a> {
                     msg.m.insert(key, value);
                 }
                 Ok(18) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_message(bytes, TestMapEntry::from_reader))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_message(bytes, test_map_pb::TestMapEntry::from_reader))?;
                     msg.mm.insert(key, value);
                 }
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -84,3 +87,4 @@ impl MessageWrite for TestMapEntry {
         Ok(())
     }
 }
+
