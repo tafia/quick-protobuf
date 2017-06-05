@@ -1,6 +1,7 @@
 pub mod struct_pb;
 pub mod basic;
 pub mod test_default_values;
+pub mod test_default_values_test;
 pub mod test_enum_values_pb;
 pub mod test_ident_pb;
 pub mod test_import_nested_imported_pb;
@@ -17,4 +18,9 @@ pub mod test_required;
 pub mod test_sanitize_file_name_pb;
 pub mod special;
 pub mod test_text_format_pb;
+pub mod test_lite_runtime_test;
+pub mod test_required_test;
+pub mod test_text_format_test;
+
+
 
