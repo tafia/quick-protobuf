@@ -80,11 +80,10 @@ fn run() -> Result<()> {
     for in_file in in_files {
         let mut out_file = in_file.with_extension("rs");
 
-         if let Some(ofile) = matches.value_of("OUTPUT") {
+        if let Some(ofile) = matches.value_of("OUTPUT") {
             out_file = PathBuf::from(ofile);
         }
-
-        if let Some(dir) = matches.value_of("OUTPUT_DIR") {
+        else if let Some(dir) = matches.value_of("OUTPUT_DIR") {
             let mut directory = PathBuf::from(dir);
             if ! directory.is_dir() { // we can create? But only last dir
                 bail!(format!("output directory {:?} does not exist", directory));
@@ -118,7 +117,8 @@ fn extension_matches<P: AsRef<Path>>(path: P, expected: &str) -> std::result::Re
 }
 
 fn path_vec(maybe_vec: std::result::Result<Vec<String>,clap::Error>) -> Vec<PathBuf> {
-    maybe_vec.unwrap_or(Vec::new()).iter().map(|s| s.into()).collect()
+    maybe_vec.unwrap_or_else(|_| Vec::new())
+        .iter().map(|s| s.into()).collect()
 }
 
 
