@@ -7,23 +7,23 @@ use super::basic::*;
 #[test]
 fn test1() {
     let mut test1 = Test1::default();
-    test1.a = 150;
+    test1.a = Some(150);
     test_serialize_deserialize!("08 96 01", &test1, Test1);
 }
 
 #[test]
 fn test2() {
     let mut test2 = Test2::default();
-    test2.b = Cow::Borrowed("testing");
+    test2.b = Some(Cow::Borrowed("testing"));
     test_serialize_deserialize!("12 07 74 65 73 74 69 6e 67", &test2, Test2);
 }
 
 #[test]
 fn test3() {
     let mut test1 = Test1::default();
-    test1.a = 150;
+    test1.a = Some(150);
     let mut test3 = Test3::default();
-    test3.c = test1;
+    test3.c = Some(test1);
     test_serialize_deserialize!("1a 03 08 96 01", &test3, Test3);
 }
 
