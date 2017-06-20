@@ -170,7 +170,7 @@ impl FieldType {
 
                 if found.is_none() {
                     // recursively search into nested messages
-                    for m in msgs.iter() {
+                    for m in msgs {
                         found = self.find_message(&m.messages);
                         if found.is_some() { break; }
                     }
@@ -236,7 +236,7 @@ impl FieldType {
             FieldType::Bool => "bool".to_string(),
             FieldType::Enum(ref e) => match self.find_enum(&desc.messages, &desc.enums) {
                 Some(e) => format!("{}{}", e.get_modules(desc), e.name),
-                None => bail!(format!("Could not find enum {} in {:?}", e, desc.enums))
+                None => bail!("Could not find enum {} in {:?}", e, desc.enums)
             },
             FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
                 Some(m) => {
@@ -1107,11 +1107,16 @@ impl FileDescriptor {
             desc.package = "".to_string();
         }
 
-        let mut file_stem = get_file_stem(&config.out_file)?;
 
         let (prefix,file_package) = split_package(&desc.package);
+
+        let mut file_stem = if file_package.is_empty() {
+            get_file_stem(&config.out_file)?
+        } else {
+            file_package.to_string()
+        };
+
         if ! file_package.is_empty() {
-            file_stem = file_package.to_string();
             sanitize_keyword(&mut file_stem);
         }
         let mut out_file = config.out_file.with_file_name(format!("{}.rs", file_stem));
@@ -1124,7 +1129,7 @@ impl FileDescriptor {
             for p in prefix.split('.') {
                 out_file.push(p);
             }
-            if ! out_file.is_dir() {
+            if ! out_file.exists() {
                 create_dir_all(&out_file)?;
                 update_mod_file(&out_file)?;
             }
@@ -1259,8 +1264,6 @@ impl FileDescriptor {
     }
 
     fn set_enums(&mut self) {
-        // this is very inefficient but we don't care ...
-        //let msgs = self.messages.clone();
         let copy = self.clone();
 
         for m in &mut self.messages {
