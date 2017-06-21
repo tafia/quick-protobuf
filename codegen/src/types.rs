@@ -1427,11 +1427,14 @@ fn split_package(package: &str) -> (&str,&str) {
     }
 }
 
+const MAGIC_HEADER: &'static str = "//! Automatically generated mod.rs";
+
 /// Given a file path, create or update the mod.rs file within its folder
 fn update_mod_file(path: &Path) -> Result<()> {
     let mut file = path.to_path_buf();
     use std::fs::OpenOptions;
     use std::io::prelude::*;
+    
     let name = file.file_stem().unwrap().to_string_lossy().to_string();
     file.pop();
     file.push("mod.rs");
@@ -1440,11 +1443,21 @@ fn update_mod_file(path: &Path) -> Result<()> {
     let mut exists = false;
     if let Ok(f) = File::open(&file) {
         exists = true;
+        let mut first = true;
         for line in BufReader::new(f).lines() {
             let line = line?;
+            if first {
+                if line.find(MAGIC_HEADER).is_none() {
+                    // it is NOT one of our generated mod.rs files, so don't modify it!
+                    present = true;
+                    break;
+                }
+                first = false;
+            }
             if let Some(i) = line.find(matches) {
                 let rest = &line[i+matches.len()..line.len()-1];
                 if rest == name {
+                    // we already have a reference to this module...
                     present = true;
                     break;
                 }
@@ -1455,7 +1468,9 @@ fn update_mod_file(path: &Path) -> Result<()> {
         let mut f = if exists {
             OpenOptions::new().append(true).open(&file)?
         } else {
-            File::create(&file)?
+            let mut f = File::create(&file)?;
+            write!(f,"{}\n", MAGIC_HEADER)?;
+            f
         };
         write!(f,"pub mod {};\n",name)?;
     }
