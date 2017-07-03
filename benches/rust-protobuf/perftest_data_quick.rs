@@ -3,8 +3,13 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
 
-use std::io::{Write};
+pub mod mod_perftest_data_quick {
+
+use std::io::Write;
 use std::borrow::Cow;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
@@ -30,7 +35,8 @@ impl Test1 {
 
 impl MessageWrite for Test1 {
     fn get_size(&self) -> usize {
-        self.value.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        0
+        + self.value.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -60,7 +66,8 @@ impl TestRepeatedBool {
 
 impl MessageWrite for TestRepeatedBool {
     fn get_size(&self) -> usize {
-        self.values.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        0
+        + self.values.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -90,7 +97,8 @@ impl TestRepeatedPackedInt32 {
 
 impl MessageWrite for TestRepeatedPackedInt32 {
     fn get_size(&self) -> usize {
-        if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
+        0
+        + if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -124,7 +132,8 @@ impl TestRepeatedMessages {
 
 impl MessageWrite for TestRepeatedMessages {
     fn get_size(&self) -> usize {
-        self.messages1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        0
+        + self.messages1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.messages2.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.messages3.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
@@ -162,7 +171,8 @@ impl TestOptionalMessages {
 
 impl MessageWrite for TestOptionalMessages {
     fn get_size(&self) -> usize {
-        self.message1.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.message1.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.message2.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.message3.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
@@ -200,7 +210,8 @@ impl<'a> TestStrings<'a> {
 
 impl<'a> MessageWrite for TestStrings<'a> {
     fn get_size(&self) -> usize {
-        self.s1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        0
+        + self.s1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
         + self.s2.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
         + self.s3.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
     }
@@ -234,7 +245,8 @@ impl<'a> TestBytes<'a> {
 
 impl<'a> MessageWrite for TestBytes<'a> {
     fn get_size(&self) -> usize {
-        self.b1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        0
+        + self.b1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -278,7 +290,8 @@ impl<'a> PerftestData<'a> {
 
 impl<'a> MessageWrite for PerftestData<'a> {
     fn get_size(&self) -> usize {
-        self.test1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        0
+        + self.test1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_repeated_bool.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_repeated_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_optional_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
@@ -299,4 +312,6 @@ impl<'a> MessageWrite for PerftestData<'a> {
         for s in &self.test_large_bytearrays { w.write_with_tag(66, |w| w.write_message(s))?; }
         Ok(())
     }
+}
+
 }
