@@ -2,6 +2,9 @@ extern crate quick_protobuf;
 extern crate protobuf;
 extern crate rand;
 extern crate time;
+extern crate prost;
+#[macro_use]
+extern crate prost_derive;
 
 use std::default::Default;
 use std::fs::File;
@@ -22,6 +25,7 @@ use perftest_data_quick::mod_perftest_data_quick::PerftestData as QuickPerftestD
 
 mod perftest_data;
 mod perftest_data_quick;
+mod perftest_data_prost;
 
 fn measure<R, F: FnMut() -> R>(iter: u64, mut f: F) -> (u64, R) {
     let start = time::precise_time_ns();
