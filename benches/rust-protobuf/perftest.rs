@@ -167,7 +167,7 @@ impl TestRunner {
         b
     }
 
-    fn prost_run_test<M: prost::Message + Clone>(&mut self, data: &[M]) -> [u64; 4]
+    fn prost_run_test<M: ProstMessage + Clone>(&mut self, data: &[M]) -> [u64; 4]
     {
         let mut c = [0; 4];
 
@@ -181,7 +181,8 @@ impl TestRunner {
             total_size += item.encoded_len() as u32;
         }
 
-        let mut buf = bytes::BytesMut::with_capacity(1024);
+        // TODO: remove the magic number.
+        let mut buf = bytes::BytesMut::with_capacity(1024 * 1024 * 30);
         c[0] = measure(random_data.len() as u64, || {
             for m in &random_data {
                 m.encode_length_delimited(&mut buf).unwrap();
@@ -211,7 +212,7 @@ impl TestRunner {
         c
     }
 
-    fn prost_test<M: prost::Message + Clone>(&mut self, data: &[M]) -> [u64; 4]
+    fn prost_test<M: ProstMessage + Clone>(&mut self, data: &[M]) -> [u64; 4]
     {
         let c = self.prost_run_test(data);
         self.any_matched = true;
@@ -320,16 +321,16 @@ fn print_results(name: &str, a: &[u64], b: &[u64], c: &[u64], print_header: bool
     let labels = ["write", "read", "read no vec", "read reuse"];
 
     if print_header {
-        println!("{:>15} {:>15} {:>15} {:>15} {:>8}", "labels", "rust-protobuf", "quick-protobuf", "prost", "");
-        println!("{:>15} {:>15} {:>15} {:>15} {:>8}", "", "ns/iter", "ns/iter", "ns/iter", "%");
+        println!("{:>15} {:>15} {:>15} {:>15} {:>15} {:>15}", "labels", "rust-protobuf", "quick-protobuf", "prost", "quick/rust", "prost/rust");
+        println!("{:>15} {:>15} {:>15} {:>15} {:>15} {:>15}", "", "ns/iter", "ns/iter", "ns/iter", "%", "%");
     }
     println!("");
     println!("{}", name);
     for i in 0..3 {
-        println!("{:>15} {:>15} {:>15} {:>15} {:>8.1}", labels[i], a[i], b[i], c[i], 100. - b[i] as f32 / a[i] as f32 * 100.);
+        println!("{:>15} {:>15} {:>15} {:>15} {:>15.1} {:>15.1}", labels[i], a[i], b[i], c[i], 100. - b[i] as f32 / a[i] as f32 * 100., 100. - c[i] as f32 / a[i] as f32 * 100.);
     }
     let i = 3;
-    println!("{:>15} {:>15} {:>15} {:>8}", labels[i], a[i], "", "NA");
+    println!("{:>15} {:>15} {:>15} {:>15} {:>15}", labels[i], a[i], "", "NA", "NA");
 }
 
 fn main() {
@@ -354,7 +355,9 @@ fn main() {
     let mut data = Vec::new();
     is.read_to_end(&mut data).unwrap();
     let mut bin = bytes::Bytes::from(data).into_buf();
-    let test_data_prost = perftest_data_prost::PerftestData::decode_length_delimited(&mut bin).unwrap();
+    let len = bin.remaining();
+    let mut bin = bytes::Buf::take(bin, len);
+    let test_data_prost = perftest_data_prost::PerftestData::decode(&mut bin).unwrap();
 
     let a = runner.test(test_data.get_test1());
     let b = runner.quick_test(&test_data_quick.test1, mod_perftest_data_quick::Test1::from_reader);
