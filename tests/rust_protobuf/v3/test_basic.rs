@@ -2,7 +2,7 @@ use quick_protobuf::*;
 
 use std::borrow::Cow;
 use rust_protobuf::hex::{encode_hex, decode_hex};
-use super::test_basic_pb::mod_basic::*;
+use super::basic::*;
 
 #[test]
 fn test1() {

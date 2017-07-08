@@ -3,14 +3,14 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-pub mod mod_foo {
-pub mod mod_baz {
 
 use quick_protobuf::{BytesReader, Result, MessageWrite};
+use super::super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ContainerForNested { }
@@ -62,5 +62,3 @@ impl From<i32> for NestedEnum {
 
 }
 
-}
-}

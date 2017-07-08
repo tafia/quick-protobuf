@@ -3,20 +3,21 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
+
 use std::io::Write;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
-
-use super::test_import_root_imported_pb::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ContainsImported {
-    pub imported_message: Option<ImportedMessage>,
-    pub imported_enum: Option<ImportedEnum>,
+    pub imported_message: Option<test_import_root_imported_pb::ImportedMessage>,
+    pub imported_enum: Option<test_import_root_imported_pb::ImportedEnum>,
 }
 
 impl ContainsImported {
@@ -24,7 +25,7 @@ impl ContainsImported {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.imported_message = Some(r.read_message(bytes, ImportedMessage::from_reader)?),
+                Ok(10) => msg.imported_message = Some(r.read_message(bytes, test_import_root_imported_pb::ImportedMessage::from_reader)?),
                 Ok(16) => msg.imported_enum = Some(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -47,3 +48,4 @@ impl MessageWrite for ContainsImported {
         Ok(())
     }
 }
+

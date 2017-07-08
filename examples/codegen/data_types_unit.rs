@@ -3,8 +3,14 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
 
 use quick_protobuf::{BytesReader, Result, MessageWrite};
+use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum test {
@@ -37,3 +43,4 @@ impl unit_message {
 }
 
 impl MessageWrite for unit_message { }
+

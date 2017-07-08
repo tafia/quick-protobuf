@@ -1,4 +1,4 @@
-mod test_basic_pb;
+mod basic;
 mod test_basic;
 
 // mod test_zeros_are_not_written;
@@ -13,3 +13,4 @@ mod test_ident_pb;
 
 mod test_oneof_pb;
 mod test_oneof;
+

@@ -3,21 +3,21 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
+
 use std::io::Write;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
-
-use super::test_import_nonunique_1_pb::*;
-use super::test_import_nonunique_2_pb::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestImportNonunque {
-    pub n1: Option<mod_nonunique_1::Nonunique>,
-    pub n2: Option<mod_nonunique_2::Nonunique>,
+    pub n1: Option<nonunique_1::Nonunique>,
+    pub n2: Option<nonunique_2::Nonunique>,
 }
 
 impl TestImportNonunque {
@@ -25,8 +25,8 @@ impl TestImportNonunque {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.n1 = Some(r.read_message(bytes, mod_nonunique_1::Nonunique::from_reader)?),
-                Ok(18) => msg.n2 = Some(r.read_message(bytes, mod_nonunique_2::Nonunique::from_reader)?),
+                Ok(10) => msg.n1 = Some(r.read_message(bytes, nonunique_1::Nonunique::from_reader)?),
+                Ok(18) => msg.n2 = Some(r.read_message(bytes, nonunique_2::Nonunique::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -48,3 +48,4 @@ impl MessageWrite for TestImportNonunque {
         Ok(())
     }
 }
+

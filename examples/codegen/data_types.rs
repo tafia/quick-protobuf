@@ -3,17 +3,18 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
+
 
 use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
-
-use super::data_types_import::*;
+use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum FooEnum {
@@ -91,7 +92,7 @@ pub struct FooMessage<'a> {
     pub f_repeated_int32: Vec<i32>,
     pub f_repeated_packed_int32: Vec<i32>,
     pub f_repeated_packed_float: Cow<'a, [f32]>,
-    pub f_imported: Option<mod_a::mod_b::ImportedMessage>,
+    pub f_imported: Option<a::b::ImportedMessage>,
     pub f_baz: Option<BazMessage>,
     pub f_nested: Option<mod_BazMessage::Nested>,
     pub f_nested_enum: Option<mod_BazMessage::mod_Nested::NestedEnum>,
@@ -129,7 +130,7 @@ impl<'a> FooMessage<'a> {
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
                 Ok(162) => msg.f_repeated_packed_int32 = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
                 Ok(170) => msg.f_repeated_packed_float = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(178) => msg.f_imported = Some(r.read_message(bytes, mod_a::mod_b::ImportedMessage::from_reader)?),
+                Ok(178) => msg.f_imported = Some(r.read_message(bytes, a::b::ImportedMessage::from_reader)?),
                 Ok(186) => msg.f_baz = Some(r.read_message(bytes, BazMessage::from_reader)?),
                 Ok(194) => msg.f_nested = Some(r.read_message(bytes, mod_BazMessage::Nested::from_reader)?),
                 Ok(200) => msg.f_nested_enum = Some(r.read_enum(bytes)?),
@@ -367,3 +368,4 @@ impl From<i32> for NestedEnum {
 }
 
 }
+

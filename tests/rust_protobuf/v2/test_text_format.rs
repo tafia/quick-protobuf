@@ -74,7 +74,7 @@ fn test_complex_message() {
 //     m.set_string_singular("quote\"newline\nbackslash\\del\x7f".to_string());
 //     assert_eq!("string_singular: \"quote\\\"newline\\nbackslash\\\\del\\177\"", &*format!("{:?}", m));
 // }
-// 
+//
 // #[test]
 // fn test_pretty() {
 //     let mut tm = TestMessage::new();
@@ -86,7 +86,7 @@ fn test_complex_message() {
 //     m.mut_string_repeated().push("ghi".to_string());
 //     assert_eq!("string_singular: \"abc\"\ntest_message_singular {\n  value: 23\n}\nstring_repeated: \"def\"\nstring_repeated: \"ghi\"\n", &*format!("{:#?}", m));
 // }
-// 
+//
 // #[test]
 // fn test_rust_identifier() {
 //     let mut m = TestTextFormatRustIdentifier::new();

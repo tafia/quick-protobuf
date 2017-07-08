@@ -3,20 +3,21 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
+
 use std::io::Write;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
-
-use super::test_import_nested_imported_pb::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ContainsImportedNested {
-    pub m: Option<mod_ContainerForNested::NestedMessage>,
-    pub e: Option<mod_ContainerForNested::NestedEnum>,
+    pub m: Option<test_import_nested_imported_pb::mod_ContainerForNested::NestedMessage>,
+    pub e: Option<test_import_nested_imported_pb::mod_ContainerForNested::NestedEnum>,
 }
 
 impl ContainsImportedNested {
@@ -24,7 +25,7 @@ impl ContainsImportedNested {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.m = Some(r.read_message(bytes, mod_ContainerForNested::NestedMessage::from_reader)?),
+                Ok(10) => msg.m = Some(r.read_message(bytes, test_import_nested_imported_pb::mod_ContainerForNested::NestedMessage::from_reader)?),
                 Ok(16) => msg.e = Some(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -47,3 +48,4 @@ impl MessageWrite for ContainsImportedNested {
         Ok(())
     }
 }
+

@@ -3,20 +3,20 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-pub mod mod_basic {
 
 use std::io::Write;
 use std::borrow::Cow;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
+use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TestEnumDescriptor {
-    UNKNOWN = 0,
     RED = 1,
     BLUE = 2,
     GREEN = 3,
@@ -24,14 +24,13 @@ pub enum TestEnumDescriptor {
 
 impl Default for TestEnumDescriptor {
     fn default() -> Self {
-        TestEnumDescriptor::UNKNOWN
+        TestEnumDescriptor::RED
     }
 }
 
 impl From<i32> for TestEnumDescriptor {
     fn from(i: i32) -> Self {
         match i {
-            0 => TestEnumDescriptor::UNKNOWN,
             1 => TestEnumDescriptor::RED,
             2 => TestEnumDescriptor::BLUE,
             3 => TestEnumDescriptor::GREEN,
@@ -42,7 +41,7 @@ impl From<i32> for TestEnumDescriptor {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Test1 {
-    pub a: Option<i32>,
+    pub a: i32,
 }
 
 impl Test1 {
@@ -50,7 +49,7 @@ impl Test1 {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(8) => msg.a = Some(r.read_int32(bytes)?),
+                Ok(8) => msg.a = r.read_int32(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -62,18 +61,18 @@ impl Test1 {
 impl MessageWrite for Test1 {
     fn get_size(&self) -> usize {
         0
-        + self.a.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + 1 + sizeof_varint(*(&self.a) as u64)
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.a { w.write_with_tag(8, |w| w.write_int32(*s))?; }
+        w.write_with_tag(8, |w| w.write_int32(*&self.a))?;
         Ok(())
     }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Test2<'a> {
-    pub b: Option<Cow<'a, str>>,
+    pub b: Cow<'a, str>,
 }
 
 impl<'a> Test2<'a> {
@@ -81,7 +80,7 @@ impl<'a> Test2<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(18) => msg.b = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.b = r.read_string(bytes).map(Cow::Borrowed)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -93,18 +92,18 @@ impl<'a> Test2<'a> {
 impl<'a> MessageWrite for Test2<'a> {
     fn get_size(&self) -> usize {
         0
-        + self.b.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        + 1 + sizeof_len((&self.b).len())
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.b { w.write_with_tag(18, |w| w.write_string(&**s))?; }
+        w.write_with_tag(18, |w| w.write_string(&**&self.b))?;
         Ok(())
     }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Test3 {
-    pub c: Option<Test1>,
+    pub c: basic::Test1,
 }
 
 impl Test3 {
@@ -112,7 +111,7 @@ impl Test3 {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(26) => msg.c = Some(r.read_message(bytes, Test1::from_reader)?),
+                Ok(26) => msg.c = r.read_message(bytes, basic::Test1::from_reader)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -124,11 +123,11 @@ impl Test3 {
 impl MessageWrite for Test3 {
     fn get_size(&self) -> usize {
         0
-        + self.c.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        + 1 + sizeof_len((&self.c).get_size())
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.c { w.write_with_tag(26, |w| w.write_message(s))?; }
+        w.write_with_tag(26, |w| w.write_message(&self.c))?;
         Ok(())
     }
 }
@@ -231,39 +230,8 @@ impl MessageWrite for TestEmpty {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct Test {
-    pub b: Option<bool>,
-}
-
-impl Test {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
-        let mut msg = Self::default();
-        while !r.is_eof() {
-            match r.next_tag(bytes) {
-                Ok(40) => msg.b = Some(r.read_bool(bytes)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
-                Err(e) => return Err(e),
-            }
-        }
-        Ok(msg)
-    }
-}
-
-impl MessageWrite for Test {
-    fn get_size(&self) -> usize {
-        0
-        + self.b.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-    }
-
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.b { w.write_with_tag(40, |w| w.write_bool(*s))?; }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestUnknownFields {
-    pub a: Option<i32>,
+    pub a: i32,
 }
 
 impl TestUnknownFields {
@@ -271,7 +239,7 @@ impl TestUnknownFields {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(8) => msg.a = Some(r.read_int32(bytes)?),
+                Ok(8) => msg.a = r.read_int32(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -283,19 +251,19 @@ impl TestUnknownFields {
 impl MessageWrite for TestUnknownFields {
     fn get_size(&self) -> usize {
         0
-        + self.a.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + 1 + sizeof_varint(*(&self.a) as u64)
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.a { w.write_with_tag(8, |w| w.write_int32(*s))?; }
+        w.write_with_tag(8, |w| w.write_int32(*&self.a))?;
         Ok(())
     }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestSelfReference {
-    pub r1: Option<Box<TestSelfReference>>,
-    pub r2: Option<Box<TestSelfReference>>,
+    pub r1: Option<Box<basic::TestSelfReference>>,
+    pub r2: Option<Box<basic::TestSelfReference>>,
 }
 
 impl TestSelfReference {
@@ -303,8 +271,8 @@ impl TestSelfReference {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.r1 = Some(Box::new(r.read_message(bytes, TestSelfReference::from_reader)?)),
-                Ok(18) => msg.r2 = Some(Box::new(r.read_message(bytes, TestSelfReference::from_reader)?)),
+                Ok(10) => msg.r1 = Some(Box::new(r.read_message(bytes, basic::TestSelfReference::from_reader)?)),
+                Ok(18) => msg.r2 = Some(Box::new(r.read_message(bytes, basic::TestSelfReference::from_reader)?)),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -360,7 +328,7 @@ impl<'a> MessageWrite for TestDefaultInstanceField<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestDefaultInstance<'a> {
-    pub field: Option<TestDefaultInstanceField<'a>>,
+    pub field: Option<basic::TestDefaultInstanceField<'a>>,
 }
 
 impl<'a> TestDefaultInstance<'a> {
@@ -368,7 +336,7 @@ impl<'a> TestDefaultInstance<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.field = Some(r.read_message(bytes, TestDefaultInstanceField::from_reader)?),
+                Ok(10) => msg.field = Some(r.read_message(bytes, basic::TestDefaultInstanceField::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -437,7 +405,7 @@ pub struct TestTypesSingular<'a> {
     pub bool_field: Option<bool>,
     pub string_field: Option<Cow<'a, str>>,
     pub bytes_field: Option<Cow<'a, [u8]>>,
-    pub enum_field: Option<TestEnumDescriptor>,
+    pub enum_field: Option<basic::TestEnumDescriptor>,
 }
 
 impl<'a> TestTypesSingular<'a> {
@@ -528,7 +496,7 @@ pub struct TestTypesRepeated<'a> {
     pub bool_field: Vec<bool>,
     pub string_field: Vec<Cow<'a, str>>,
     pub bytes_field: Vec<Cow<'a, [u8]>>,
-    pub enum_field: Vec<TestEnumDescriptor>,
+    pub enum_field: Vec<basic::TestEnumDescriptor>,
 }
 
 impl<'a> TestTypesRepeated<'a> {
@@ -549,8 +517,8 @@ impl<'a> TestTypesRepeated<'a> {
                 Ok(93) => msg.sfixed32_field.push(r.read_sfixed32(bytes)?),
                 Ok(97) => msg.sfixed64_field.push(r.read_sfixed64(bytes)?),
                 Ok(104) => msg.bool_field.push(r.read_bool(bytes)?),
-                Ok(114) => msg.string_field = r.read_packed(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed))?,
-                Ok(122) => msg.bytes_field = r.read_packed(bytes, |r, bytes| r.read_bytes(bytes).map(Cow::Borrowed))?,
+                Ok(114) => msg.string_field.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(122) => msg.bytes_field.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(128) => msg.enum_field.push(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -576,8 +544,8 @@ impl<'a> MessageWrite for TestTypesRepeated<'a> {
         + (1 + 4) * self.sfixed32_field.len()
         + (1 + 8) * self.sfixed64_field.len()
         + self.bool_field.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
-        + if self.string_field.is_empty() { 0 } else { 1 + sizeof_len(self.string_field.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
-        + if self.bytes_field.is_empty() { 0 } else { 1 + sizeof_len(self.bytes_field.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
+        + self.string_field.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
+        + self.bytes_field.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
         + self.enum_field.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
     }
 
@@ -595,8 +563,8 @@ impl<'a> MessageWrite for TestTypesRepeated<'a> {
         for s in &self.sfixed32_field { w.write_with_tag(93, |w| w.write_sfixed32(*s))?; }
         for s in &self.sfixed64_field { w.write_with_tag(97, |w| w.write_sfixed64(*s))?; }
         for s in &self.bool_field { w.write_with_tag(104, |w| w.write_bool(*s))?; }
-        w.write_packed_with_tag(114, &self.string_field, |w, m| w.write_string(&**m), &|m| sizeof_len((m).len()))?;
-        w.write_packed_with_tag(122, &self.bytes_field, |w, m| w.write_bytes(&**m), &|m| sizeof_len((m).len()))?;
+        for s in &self.string_field { w.write_with_tag(114, |w| w.write_string(&**s))?; }
+        for s in &self.bytes_field { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
         for s in &self.enum_field { w.write_with_tag(128, |w| w.write_enum(*s as i32))?; }
         Ok(())
     }
@@ -619,7 +587,7 @@ pub struct TestTypesRepeatedPacked<'a> {
     pub bool_field: Vec<bool>,
     pub string_field: Vec<Cow<'a, str>>,
     pub bytes_field: Vec<Cow<'a, [u8]>>,
-    pub enum_field: Vec<TestEnumDescriptor>,
+    pub enum_field: Vec<basic::TestEnumDescriptor>,
 }
 
 impl<'a> TestTypesRepeatedPacked<'a> {
@@ -640,8 +608,8 @@ impl<'a> TestTypesRepeatedPacked<'a> {
                 Ok(90) => msg.sfixed32_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
                 Ok(98) => msg.sfixed64_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
                 Ok(106) => msg.bool_field = r.read_packed(bytes, |r, bytes| r.read_bool(bytes))?,
-                Ok(114) => msg.string_field = r.read_packed(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed))?,
-                Ok(122) => msg.bytes_field = r.read_packed(bytes, |r, bytes| r.read_bytes(bytes).map(Cow::Borrowed))?,
+                Ok(114) => msg.string_field.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(122) => msg.bytes_field.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(130) => msg.enum_field = r.read_packed(bytes, |r, bytes| r.read_enum(bytes))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -667,8 +635,8 @@ impl<'a> MessageWrite for TestTypesRepeatedPacked<'a> {
         + if self.sfixed32_field.is_empty() { 0 } else { 1 + sizeof_len(self.sfixed32_field.len() * 4) }
         + if self.sfixed64_field.is_empty() { 0 } else { 1 + sizeof_len(self.sfixed64_field.len() * 8) }
         + if self.bool_field.is_empty() { 0 } else { 1 + sizeof_len(self.bool_field.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
-        + if self.string_field.is_empty() { 0 } else { 1 + sizeof_len(self.string_field.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
-        + if self.bytes_field.is_empty() { 0 } else { 1 + sizeof_len(self.bytes_field.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
+        + self.string_field.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
+        + self.bytes_field.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
         + if self.enum_field.is_empty() { 0 } else { 2 + sizeof_len(self.enum_field.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
@@ -686,8 +654,8 @@ impl<'a> MessageWrite for TestTypesRepeatedPacked<'a> {
         w.write_packed_fixed_with_tag(90, &self.sfixed32_field)?;
         w.write_packed_fixed_with_tag(98, &self.sfixed64_field)?;
         w.write_packed_with_tag(106, &self.bool_field, |w, m| w.write_bool(*m), &|m| sizeof_varint(*(m) as u64))?;
-        w.write_packed_with_tag(114, &self.string_field, |w, m| w.write_string(&**m), &|m| sizeof_len((m).len()))?;
-        w.write_packed_with_tag(122, &self.bytes_field, |w, m| w.write_bytes(&**m), &|m| sizeof_len((m).len()))?;
+        for s in &self.string_field { w.write_with_tag(114, |w| w.write_string(&**s))?; }
+        for s in &self.bytes_field { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
         w.write_packed_with_tag(130, &self.enum_field, |w, m| w.write_enum(*m as i32), &|m| sizeof_varint(*(m) as u64))?;
         Ok(())
     }
@@ -771,4 +739,3 @@ impl MessageWrite for TestBugSint {
     }
 }
 
-}

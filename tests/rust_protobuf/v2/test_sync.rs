@@ -5,7 +5,7 @@ use std::sync::Arc;
 // use protobuf::Message;
 use quick_protobuf::*;
 
-use super::test_basic_pb::mod_basic::*;
+use super::basic::*;
 
 // test messages are sync
 #[test]

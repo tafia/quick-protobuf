@@ -3,13 +3,14 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
 #![allow(unknown_lints)]
 #![allow(clippy)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
-pub mod mod_nonunique_2 {
 
 use quick_protobuf::{BytesReader, Result, MessageWrite};
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Nonunique { }
@@ -23,4 +24,3 @@ impl Nonunique {
 
 impl MessageWrite for Nonunique { }
 
-}
