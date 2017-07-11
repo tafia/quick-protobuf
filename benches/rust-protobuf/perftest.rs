@@ -24,8 +24,7 @@ use perftest_data::PerftestData;
 
 use quick_protobuf::{BytesReader, Reader, Writer, MessageWrite};
 use quick_protobuf::Result as QuickResult;
-use perftest_data_quick::mod_perftest_data_quick;
-use perftest_data_quick::mod_perftest_data_quick::PerftestData as QuickPerftestData;
+use perftest_data_quick::PerftestData as QuickPerftestData;
 
 use prost::Message as ProstMessage;
 
@@ -167,6 +166,96 @@ impl TestRunner {
         b
     }
 
+    fn quick_run_test_strings(&self, data: &[perftest_data_quick::TestStrings]) -> [u64; 4]
+    {
+
+        let mut b = [0; 4];
+
+        let mut rng: StdRng = SeedableRng::from_seed(&[10, 20, 30, 40][..]);
+        let mut random_data = Vec::new();
+
+        let mut total_size = 0;
+        while total_size < self.data_size {
+            let ref item = data[rng.gen_range(0, data.len())];
+            random_data.push(item.clone());
+            total_size += item.get_size() as u32;
+        }
+
+        let mut buf = Vec::new();
+        b[0] = measure(random_data.len() as u64, || {
+            let mut w = Writer::new(&mut buf);
+            for m in &random_data {
+                w.write_message(m).unwrap();
+            }
+        }).0;
+
+        let (ns, read_data) = measure(random_data.len() as u64, || {
+            let mut r = Vec::new();
+            let mut reader = BytesReader::from_bytes(&buf);
+            while !reader.is_eof() {
+                r.push(reader.read_message(&buf, perftest_data_quick::TestStrings::from_reader).unwrap());
+            }
+            r
+        });
+        b[1] = ns;
+
+        assert_eq!(random_data, &*read_data);
+
+        b[2] = measure(random_data.len() as u64, || {
+            let mut reader = BytesReader::from_bytes(&buf);
+            while !reader.is_eof() {
+                let _ = reader.read_message(&buf, perftest_data_quick::TestStrings::from_reader).unwrap();
+            }
+        }).0;
+
+        b
+    }
+
+    fn quick_run_test_bytes(&self, data: &[perftest_data_quick::TestBytes]) -> [u64; 4]
+    {
+
+        let mut b = [0; 4];
+
+        let mut rng: StdRng = SeedableRng::from_seed(&[10, 20, 30, 40][..]);
+        let mut random_data = Vec::new();
+
+        let mut total_size = 0;
+        while total_size < self.data_size {
+            let ref item = data[rng.gen_range(0, data.len())];
+            random_data.push(item.clone());
+            total_size += item.get_size() as u32;
+        }
+
+        let mut buf = Vec::new();
+        b[0] = measure(random_data.len() as u64, || {
+            let mut w = Writer::new(&mut buf);
+            for m in &random_data {
+                w.write_message(m).unwrap();
+            }
+        }).0;
+
+        let (ns, read_data) = measure(random_data.len() as u64, || {
+            let mut r = Vec::new();
+            let mut reader = BytesReader::from_bytes(&buf);
+            while !reader.is_eof() {
+                r.push(reader.read_message(&buf, perftest_data_quick::TestBytes::from_reader).unwrap());
+            }
+            r
+        });
+        b[1] = ns;
+
+        assert_eq!(random_data, &*read_data);
+
+        b[2] = measure(random_data.len() as u64, || {
+            let mut reader = BytesReader::from_bytes(&buf);
+            while !reader.is_eof() {
+                let _ = reader.read_message(&buf, perftest_data_quick::TestBytes::from_reader).unwrap();
+            }
+        }).0;
+
+        b
+    }
+
     fn prost_run_test<M: ProstMessage + Clone + Default + PartialEq>(&mut self, data: &[M]) -> [u64; 4]
     {
         let mut c = [0; 4];
@@ -218,96 +307,6 @@ impl TestRunner {
         c
     }
 
-    fn quick_run_test_strings(&self, data: &[mod_perftest_data_quick::TestStrings]) -> [u64; 4]
-    {
-
-        let mut b = [0; 4];
-
-        let mut rng: StdRng = SeedableRng::from_seed(&[10, 20, 30, 40][..]);
-        let mut random_data = Vec::new();
-
-        let mut total_size = 0;
-        while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
-            random_data.push(item.clone());
-            total_size += item.get_size() as u32;
-        }
-
-        let mut buf = Vec::new();
-        b[0] = measure(random_data.len() as u64, || {
-            let mut w = Writer::new(&mut buf);
-            for m in &random_data {
-                w.write_message(m).unwrap();
-            }
-        }).0;
-
-        let (ns, read_data) = measure(random_data.len() as u64, || {
-            let mut r = Vec::new();
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                r.push(reader.read_message(&buf, mod_perftest_data_quick::TestStrings::from_reader).unwrap());
-            }
-            r
-        });
-        b[1] = ns;
-
-        assert_eq!(random_data, &*read_data);
-
-        b[2] = measure(random_data.len() as u64, || {
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                let _ = reader.read_message(&buf, mod_perftest_data_quick::TestStrings::from_reader).unwrap();
-            }
-        }).0;
-
-        b
-    }
-
-    fn quick_run_test_bytes(&self, data: &[mod_perftest_data_quick::TestBytes]) -> [u64; 4]
-    {
-
-        let mut b = [0; 4];
-
-        let mut rng: StdRng = SeedableRng::from_seed(&[10, 20, 30, 40][..]);
-        let mut random_data = Vec::new();
-
-        let mut total_size = 0;
-        while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
-            random_data.push(item.clone());
-            total_size += item.get_size() as u32;
-        }
-
-        let mut buf = Vec::new();
-        b[0] = measure(random_data.len() as u64, || {
-            let mut w = Writer::new(&mut buf);
-            for m in &random_data {
-                w.write_message(m).unwrap();
-            }
-        }).0;
-
-        let (ns, read_data) = measure(random_data.len() as u64, || {
-            let mut r = Vec::new();
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                r.push(reader.read_message(&buf, mod_perftest_data_quick::TestBytes::from_reader).unwrap());
-            }
-            r
-        });
-        b[1] = ns;
-
-        assert_eq!(random_data, &*read_data);
-
-        b[2] = measure(random_data.len() as u64, || {
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                let _ = reader.read_message(&buf, mod_perftest_data_quick::TestBytes::from_reader).unwrap();
-            }
-        }).0;
-
-        b
-    }
-
     fn check(&self) {
         if !self.any_matched {
             let name = self.selected.as_ref().map(|s| &s[..]).unwrap_or("bug");
@@ -356,27 +355,27 @@ fn main() {
     let test_data_prost = perftest_data_prost::PerftestData::decode(&data).unwrap();
 
     let a = runner.test(test_data.get_test1());
-    let b = runner.quick_test(&test_data_quick.test1, mod_perftest_data_quick::Test1::from_reader);
+    let b = runner.quick_test(&test_data_quick.test1, perftest_data_quick::Test1::from_reader);
     let c = runner.prost_test(&test_data_prost.test1);
     print_results("test1", &a, &b, &c, true);
 
     let a = runner.test(test_data.get_test_repeated_bool());
-    let b = runner.quick_test(&test_data_quick.test_repeated_bool, mod_perftest_data_quick::TestRepeatedBool::from_reader);
+    let b = runner.quick_test(&test_data_quick.test_repeated_bool, perftest_data_quick::TestRepeatedBool::from_reader);
     let c = runner.prost_test(&test_data_prost.test_repeated_bool);
     print_results("test_repeated_bool", &a, &b, &c, false);
 
     let a = runner.test(test_data.get_test_repeated_packed_int32());
-    let b = runner.quick_test(&test_data_quick.test_repeated_packed_int32, mod_perftest_data_quick::TestRepeatedPackedInt32::from_reader);
+    let b = runner.quick_test(&test_data_quick.test_repeated_packed_int32, perftest_data_quick::TestRepeatedPackedInt32::from_reader);
     let c = runner.prost_test(&test_data_prost.test_repeated_packed_int32);
     print_results("test_repeated_packed_int32", &a, &b, &c, false);
 
     let a = runner.test(test_data.get_test_repeated_messages());
-    let b = runner.quick_test(&test_data_quick.test_repeated_messages, mod_perftest_data_quick::TestRepeatedMessages::from_reader);
+    let b = runner.quick_test(&test_data_quick.test_repeated_messages, perftest_data_quick::TestRepeatedMessages::from_reader);
     let c = runner.prost_test(&test_data_prost.test_repeated_messages);
     print_results("test_repeated_messages", &a, &b, &c, false);
 
     let a = runner.test(test_data.get_test_optional_messages());
-    let b = runner.quick_test(&test_data_quick.test_optional_messages, mod_perftest_data_quick::TestOptionalMessages::from_reader);
+    let b = runner.quick_test(&test_data_quick.test_optional_messages, perftest_data_quick::TestOptionalMessages::from_reader);
     let c = runner.prost_test(&test_data_prost.test_optional_messages);
     print_results("test_optional_messages", &a, &b, &c, false);
 
