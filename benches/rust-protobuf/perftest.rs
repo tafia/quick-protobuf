@@ -16,7 +16,7 @@ use rand::Rng;
 use rand::StdRng;
 use rand::SeedableRng;
 
-use bytes::{Bytes, BufMut, Buf, IntoBuf};
+use bytes::{Buf, IntoBuf};
 
 use protobuf::Message;
 use protobuf::MessageStatic;
@@ -167,7 +167,7 @@ impl TestRunner {
         b
     }
 
-    fn prost_run_test<M: ProstMessage + Clone>(&mut self, data: &[M]) -> [u64; 4]
+    fn prost_run_test<M: ProstMessage + Clone + Default + PartialEq>(&mut self, data: &[M]) -> [u64; 4]
     {
         let mut c = [0; 4];
 
@@ -181,8 +181,7 @@ impl TestRunner {
             total_size += item.encoded_len() as u32;
         }
 
-        // TODO: remove the magic number.
-        let mut buf = bytes::BytesMut::with_capacity(1024 * 1024 * 30);
+        let mut buf = Vec::new();
         c[0] = measure(random_data.len() as u64, || {
             for m in &random_data {
                 m.encode_length_delimited(&mut buf).unwrap();
@@ -212,7 +211,7 @@ impl TestRunner {
         c
     }
 
-    fn prost_test<M: ProstMessage + Clone>(&mut self, data: &[M]) -> [u64; 4]
+    fn prost_test<M: ProstMessage + Clone + Default + PartialEq>(&mut self, data: &[M]) -> [u64; 4]
     {
         let c = self.prost_run_test(data);
         self.any_matched = true;
@@ -354,10 +353,7 @@ fn main() {
     let mut is = File::open(&Path::new("perftest_data.pbbin")).unwrap();
     let mut data = Vec::new();
     is.read_to_end(&mut data).unwrap();
-    let mut bin = bytes::Bytes::from(data).into_buf();
-    let len = bin.remaining();
-    let mut bin = bytes::Buf::take(bin, len);
-    let test_data_prost = perftest_data_prost::PerftestData::decode(&mut bin).unwrap();
+    let test_data_prost = perftest_data_prost::PerftestData::decode(&data).unwrap();
 
     let a = runner.test(test_data.get_test1());
     let b = runner.quick_test(&test_data_quick.test1, mod_perftest_data_quick::Test1::from_reader);
