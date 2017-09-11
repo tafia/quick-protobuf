@@ -3,11 +3,17 @@
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
 
-use std::io::{Write};
+
+use std::io::Write;
 use std::borrow::Cow;
 use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Test1 {
@@ -30,7 +36,8 @@ impl Test1 {
 
 impl MessageWrite for Test1 {
     fn get_size(&self) -> usize {
-        self.value.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        0
+        + self.value.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -60,7 +67,8 @@ impl TestRepeatedBool {
 
 impl MessageWrite for TestRepeatedBool {
     fn get_size(&self) -> usize {
-        self.values.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        0
+        + self.values.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -90,7 +98,8 @@ impl TestRepeatedPackedInt32 {
 
 impl MessageWrite for TestRepeatedPackedInt32 {
     fn get_size(&self) -> usize {
-        if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
+        0
+        + if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -101,9 +110,9 @@ impl MessageWrite for TestRepeatedPackedInt32 {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestRepeatedMessages {
-    pub messages1: Vec<TestRepeatedMessages>,
-    pub messages2: Vec<TestRepeatedMessages>,
-    pub messages3: Vec<TestRepeatedMessages>,
+    pub messages1: Vec<perftest_data_quick::TestRepeatedMessages>,
+    pub messages2: Vec<perftest_data_quick::TestRepeatedMessages>,
+    pub messages3: Vec<perftest_data_quick::TestRepeatedMessages>,
 }
 
 impl TestRepeatedMessages {
@@ -111,9 +120,9 @@ impl TestRepeatedMessages {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.messages1.push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(18) => msg.messages2.push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(26) => msg.messages3.push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
+                Ok(10) => msg.messages1.push(r.read_message(bytes, perftest_data_quick::TestRepeatedMessages::from_reader)?),
+                Ok(18) => msg.messages2.push(r.read_message(bytes, perftest_data_quick::TestRepeatedMessages::from_reader)?),
+                Ok(26) => msg.messages3.push(r.read_message(bytes, perftest_data_quick::TestRepeatedMessages::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -124,7 +133,8 @@ impl TestRepeatedMessages {
 
 impl MessageWrite for TestRepeatedMessages {
     fn get_size(&self) -> usize {
-        self.messages1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        0
+        + self.messages1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.messages2.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.messages3.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
@@ -139,9 +149,9 @@ impl MessageWrite for TestRepeatedMessages {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestOptionalMessages {
-    pub message1: Option<Box<TestOptionalMessages>>,
-    pub message2: Option<Box<TestOptionalMessages>>,
-    pub message3: Option<Box<TestOptionalMessages>>,
+    pub message1: Option<Box<perftest_data_quick::TestOptionalMessages>>,
+    pub message2: Option<Box<perftest_data_quick::TestOptionalMessages>>,
+    pub message3: Option<Box<perftest_data_quick::TestOptionalMessages>>,
 }
 
 impl TestOptionalMessages {
@@ -149,9 +159,9 @@ impl TestOptionalMessages {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.message1 = Some(Box::new(r.read_message(bytes, TestOptionalMessages::from_reader)?)),
-                Ok(18) => msg.message2 = Some(Box::new(r.read_message(bytes, TestOptionalMessages::from_reader)?)),
-                Ok(26) => msg.message3 = Some(Box::new(r.read_message(bytes, TestOptionalMessages::from_reader)?)),
+                Ok(10) => msg.message1 = Some(Box::new(r.read_message(bytes, perftest_data_quick::TestOptionalMessages::from_reader)?)),
+                Ok(18) => msg.message2 = Some(Box::new(r.read_message(bytes, perftest_data_quick::TestOptionalMessages::from_reader)?)),
+                Ok(26) => msg.message3 = Some(Box::new(r.read_message(bytes, perftest_data_quick::TestOptionalMessages::from_reader)?)),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -162,7 +172,8 @@ impl TestOptionalMessages {
 
 impl MessageWrite for TestOptionalMessages {
     fn get_size(&self) -> usize {
-        self.message1.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.message1.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.message2.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.message3.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
@@ -200,7 +211,8 @@ impl<'a> TestStrings<'a> {
 
 impl<'a> MessageWrite for TestStrings<'a> {
     fn get_size(&self) -> usize {
-        self.s1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        0
+        + self.s1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
         + self.s2.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
         + self.s3.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
     }
@@ -234,7 +246,8 @@ impl<'a> TestBytes<'a> {
 
 impl<'a> MessageWrite for TestBytes<'a> {
     fn get_size(&self) -> usize {
-        self.b1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        0
+        + self.b1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -245,14 +258,14 @@ impl<'a> MessageWrite for TestBytes<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct PerftestData<'a> {
-    pub test1: Vec<Test1>,
-    pub test_repeated_bool: Vec<TestRepeatedBool>,
-    pub test_repeated_messages: Vec<TestRepeatedMessages>,
-    pub test_optional_messages: Vec<TestOptionalMessages>,
-    pub test_strings: Vec<TestStrings<'a>>,
-    pub test_repeated_packed_int32: Vec<TestRepeatedPackedInt32>,
-    pub test_small_bytearrays: Vec<TestBytes<'a>>,
-    pub test_large_bytearrays: Vec<TestBytes<'a>>,
+    pub test1: Vec<perftest_data_quick::Test1>,
+    pub test_repeated_bool: Vec<perftest_data_quick::TestRepeatedBool>,
+    pub test_repeated_messages: Vec<perftest_data_quick::TestRepeatedMessages>,
+    pub test_optional_messages: Vec<perftest_data_quick::TestOptionalMessages>,
+    pub test_strings: Vec<perftest_data_quick::TestStrings<'a>>,
+    pub test_repeated_packed_int32: Vec<perftest_data_quick::TestRepeatedPackedInt32>,
+    pub test_small_bytearrays: Vec<perftest_data_quick::TestBytes<'a>>,
+    pub test_large_bytearrays: Vec<perftest_data_quick::TestBytes<'a>>,
 }
 
 impl<'a> PerftestData<'a> {
@@ -260,14 +273,14 @@ impl<'a> PerftestData<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.test1.push(r.read_message(bytes, Test1::from_reader)?),
-                Ok(18) => msg.test_repeated_bool.push(r.read_message(bytes, TestRepeatedBool::from_reader)?),
-                Ok(26) => msg.test_repeated_messages.push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(34) => msg.test_optional_messages.push(r.read_message(bytes, TestOptionalMessages::from_reader)?),
-                Ok(42) => msg.test_strings.push(r.read_message(bytes, TestStrings::from_reader)?),
-                Ok(50) => msg.test_repeated_packed_int32.push(r.read_message(bytes, TestRepeatedPackedInt32::from_reader)?),
-                Ok(58) => msg.test_small_bytearrays.push(r.read_message(bytes, TestBytes::from_reader)?),
-                Ok(66) => msg.test_large_bytearrays.push(r.read_message(bytes, TestBytes::from_reader)?),
+                Ok(10) => msg.test1.push(r.read_message(bytes, perftest_data_quick::Test1::from_reader)?),
+                Ok(18) => msg.test_repeated_bool.push(r.read_message(bytes, perftest_data_quick::TestRepeatedBool::from_reader)?),
+                Ok(26) => msg.test_repeated_messages.push(r.read_message(bytes, perftest_data_quick::TestRepeatedMessages::from_reader)?),
+                Ok(34) => msg.test_optional_messages.push(r.read_message(bytes, perftest_data_quick::TestOptionalMessages::from_reader)?),
+                Ok(42) => msg.test_strings.push(r.read_message(bytes, perftest_data_quick::TestStrings::from_reader)?),
+                Ok(50) => msg.test_repeated_packed_int32.push(r.read_message(bytes, perftest_data_quick::TestRepeatedPackedInt32::from_reader)?),
+                Ok(58) => msg.test_small_bytearrays.push(r.read_message(bytes, perftest_data_quick::TestBytes::from_reader)?),
+                Ok(66) => msg.test_large_bytearrays.push(r.read_message(bytes, perftest_data_quick::TestBytes::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -278,7 +291,8 @@ impl<'a> PerftestData<'a> {
 
 impl<'a> MessageWrite for PerftestData<'a> {
     fn get_size(&self) -> usize {
-        self.test1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        0
+        + self.test1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_repeated_bool.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_repeated_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_optional_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
@@ -300,3 +314,4 @@ impl<'a> MessageWrite for PerftestData<'a> {
         Ok(())
     }
 }
+

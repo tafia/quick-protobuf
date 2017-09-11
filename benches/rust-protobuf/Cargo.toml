@@ -5,10 +5,13 @@ authors = ["Stepan Koltsov <stepan.koltsov@gmail.com>",
            "Johann Tuffe <tafia973@gmail.com>"]
 
 [dependencies]
-protobuf = "1.2.1"
+protobuf = "1.4"
 quick-protobuf = { path = "../../" }
 time = { git = "https://github.com/rust-lang/time" }
 rand = "0.3.15"
+prost = { git = "https://github.com/danburkert/prost.git" }
+prost-derive = { git = "https://github.com/danburkert/prost.git" }
+bytes = "0.4"
 
 [[bin]]
 
