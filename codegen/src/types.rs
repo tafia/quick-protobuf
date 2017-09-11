@@ -1095,7 +1095,7 @@ impl FileDescriptor {
             bail!(ErrorKind::EmptyRead);
         }
 
-        let mut leaf_messages = Vec::new();
+        let mut leaf_messages = desc.enums.iter().map(|e| e.name.to_string()).collect::<Vec<_>>();
         break_cycles(&mut desc.messages, &mut leaf_messages);
 
         desc.sanity_checks()?;
@@ -1373,6 +1373,9 @@ impl FileDescriptor {
 fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
 
     for m in messages.iter_mut() {
+        for e in m.enums.iter_mut() {
+            leaf_messages.push(e.name.to_string());
+        }
         break_cycles(&mut m.messages, leaf_messages);
     }
 
