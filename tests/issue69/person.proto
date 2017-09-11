@@ -1,0 +1,12 @@
+enum City {
+    LONDON = 0;
+    PARIS = 1;
+}
+
+message Address {
+    City city = 1;
+}
+
+message Person {
+    Address address = 2;
+}

@@ -1086,7 +1086,6 @@ pub struct FileDescriptor {
 
 impl FileDescriptor {
 
-
     pub fn write_proto(config: &Config) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&config.in_file, &config.import_search_path)?;
 
