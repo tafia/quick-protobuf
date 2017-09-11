@@ -69,7 +69,7 @@ impl MessageWrite for Address {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Person {
-    pub address: Option<Box<Address>>,
+    pub address: Option<Address>,
 }
 
 impl Person {
@@ -77,7 +77,7 @@ impl Person {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(18) => msg.address = Some(Box::new(r.read_message(bytes, Address::from_reader)?)),
+                Ok(18) => msg.address = Some(r.read_message(bytes, Address::from_reader)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -93,7 +93,7 @@ impl MessageWrite for Person {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.address { w.write_with_tag(18, |w| w.write_message(&**s))?; }
+        if let Some(ref s) = self.address { w.write_with_tag(18, |w| w.write_message(s))?; }
         Ok(())
     }
 }
