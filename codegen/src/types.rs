@@ -797,7 +797,7 @@ impl Message {
 
     /// Searches for a matching message in all message
     ///
-    /// If none is found,
+    /// If none is found, then it is an enum
     fn set_enums(&mut self, desc: &FileDescriptor) {
         for f in self.fields.iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
@@ -805,7 +805,6 @@ impl Message {
             if f.typ.find_message(&desc.messages).is_none() {
                 if let FieldType::Message(m) = f.typ.clone() {
                     f.typ = FieldType::Enum(m);
-                    f.boxed = false;
                 }
             }
         }
@@ -1086,7 +1085,6 @@ pub struct FileDescriptor {
 
 impl FileDescriptor {
 
-
     pub fn write_proto(config: &Config) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&config.in_file, &config.import_search_path)?;
 
@@ -1095,11 +1093,12 @@ impl FileDescriptor {
             bail!(ErrorKind::EmptyRead);
         }
 
+        desc.set_enums();
+
         let mut leaf_messages = Vec::new();
         break_cycles(&mut desc.messages, &mut leaf_messages);
 
         desc.sanity_checks()?;
-        desc.set_enums();
         desc.set_defaults()?;
         desc.sanitize_names();
 
