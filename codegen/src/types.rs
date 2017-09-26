@@ -4,7 +4,7 @@ use std::fs::File;
 
 use errors::{Result, Error, ErrorKind};
 use parser::file_descriptor;
-use keywords::sanitize_keyword;
+use keywords::{get_ident, sanitize_keyword};
 
 fn sizeof_varint(v: u32) -> usize {
     match v {
@@ -161,11 +161,11 @@ impl FieldType {
             FieldType::Message(ref m) => {
                 let mut found = match m.rfind('.') {
                     Some(p) => {
-                        let package = &m[..p];
-                        let name = &m[(p + 1)..];
-                        msgs.iter().find(|m| m.package == package && m.name == name)
+                        let package = get_ident(&String::from(&m[..p]));
+                        let name = get_ident(&String::from(&m[(p + 1)..]));
+                        msgs.iter().find(|m| get_ident(&m.package) == package && get_ident(&m.name) == name)
                     },
-                    None => msgs.iter().find(|m2| m2.name == &m[..]),
+                    None => msgs.iter().find(|m2| get_ident(&m2.name) == get_ident(&m)),
                 };
 
                 if found.is_none() {
@@ -188,11 +188,11 @@ impl FieldType {
             FieldType::Enum(ref m) => {
                 let mut found = match m.rfind('.') {
                     Some(p) => {
-                        let package = &m[..p];
-                        let name = &m[(p + 1)..];
-                        enums.iter().find(|m| m.package == package && m.name == name)
+                        let package = get_ident(&String::from(&m[..p]));
+                        let name = get_ident(&String::from(&m[(p + 1)..]));
+                        enums.iter().find(|m| get_ident(&m.package) == package && get_ident(&m.name) == name)
                     },
-                    None => enums.iter().find(|m2| m2.name == &m[..]),
+                    None => enums.iter().find(|m2| get_ident(&m2.name) == get_ident(&m)),
                 };
 
                 if found.is_none() {
@@ -1433,7 +1433,7 @@ fn update_mod_file(path: &Path) -> Result<()> {
     let mut file = path.to_path_buf();
     use std::fs::OpenOptions;
     use std::io::prelude::*;
-    
+
     let name = file.file_stem().unwrap().to_string_lossy().to_string();
     file.pop();
     file.push("mod.rs");
