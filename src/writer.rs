@@ -73,87 +73,104 @@ impl<W: Write> Writer<W> {
     }
 
     /// Writes a tag, which represents both the field number and the wire type
+    #[inline(always)]
     pub fn write_tag(&mut self, tag: u32) -> Result<()> {
         self.write_varint(tag as u64)
     }
 
     /// Writes a `int32` which is internally coded as a `varint`
+    #[inline(always)]
     pub fn write_int32(&mut self, v: i32) -> Result<()> {
         self.write_varint(v as u64)
     }
 
     /// Writes a `int64` which is internally coded as a `varint`
+    #[inline(always)]
     pub fn write_int64(&mut self, v: i64) -> Result<()> {
         self.write_varint(v as u64)
     }
 
     /// Writes a `uint32` which is internally coded as a `varint`
+    #[inline(always)]
     pub fn write_uint32(&mut self, v: u32) -> Result<()> {
         self.write_varint(v as u64)
     }
 
     /// Writes a `uint64` which is internally coded as a `varint`
+    #[inline(always)]
     pub fn write_uint64(&mut self, v: u64) -> Result<()> {
         self.write_varint(v)
     }
 
     /// Writes a `sint32` which is internally coded as a `varint`
+    #[inline(always)]
     pub fn write_sint32(&mut self, v: i32) -> Result<()> {
         self.write_varint(((v << 1) ^ (v >> 31)) as u64)
     }
 
     /// Writes a `sint64` which is internally coded as a `varint`
+    #[inline(always)]
     pub fn write_sint64(&mut self, v: i64) -> Result<()> {
         self.write_varint(((v << 1) ^ (v >> 63)) as u64)
     }
 
     /// Writes a `fixed64` which is little endian coded `u64`
+    #[inline(always)]
     pub fn write_fixed64(&mut self, v: u64) -> Result<()> {
         self.inner.write_u64::<LE>(v).map_err(|e| e.into())
     }
 
     /// Writes a `fixed32` which is little endian coded `u32`
+    #[inline(always)]
     pub fn write_fixed32(&mut self, v: u32) -> Result<()> {
         self.inner.write_u32::<LE>(v).map_err(|e| e.into())
     }
 
     /// Writes a `sfixed64` which is little endian coded `i64`
+    #[inline(always)]
     pub fn write_sfixed64(&mut self, v: i64) -> Result<()> {
         self.inner.write_i64::<LE>(v).map_err(|e| e.into())
     }
 
     /// Writes a `sfixed32` which is little endian coded `i32`
+    #[inline(always)]
     pub fn write_sfixed32(&mut self, v: i32) -> Result<()> {
         self.inner.write_i32::<LE>(v).map_err(|e| e.into())
     }
 
     /// Writes a `float`
+    #[inline(always)]
     pub fn write_float(&mut self, v: f32) -> Result<()> {
         self.inner.write_f32::<LE>(v).map_err(|e| e.into())
     }
 
     /// Writes a `double`
+    #[inline(always)]
     pub fn write_double(&mut self, v: f64) -> Result<()> {
         self.inner.write_f64::<LE>(v).map_err(|e| e.into())
     }
 
     /// Writes a `bool` 1 = true, 0 = false
+    #[inline(always)]
     pub fn write_bool(&mut self, v: bool) -> Result<()> {
-        self.write_varint(if v { 1 } else { 0 })
+        self.inner.write_u8(if v { 1 } else { 0 }).map_err(|e| e.into())
     }
 
     /// Writes an `enum` converting it to a `i32` first
+    #[inline(always)]
     pub fn write_enum(&mut self, v: i32) -> Result<()> {
         self.write_int32(v)
     }
 
     /// Writes `bytes`: length first then the chunk of data
+    #[inline(always)]
     pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
         self.write_varint(bytes.len() as u64)?;
         self.inner.write_all(bytes).map_err(|e| e.into())
     }
 
     /// Writes `string`: length first then the chunk of data
+    #[inline(always)]
     pub fn write_string(&mut self, s: &str) -> Result<()> {
         self.write_bytes(s.as_bytes())
     }
@@ -179,6 +196,7 @@ impl<W: Write> Writer<W> {
     /// `item_size` is internally used to compute the total length
     /// As the length is fixed (and the same as rust internal representation, we can directly dump
     /// all data at once
+    #[inline]
     pub fn write_packed_fixed<M>(&mut self, v: &[M]) -> Result<()> {
         let len = v.len() * ::std::mem::size_of::<M>();
         let bytes = unsafe { ::std::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
@@ -186,6 +204,7 @@ impl<W: Write> Writer<W> {
     }
 
     /// Writes a message which implements `MessageWrite`
+    #[inline]
     pub fn write_message<M: MessageWrite>(&mut self, m: &M) -> Result<()> {
         let len = m.get_size();
         self.write_varint(len as u64)?;
@@ -193,6 +212,7 @@ impl<W: Write> Writer<W> {
     }
 
     /// Writes another item prefixed with tag
+    #[inline]
     pub fn write_with_tag<F>(&mut self, tag: u32, mut write: F) -> Result<()>
         where F: FnMut(&mut Self) -> Result<()>
     {
