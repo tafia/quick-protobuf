@@ -12,7 +12,7 @@
 use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -22,8 +22,8 @@ pub struct TestMap<'a> {
     pub mm: HashMap<Cow<'a, str>, TestMapEntry>,
 }
 
-impl<'a> TestMap<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestMap<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -32,7 +32,7 @@ impl<'a> TestMap<'a> {
                     msg.m.insert(key, value);
                 }
                 Ok(18) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_message(bytes, TestMapEntry::from_reader))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_message::<TestMapEntry>(bytes))?;
                     msg.mm.insert(key, value);
                 }
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -62,8 +62,8 @@ pub struct TestMapEntry {
     pub v: Option<i64>,
 }
 
-impl TestMapEntry {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestMapEntry {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {

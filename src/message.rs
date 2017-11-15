@@ -8,6 +8,7 @@ use std::fs::File;
 
 use errors::Result;
 use writer::Writer;
+use reader::BytesReader;
 
 /// A trait to handle deserialization based on parsed `Field`s
 pub trait MessageWrite: Sized {
@@ -28,4 +29,11 @@ pub trait MessageWrite: Sized {
         let mut writer = Writer::new(file);
         self.write_message(&mut writer)
     }
+}
+
+/// A trait to handle deserialization from protocol buffers.
+pub trait MessageRead<'a>: Sized {
+    /// Constructs an instance of `Self` by reading from the given bytes
+    /// via the given reader.
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self>;
 }

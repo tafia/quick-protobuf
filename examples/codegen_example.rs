@@ -66,7 +66,7 @@ fn main() {
     // to directly use a `BytesWriter`.
     let read_message = {
         let mut reader = BytesReader::from_bytes(&out);
-        reader.read_message(&out, FooMessage::from_reader).expect("Cannot read message")
+        reader.read_message::<FooMessage>(&out).expect("Cannot read message")
     };
     assert_eq!(message, read_message);
 

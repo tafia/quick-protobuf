@@ -10,7 +10,7 @@
 
 
 use std::io::Write;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -20,12 +20,12 @@ pub struct ContainsImported {
     pub imported_enum: Option<test_import_root_imported_pb::ImportedEnum>,
 }
 
-impl ContainsImported {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for ContainsImported {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.imported_message = Some(r.read_message(bytes, test_import_root_imported_pb::ImportedMessage::from_reader)?),
+                Ok(10) => msg.imported_message = Some(r.read_message::<test_import_root_imported_pb::ImportedMessage>(bytes)?),
                 Ok(16) => msg.imported_enum = Some(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),

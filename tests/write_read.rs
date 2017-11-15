@@ -3,7 +3,7 @@ extern crate quick_protobuf;
 use std::collections::HashMap;
 use std::borrow::Cow;
 use std::io::{Write};
-use quick_protobuf::{BytesReader, Reader, Writer, MessageWrite, Result};
+use quick_protobuf::{BytesReader, Reader, Writer, MessageRead, MessageWrite, Result};
 use quick_protobuf::sizeofs::*;
 
 macro_rules! write_read_primitive {
@@ -97,8 +97,7 @@ struct TestMessage {
     val: Vec<i64>,
 }
 
-// impl MessageRead for TestMessage {
-impl TestMessage {
+impl<'a> MessageRead<'a> for TestMessage {
     fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<TestMessage> {
         let mut msg = TestMessage::default();
         while !r.is_eof() {
@@ -139,7 +138,7 @@ fn wr_message(){
         w.write_message(&v).unwrap();
     }
     let mut r = BytesReader::from_bytes(&buf);
-    assert_eq!(v, r.read_message(&buf, TestMessage::from_reader).unwrap());
+    assert_eq!(v, r.read_message::<TestMessage>(&buf).unwrap());
 
     // test get_size!
     assert_eq!(buf.len(), sizeof_varint(8) + v.get_size());
@@ -151,8 +150,8 @@ struct TestMessageBorrow<'a> {
     val: Vec<&'a str>,
 }
 
-impl<'a> TestMessageBorrow<'a> {
-    fn from_reader(r: &mut BytesReader, bytes: &'a[u8]) -> Result<TestMessageBorrow<'a>> {
+impl<'a> MessageRead<'a> for TestMessageBorrow<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<TestMessageBorrow<'a>> {
         let mut msg = TestMessageBorrow::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -195,7 +194,7 @@ fn wr_message_length_prefixed(){
         writer.write_message(&v).unwrap();
     }
     let mut r = BytesReader::from_bytes(&buf);
-    assert_eq!(v, r.read_message(&buf, TestMessageBorrow::from_reader).unwrap());
+    assert_eq!(v, r.read_message::<TestMessageBorrow>(&buf).unwrap());
 
     // test get_size!
     assert_eq!(buf.len(), sizeof_varint(8) + v.get_size());
@@ -237,7 +236,7 @@ fn wr_message_with_prefix_wrapper(){
         writer.write_message(&v).unwrap();
     }
     let mut r = Reader::from_bytes(buf);
-    assert_eq!(v, r.read(|r, b| r.read_message(b, TestMessageBorrow::from_reader)).unwrap());
+    assert_eq!(v, r.read(|r, b| r.read_message::<TestMessageBorrow>(b)).unwrap());
 
     // test get_size!
     assert_eq!(r.buffer().len(), sizeof_varint(8) + v.get_size());
@@ -299,7 +298,7 @@ fn wr_map(){
     let mut buf = Vec::new();
     {
         let mut w = Writer::new(&mut buf);
-        for (k, v) in v.iter() { 
+        for (k, v) in v.iter() {
             w.write_map(2 + sizeof_len(k.len()) + sizeof_varint(*v as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_int32(*v)).unwrap();
         }
     }

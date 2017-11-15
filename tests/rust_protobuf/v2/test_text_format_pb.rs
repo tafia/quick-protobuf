@@ -11,7 +11,7 @@
 
 use std::io::Write;
 use std::borrow::Cow;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -42,8 +42,8 @@ pub struct TestMessage {
     pub value: Option<i32>,
 }
 
-impl TestMessage {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestMessage {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -106,8 +106,8 @@ pub struct TestTypes<'a> {
     pub test_message_repeated: Vec<TestMessage>,
 }
 
-impl<'a> TestTypes<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestTypes<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -127,7 +127,7 @@ impl<'a> TestTypes<'a> {
                 Ok(114) => msg.string_singular = Some(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(122) => msg.bytes_singular = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(128) => msg.test_enum_singular = Some(r.read_enum(bytes)?),
-                Ok(138) => msg.test_message_singular = Some(r.read_message(bytes, TestMessage::from_reader)?),
+                Ok(138) => msg.test_message_singular = Some(r.read_message::<TestMessage>(bytes)?),
                 Ok(249) => msg.double_repeated.push(r.read_double(bytes)?),
                 Ok(261) => msg.float_repeated.push(r.read_float(bytes)?),
                 Ok(264) => msg.int32_repeated.push(r.read_int32(bytes)?),
@@ -144,7 +144,7 @@ impl<'a> TestTypes<'a> {
                 Ok(354) => msg.string_repeated.push(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(362) => msg.bytes_repeated.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(368) => msg.test_enum_repeated.push(r.read_enum(bytes)?),
-                Ok(378) => msg.test_message_repeated.push(r.read_message(bytes, TestMessage::from_reader)?),
+                Ok(378) => msg.test_message_repeated.push(r.read_message::<TestMessage>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -236,8 +236,8 @@ pub struct TestTextFormatRustIdentifier {
     pub const_pb: Option<bool>,
 }
 
-impl TestTextFormatRustIdentifier {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestTextFormatRustIdentifier {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
