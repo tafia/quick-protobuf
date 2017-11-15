@@ -30,6 +30,8 @@ error_chain! {
     }
 }
 
+unsafe impl Sync for Error {}
+
 impl Into<::std::io::Error> for Error {
     fn into(self) -> ::std::io::Error {
         use ::std::io;
