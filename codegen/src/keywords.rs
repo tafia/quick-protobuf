@@ -89,3 +89,19 @@ pub fn sanitize_keyword(ident: &mut String) {
         }).collect::<Vec<_>>().join(".");
     }
 }
+
+// get the correct identifier (sanitize if needed, otherwise do nothing)
+// (disclaimer) I'm new to rust, so this can probably be better
+pub fn get_ident(ident: &String) -> String {
+    if !ident.contains('.') {
+        if RUST_KEYWORDS.contains(&&ident[..]) {
+            ident.clone() + &"_pb".to_string()
+        }
+        else {
+            ident.clone()
+        }
+    }
+    else {
+        ident.split('.').map(|s| get_ident(&s.to_string())).collect::<Vec<_>>().join(".")
+    }
+}
