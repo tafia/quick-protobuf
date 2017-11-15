@@ -82,10 +82,14 @@ pub fn sanitize_keyword(ident: &mut String) {
     if !ident.contains('.') && RUST_KEYWORDS.contains(&&**ident) {
         ident.push_str("_pb");
     } else {
-        *ident = ident.split('.').map(|s| if RUST_KEYWORDS.contains(&s) {
-            format!("{}_pb", s)
-        } else {
-            s.to_string()
-        }).collect::<Vec<_>>().join(".");
+        *ident = ident
+            .split('.')
+            .map(|s| if RUST_KEYWORDS.contains(&s) {
+                format!("{}_pb", s)
+            } else {
+                s.to_string()
+            })
+            .collect::<Vec<_>>()
+            .join(".");
     }
 }

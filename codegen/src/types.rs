@@ -1,8 +1,8 @@
-use std::io::{Read, Write, BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 
-use errors::{Result, Error, ErrorKind};
+use errors::{Error, ErrorKind, Result};
 use parser::file_descriptor;
 use keywords::sanitize_keyword;
 
@@ -58,7 +58,6 @@ pub enum FieldType {
 }
 
 impl FieldType {
-
     fn has_cow(&self) -> bool {
         match *self {
             FieldType::Bytes | FieldType::String_ => true,
@@ -87,12 +86,16 @@ impl FieldType {
 
     fn wire_type_num_non_packed(&self) -> u32 {
         match *self {
-            FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
-            FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
-            FieldType::Bool | FieldType::Enum(_) => 0,
+            FieldType::Int32 |
+            FieldType::Sint32 |
+            FieldType::Int64 |
+            FieldType::Sint64 |
+            FieldType::Uint32 |
+            FieldType::Uint64 |
+            FieldType::Bool |
+            FieldType::Enum(_) => 0,
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => 1,
-            FieldType::String_ | FieldType::Bytes |
-                FieldType::Message(_) | FieldType::Map(_) => 2,
+            FieldType::String_ | FieldType::Bytes | FieldType::Message(_) | FieldType::Map(_) => 2,
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
         }
     }
@@ -144,8 +147,7 @@ impl FieldType {
             FieldType::Double => Some("0f64"),
             FieldType::String_ => Some("Cow::Borrowed(\"\")"),
             FieldType::Bytes => Some("Cow::Borrowed(b\"\")"),
-            FieldType::Enum(_) => self
-                .find_enum(&desc.messages, &desc.enums)
+            FieldType::Enum(_) => self.find_enum(&desc.messages, &desc.enums)
                 .and_then(|e| e.fields.iter().find(|&&(_, i)| i == 0))
                 .map(|ref e| &*e.0),
             FieldType::Message(_) => None,
@@ -164,7 +166,7 @@ impl FieldType {
                         let package = &m[..p];
                         let name = &m[(p + 1)..];
                         msgs.iter().find(|m| m.package == package && m.name == name)
-                    },
+                    }
                     None => msgs.iter().find(|m2| m2.name == &m[..]),
                 };
 
@@ -172,34 +174,44 @@ impl FieldType {
                     // recursively search into nested messages
                     for m in msgs {
                         found = self.find_message(&m.messages);
-                        if found.is_some() { break; }
+                        if found.is_some() {
+                            break;
+                        }
                     }
                 }
 
                 found
-            },
+            }
             _ => None,
         }
     }
 
     /// Searches for enum corresponding to the current type
-    fn find_enum<'a, 'b>(&'a self, msgs: &'b [Message], enums: &'b [Enumerator]) -> Option<&'b Enumerator> {
+    fn find_enum<'a, 'b>(
+        &'a self,
+        msgs: &'b [Message],
+        enums: &'b [Enumerator],
+    ) -> Option<&'b Enumerator> {
         match *self {
             FieldType::Enum(ref m) => {
                 let mut found = match m.rfind('.') {
                     Some(p) => {
                         let package = &m[..p];
                         let name = &m[(p + 1)..];
-                        enums.iter().find(|m| m.package == package && m.name == name)
-                    },
+                        enums
+                            .iter()
+                            .find(|m| m.package == package && m.name == name)
+                    }
                     None => enums.iter().find(|m2| m2.name == &m[..]),
                 };
 
                 if found.is_none() {
                     // recursively search into nested messages
                     for m in msgs.iter() {
-                        found = self.find_enum(&m.messages,&m.enums);
-                        if found.is_some() { break; }
+                        found = self.find_enum(&m.messages, &m.enums);
+                        if found.is_some() {
+                            break;
+                        }
                     }
                 }
 
@@ -212,9 +224,14 @@ impl FieldType {
     fn has_lifetime(&self, desc: &FileDescriptor, packed: bool) -> bool {
         match *self {
             FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
-            FieldType::Message(_) => self.find_message(&desc.messages).map_or(false, |m| m.has_lifetime(desc)),
-            FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double |
-            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => packed, // Cow<[M]>
+            FieldType::Message(_) => self.find_message(&desc.messages)
+                .map_or(false, |m| m.has_lifetime(desc)),
+            FieldType::Fixed64 |
+            FieldType::Sfixed64 |
+            FieldType::Double |
+            FieldType::Fixed32 |
+            FieldType::Sfixed32 |
+            FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref m) => {
                 let &(ref key, ref value) = &**m;
                 key.has_lifetime(desc, false) || value.has_lifetime(desc, false)
@@ -236,18 +253,26 @@ impl FieldType {
             FieldType::Bool => "bool".to_string(),
             FieldType::Enum(ref e) => match self.find_enum(&desc.messages, &desc.enums) {
                 Some(e) => format!("{}{}", e.get_modules(desc), e.name),
-                None => bail!("Could not find enum {} in {:?}", e, desc.enums)
+                None => bail!("Could not find enum {} in {:?}", e, desc.enums),
             },
             FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
                 Some(m) => {
                     let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
                     format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
-                },
-                None => bail!(format!("Could not find message {} in {:?}", msg, desc.messages))
+                }
+                None => bail!(format!(
+                    "Could not find message {} in {:?}",
+                    msg,
+                    desc.messages
+                )),
             },
             FieldType::Map(ref t) => {
                 let &(ref key, ref value) = &**t;
-                format!("HashMap<{}, {}>", key.rust_type(desc)?, value.rust_type(desc)?)
+                format!(
+                    "HashMap<{}, {}>",
+                    key.rust_type(desc)?,
+                    value.rust_type(desc)?
+                )
             }
         })
     }
@@ -257,17 +282,21 @@ impl FieldType {
         Ok(match *self {
             FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
                 Some(m) => {
-                    let m = format!("r.read_message(bytes, {}{}::from_reader)", m.get_modules(desc), m.name);
+                    let m = format!(
+                        "r.read_message(bytes, {}{}::from_reader)",
+                        m.get_modules(desc),
+                        m.name
+                    );
                     (m.clone(), m)
                 }
-                None => bail!(format!("Could not find message {}", msg))
+                None => bail!(format!("Could not find message {}", msg)),
             },
-            FieldType::Map(_) =>  bail!("There should be a special case for maps"),
+            FieldType::Map(_) => bail!("There should be a special case for maps"),
             FieldType::String_ | FieldType::Bytes => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let cow = format!("{}.map(Cow::Borrowed)", m);
                 (m, cow)
-            },
+            }
             _ => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 (m.clone(), m)
@@ -277,8 +306,12 @@ impl FieldType {
 
     fn get_size(&self, s: &str) -> String {
         match *self {
-            FieldType::Int32 | FieldType::Int64 | FieldType::Uint32 | FieldType::Uint64 |
-            FieldType::Bool | FieldType::Enum(_) => format!("sizeof_varint(*({}) as u64)", s),
+            FieldType::Int32 |
+            FieldType::Int64 |
+            FieldType::Uint32 |
+            FieldType::Uint64 |
+            FieldType::Bool |
+            FieldType::Enum(_) => format!("sizeof_varint(*({}) as u64)", s),
             FieldType::Sint32 => format!("sizeof_sint32(*({}))", s),
             FieldType::Sint64 => format!("sizeof_sint64(*({}))", s),
 
@@ -300,13 +333,19 @@ impl FieldType {
         match *self {
             FieldType::Enum(_) => format!("write_enum(*{} as i32)", s),
 
-            FieldType::Int32 | FieldType::Sint32 | FieldType::Int64 |
-            FieldType::Sint64 | FieldType::Uint32 | FieldType::Uint64 |
+            FieldType::Int32 |
+            FieldType::Sint32 |
+            FieldType::Int64 |
+            FieldType::Sint64 |
+            FieldType::Uint32 |
+            FieldType::Uint64 |
             FieldType::Bool |
-            FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double |
-            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => {
-                format!("write_{}(*{})", self.proto_type(), s)
-            },
+            FieldType::Fixed64 |
+            FieldType::Sfixed64 |
+            FieldType::Double |
+            FieldType::Fixed32 |
+            FieldType::Sfixed32 |
+            FieldType::Float => format!("write_{}(*{})", self.proto_type(), s),
 
             FieldType::String_ => format!("write_string(&**{})", s),
             FieldType::Bytes => format!("write_bytes(&**{})", s),
@@ -316,10 +355,14 @@ impl FieldType {
 
             FieldType::Map(ref m) => {
                 let &(ref k, ref v) = &**m;
-                format!("write_map({}, {}, |w| w.{}, {}, |w| w.{})",
-                        self.get_size(""),
-                        tag(1, k, false), k.get_write("k", false),
-                        tag(2, v, false), v.get_write("v", false))
+                format!(
+                    "write_map({}, {}, |w| w.{}, {}, |w| w.{})",
+                    self.get_size(""),
+                    tag(1, k, false),
+                    k.get_write("k", false),
+                    tag(2, v, false),
+                    v.get_write("v", false)
+                )
             }
         }
     }
@@ -345,18 +388,16 @@ impl Field {
     /// searches if the message must be boxed
     fn is_leaf(&self, leaf_messages: &[String]) -> bool {
         match self.typ {
-            FieldType::Message(ref s) => {
-                match self.frequency {
-                    Frequency::Repeated => true,
-                    _ => {
-                        let typ = match s.rfind('.') {
-                            Some(p) => &s[p + 1..],
-                            None => &s[..],
-                        };
-                        leaf_messages.iter().any(|m| &*m == &typ)
-                    }
+            FieldType::Message(ref s) => match self.frequency {
+                Frequency::Repeated => true,
+                _ => {
+                    let typ = match s.rfind('.') {
+                        Some(p) => &s[p + 1..],
+                        None => &s[..],
+                    };
+                    leaf_messages.iter().any(|m| &*m == &typ)
                 }
-            }
+            },
             _ => true,
         }
     }
@@ -407,7 +448,7 @@ impl Field {
             Frequency::Optional => writeln!(w, "Option<{}>,", rust_type)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
                 writeln!(w, "Cow<'a, [{}]>,", rust_type)?;
-            },
+            }
             Frequency::Repeated => writeln!(w, "Vec<{}>,", rust_type)?,
             Frequency::Required => writeln!(w, "{},", rust_type)?,
         }
@@ -415,15 +456,23 @@ impl Field {
     }
 
     fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
-
         // special case for FieldType::Map: destructure tuple before inserting in HashMap
         if let FieldType::Map(ref m) = self.typ {
             let &(ref key, ref value) = &**m;
 
             writeln!(w, "                Ok({}) => {{", self.tag())?;
-            writeln!(w, "                    let (key, value) = r.read_map(bytes, |r, bytes| {}, |r, bytes| {})?;",
-                     key.read_fn(desc)?.1, value.read_fn(desc)?.1)?;
-            writeln!(w, "                    msg.{}.insert(key, value);", self.name)?;
+            writeln!(
+                w,
+                "                    let (key, value) = \
+                 r.read_map(bytes, |r, bytes| {}, |r, bytes| {})?;",
+                key.read_fn(desc)?.1,
+                value.read_fn(desc)?.1
+            )?;
+            writeln!(
+                w,
+                "                    msg.{}.insert(key, value);",
+                self.name
+            )?;
             writeln!(w, "                }}")?;
             return Ok(());
         }
@@ -434,14 +483,25 @@ impl Field {
         match self.frequency {
             _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
             Frequency::Required => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
-            Frequency::Optional if self.default.is_some() => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
+            Frequency::Optional if self.default.is_some() => {
+                writeln!(w, "msg.{} = {}?,", name, val_cow)?
+            }
             Frequency::Optional => writeln!(w, "msg.{} = Some({}?),", name, val_cow)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
-                writeln!(w, "msg.{} = Cow::Borrowed(r.read_packed_fixed(bytes)?),", name)?;
-            },
+                writeln!(
+                    w,
+                    "msg.{} = Cow::Borrowed(r.read_packed_fixed(bytes)?),",
+                    name
+                )?;
+            }
             Frequency::Repeated if self.packed() => {
-                writeln!(w, "msg.{} = r.read_packed(bytes, |r, bytes| {})?,", name, val_cow)?;
-            },
+                writeln!(
+                    w,
+                    "msg.{} = r.read_packed(bytes, |r, bytes| {})?,",
+                    name,
+                    val_cow
+                )?;
+            }
             Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val_cow)?,
         }
         Ok(())
@@ -452,44 +512,70 @@ impl Field {
         let tag_size = sizeof_varint(self.tag());
         match self.frequency {
             Frequency::Required if self.typ.is_map() => {
-                writeln!(w, "self.{}.iter().map(|(k, v)| {} + sizeof_len({})).sum::<usize>()",
-                         self.name, tag_size, self.typ.get_size(""))?;
+                writeln!(
+                    w,
+                    "self.{}.iter().map(|(k, v)| {} + sizeof_len({})).sum::<usize>()",
+                    self.name,
+                    tag_size,
+                    self.typ.get_size("")
+                )?;
             }
-            Frequency::Required => writeln!(w, "{} + {}", tag_size, self.typ.get_size(&format!("&self.{}", self.name)))?,
-            Frequency::Optional => {
-                match self.default.as_ref() {
-                    None => {
-                        write!(w, "self.{}.as_ref().map_or(0, ", self.name)?;
-                        if self.typ.is_fixed_size() {
-                            writeln!(w, "|_| {} + {})", tag_size, self.typ.get_size(""))?;
-                        } else {
-                            writeln!(w, "|m| {} + {})", tag_size, self.typ.get_size("m"))?;
-                        }
-                    }
-                    Some(d) => {
-                        writeln!(w, "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
-                               self.name, d, tag_size, self.typ.get_size(&format!("&self.{}", self.name)))?;
+            Frequency::Required => writeln!(
+                w,
+                "{} + {}",
+                tag_size,
+                self.typ.get_size(&format!("&self.{}", self.name))
+            )?,
+            Frequency::Optional => match self.default.as_ref() {
+                None => {
+                    write!(w, "self.{}.as_ref().map_or(0, ", self.name)?;
+                    if self.typ.is_fixed_size() {
+                        writeln!(w, "|_| {} + {})", tag_size, self.typ.get_size(""))?;
+                    } else {
+                        writeln!(w, "|m| {} + {})", tag_size, self.typ.get_size("m"))?;
                     }
                 }
-            }
-            Frequency::Repeated => {
-                if self.packed() {
-                    write!(w, "if self.{}.is_empty() {{ 0 }} else {{ {} + ", self.name, tag_size)?;
-                    match self.typ.wire_type_num_non_packed() {
-                        1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
-                        5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
-                        _ => writeln!(w, "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}",
-                                      self.name, self.typ.get_size("s"))?,
-                    }
-                } else {
-                    match self.typ.wire_type_num_non_packed() {
-                        1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
-                        5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
-                        _ => writeln!(w, "self.{}.iter().map(|s| {} + {}).sum::<usize>()",
-                                      self.name, tag_size, self.typ.get_size("s"))?,
-                    }
+                Some(d) => {
+                    writeln!(
+                        w,
+                        "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
+                        self.name,
+                        d,
+                        tag_size,
+                        self.typ.get_size(&format!("&self.{}", self.name))
+                    )?;
                 }
-            }
+            },
+            Frequency::Repeated => if self.packed() {
+                write!(
+                    w,
+                    "if self.{}.is_empty() {{ 0 }} else {{ {} + ",
+                    self.name,
+                    tag_size
+                )?;
+                match self.typ.wire_type_num_non_packed() {
+                    1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
+                    5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
+                    _ => writeln!(
+                        w,
+                        "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}",
+                        self.name,
+                        self.typ.get_size("s")
+                    )?,
+                }
+            } else {
+                match self.typ.wire_type_num_non_packed() {
+                    1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
+                    5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
+                    _ => writeln!(
+                        w,
+                        "self.{}.iter().map(|s| {} + {}).sum::<usize>()",
+                        self.name,
+                        tag_size,
+                        self.typ.get_size("s")
+                    )?,
+                }
+            },
         }
         Ok(())
     }
@@ -497,33 +583,68 @@ impl Field {
     fn write_write<W: Write>(&self, w: &mut W) -> Result<()> {
         match self.frequency {
             Frequency::Required if self.typ.is_map() => {
-                writeln!(w, "        for (k, v) in self.{}.iter() {{ w.write_with_tag({}, |w| w.{})?; }}",
-                         self.name, self.tag(), self.typ.get_write("", false))?;
+                writeln!(
+                    w,
+                    "        for (k, v) in self.{}.iter() {{ w.write_with_tag({}, |w| w.{})?; }}",
+                    self.name,
+                    self.tag(),
+                    self.typ.get_write("", false)
+                )?;
             }
             Frequency::Required => {
-                writeln!(w, "        w.write_with_tag({}, |w| w.{})?;",
-                         self.tag(), self.typ.get_write(&format!("&self.{}", self.name), self.boxed))?;
+                writeln!(
+                    w,
+                    "        w.write_with_tag({}, |w| w.{})?;",
+                    self.tag(),
+                    self.typ
+                        .get_write(&format!("&self.{}", self.name), self.boxed)
+                )?;
             }
             Frequency::Optional => match self.default.as_ref() {
                 None => {
-                    writeln!(w, "        if let Some(ref s) = self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                             self.name, self.tag(), self.typ.get_write("s", self.boxed))?;
-                },
+                    writeln!(
+                        w,
+                        "        if let Some(ref s) =\
+                         self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                        self.name,
+                        self.tag(),
+                        self.typ.get_write("s", self.boxed)
+                    )?;
+                }
                 Some(d) => {
-                    writeln!(w, "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                             self.name, d, self.tag(), self.typ.get_write(&format!("&self.{}", self.name), self.boxed))?;
+                    writeln!(
+                        w,
+                        "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                        self.name,
+                        d,
+                        self.tag(),
+                        self.typ
+                            .get_write(&format!("&self.{}", self.name), self.boxed)
+                    )?;
                 }
             },
-            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
-                writeln!(w, "        w.write_packed_fixed_with_tag({}, &self.{})?;", self.tag(), self.name)?
-            }
-            Frequency::Repeated if self.packed() => {
-                writeln!(w, "        w.write_packed_with_tag({}, &self.{}, |w, m| w.{}, &|m| {})?;",
-                         self.tag(), self.name, self.typ.get_write("m", self.boxed), self.typ.get_size("m"))?
-            }
+            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => writeln!(
+                w,
+                "        w.write_packed_fixed_with_tag({}, &self.{})?;",
+                self.tag(),
+                self.name
+            )?,
+            Frequency::Repeated if self.packed() => writeln!(
+                w,
+                "        w.write_packed_with_tag({}, &self.{}, |w, m| w.{}, &|m| {})?;",
+                self.tag(),
+                self.name,
+                self.typ.get_write("m", self.boxed),
+                self.typ.get_size("m")
+            )?,
             Frequency::Repeated => {
-                writeln!(w, "        for s in &self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                         self.name, self.tag(), self.typ.get_write("s", self.boxed))?;
+                writeln!(
+                    w,
+                    "        for s in &self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                    self.name,
+                    self.tag(),
+                    self.typ.get_write("s", self.boxed)
+                )?;
             }
         }
         Ok(())
@@ -531,9 +652,14 @@ impl Field {
 }
 
 fn get_modules(module: &str, imported: bool, desc: &FileDescriptor) -> String {
-    let skip = if desc.package.is_empty() && ! imported { 1 } else { 0 };
+    let skip = if desc.package.is_empty() && !imported {
+        1
+    } else {
+        0
+    };
     module
-        .split('.').filter(|p| !p.is_empty())
+        .split('.')
+        .filter(|p| !p.is_empty())
         .skip(skip)
         .map(|p| format!("{}::", p))
         .collect()
@@ -551,20 +677,21 @@ pub struct Message {
     pub package: String,        // package from imports + nested items
     pub messages: Vec<Message>, // nested messages
     pub enums: Vec<Enumerator>, // nested enums
-    pub module: String, // 'package' corresponding to actual generated Rust module
+    pub module: String,         // 'package' corresponding to actual generated Rust module
 }
 
 impl Message {
-
     fn is_leaf(&self, leaf_messages: &[String]) -> bool {
-        self.imported ||
-            self.fields.iter()
-            .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
-            .all(|f| f.is_leaf(leaf_messages) || f.deprecated)
+        self.imported
+            || self.fields
+                .iter()
+                .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
+                .all(|f| f.is_leaf(leaf_messages) || f.deprecated)
     }
 
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
-        self.fields.iter()
+        self.fields
+            .iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
             .any(|f| match f.typ {
                 FieldType::Message(ref m) if &m[..] == self.name => false,
@@ -587,7 +714,7 @@ impl Message {
 
 
     fn get_modules(&self, desc: &FileDescriptor) -> String {
-        get_modules(&self.module,self.imported,desc)
+        get_modules(&self.module, self.imported, desc)
     }
 
     fn is_unit(&self) -> bool {
@@ -608,14 +735,20 @@ impl Message {
             writeln!(w, "")?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w, "")?;
-            if self.messages.iter().any(|m| m.fields.iter()
-                                        .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                                        .any(|f| f.typ.has_cow())) {
+            if self.messages.iter().any(|m| {
+                m.fields
+                    .iter()
+                    .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
+                    .any(|f| f.typ.has_cow())
+            }) {
                 writeln!(w, "use std::borrow::Cow;")?;
             }
-            if self.messages.iter().any(|m| m.fields.iter()
-                                        .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                                        .any(|f| f.typ.is_map())) {
+            if self.messages.iter().any(|m| {
+                m.fields
+                    .iter()
+                    .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
+                    .any(|f| f.typ.is_map())
+            }) {
                 writeln!(w, "use std::collections::HashMap;")?;
             }
             if !self.messages.is_empty() || !self.oneofs.is_empty() {
@@ -663,7 +796,10 @@ impl Message {
     fn write_impl_message_read<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         if self.is_unit() {
             writeln!(w, "impl {} {{", self.name)?;
-            writeln!(w, "    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{")?;
+            writeln!(
+                w,
+                "    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{"
+            )?;
             writeln!(w, "        r.read_to_end();")?;
             writeln!(w, "        Ok(Self::default())")?;
             writeln!(w, "    }}")?;
@@ -673,13 +809,20 @@ impl Message {
 
         if self.has_lifetime(desc) {
             writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
-            writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
+            writeln!(
+                w,
+                "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{"
+            )?;
         } else {
             writeln!(w, "impl {} {{", self.name)?;
-            writeln!(w, "    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {{")?;
+            writeln!(
+                w,
+                "    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {{"
+            )?;
         }
 
-        let unregular_defaults = self.fields.iter()
+        let unregular_defaults = self.fields
+            .iter()
             .filter(|f| !f.has_regular_default(desc))
             .collect::<Vec<_>>();
         if unregular_defaults.is_empty() {
@@ -687,7 +830,12 @@ impl Message {
         } else {
             writeln!(w, "        let mut msg = {} {{", self.name)?;
             for f in unregular_defaults {
-                writeln!(w, "            {}: {},", f.name, f.default.as_ref().unwrap())?;
+                writeln!(
+                    w,
+                    "            {}: {},",
+                    f.name,
+                    f.default.as_ref().unwrap()
+                )?;
             }
             writeln!(w, "            ..Self::default()")?;
             writeln!(w, "        }};")?;
@@ -700,7 +848,10 @@ impl Message {
         for o in &self.oneofs {
             o.write_match_tag(w, desc)?;
         }
-        writeln!(w, "                Ok(t) => {{ r.read_unknown(bytes, t)?; }}")?;
+        writeln!(
+            w,
+            "                Ok(t) => {{ r.read_unknown(bytes, t)?; }}"
+        )?;
         writeln!(w, "                Err(e) => return Err(e),")?;
         writeln!(w, "            }}")?;
         writeln!(w, "        }}")?;
@@ -725,9 +876,9 @@ impl Message {
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
         }
-        self.write_get_size(w,desc)?;
+        self.write_get_size(w, desc)?;
         writeln!(w, "")?;
-        self.write_write_message(w,desc)?;
+        self.write_write_message(w, desc)?;
         writeln!(w, "}}")?;
         Ok(())
     }
@@ -739,19 +890,22 @@ impl Message {
             f.write_get_size(w)?;
         }
         for o in self.oneofs.iter() {
-            o.write_get_size(w,desc)?;
+            o.write_get_size(w, desc)?;
         }
         writeln!(w, "    }}")?;
         Ok(())
     }
 
     fn write_write_message<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
-        writeln!(w, "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{")?;
+        writeln!(
+            w,
+            "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{"
+        )?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w)?;
         }
         for o in &self.oneofs {
-            o.write_write(w,desc)?;
+            o.write_write(w, desc)?;
         }
         writeln!(w, "        Ok(())")?;
         writeln!(w, "    }}")?;
@@ -760,14 +914,24 @@ impl Message {
 
     fn sanity_checks(&self) -> Result<()> {
         // checks for reserved fields
-        for f in self.fields.iter()
+        for f in self.fields
+            .iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
         {
-            if self.reserved_names.as_ref().map_or(false, |names| names.contains(&f.name)) ||
-                self.reserved_nums.as_ref().map_or(false, |nums| nums.contains(&f.number)) {
-                return Err(ErrorKind::InvalidMessage(
-                        format!("Error in message {}\nField {:?} conflict with reserved fields",
-                                self.name, f)).into());
+            if self.reserved_names
+                .as_ref()
+                .map_or(false, |names| names.contains(&f.name))
+                || self.reserved_nums
+                    .as_ref()
+                    .map_or(false, |nums| nums.contains(&f.number))
+            {
+                return Err(
+                    ErrorKind::InvalidMessage(format!(
+                        "Error in message {}\nField {:?} conflict with reserved fields",
+                        self.name,
+                        f
+                    )).into(),
+                );
             }
         }
         Ok(())
@@ -787,19 +951,29 @@ impl Message {
         } else {
             self.package = package.to_string();
             self.module = module.to_string();
-            (format!("{}.{}", package, self.name), format!("{}.mod_{}", module, self.name))
+            (
+                format!("{}.{}", package, self.name),
+                format!("{}.mod_{}", module, self.name),
+            )
         };
 
-        for m in &mut self.messages { m.set_package(&child_package,&child_module); }
-        for m in &mut self.enums { m.set_package(&child_package,&child_module); }
-        for m in &mut self.oneofs { m.set_package(&child_package,&child_module); }
+        for m in &mut self.messages {
+            m.set_package(&child_package, &child_module);
+        }
+        for m in &mut self.enums {
+            m.set_package(&child_package, &child_module);
+        }
+        for m in &mut self.oneofs {
+            m.set_package(&child_package, &child_module);
+        }
     }
 
     /// Searches for a matching message in all message
     ///
     /// If none is found, then it is an enum
     fn set_enums(&mut self, desc: &FileDescriptor) {
-        for f in self.fields.iter_mut()
+        for f in self.fields
+            .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
             if f.typ.find_message(&desc.messages).is_none() {
@@ -814,7 +988,8 @@ impl Message {
     }
 
     fn set_map_required(&mut self) {
-        for f in self.fields.iter_mut()
+        for f in self.fields
+            .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
             if let FieldType::Map(_) = f.typ {
@@ -827,7 +1002,8 @@ impl Message {
     }
 
     fn set_repeated_as_packed(&mut self) {
-        for f in self.fields.iter_mut()
+        for f in self.fields
+            .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
             if f.packed.is_none() {
@@ -839,8 +1015,10 @@ impl Message {
     }
 
     fn sanitize_defaults(&mut self, desc: &FileDescriptor) -> Result<()> {
-        for f in self.fields.iter_mut()
-            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut())) {
+        for f in self.fields
+            .iter_mut()
+            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+        {
             f.sanitize_default(desc)?;
         }
         for m in &mut self.messages {
@@ -877,7 +1055,6 @@ pub struct Enumerator {
 }
 
 impl Enumerator {
-
     fn set_package(&mut self, package: &str, module: &str) {
         self.package = package.to_string();
         self.module = module.to_string();
@@ -892,7 +1069,7 @@ impl Enumerator {
     }
 
     fn get_modules(&self, desc: &FileDescriptor) -> String {
-        get_modules(&self.module,self.imported,desc)
+        get_modules(&self.module, self.imported, desc)
     }
 
     fn write<W: Write>(&self, w: &mut W) -> Result<()> {
@@ -954,9 +1131,10 @@ pub struct OneOf {
 }
 
 impl OneOf {
-
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
-        self.fields.iter().any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed()))
+        self.fields
+            .iter()
+            .any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed()))
     }
 
     fn set_package(&mut self, package: &str, module: &str) {
@@ -973,7 +1151,7 @@ impl OneOf {
     }
 
     fn get_modules(&self, desc: &FileDescriptor) -> String {
-        get_modules(&self.module,self.imported,desc)
+        get_modules(&self.module, self.imported, desc)
     }
 
     fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
@@ -1014,9 +1192,21 @@ impl OneOf {
 
     fn write_message_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         if self.has_lifetime(desc) {
-            writeln!(w, "    pub {}: {}OneOf{}<'a>,", self.name, self.get_modules(desc), self.name)?;
+            writeln!(
+                w,
+                "    pub {}: {}OneOf{}<'a>,",
+                self.name,
+                self.get_modules(desc),
+                self.name
+            )?;
         } else {
-            writeln!(w, "    pub {}: {}OneOf{},", self.name, self.get_modules(desc), self.name)?;
+            writeln!(
+                w,
+                "    pub {}: {}OneOf{},",
+                self.name,
+                self.get_modules(desc),
+                self.name
+            )?;
         }
         Ok(())
     }
@@ -1025,11 +1215,27 @@ impl OneOf {
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let (val, val_cow) = f.typ.read_fn(desc)?;
             if f.boxed {
-                writeln!(w, "                Ok({}) => msg.{} = {}OneOf{}::{}(Box::new({}?)),",
-                       f.tag(), self.name, self.get_modules(desc), self.name, f.name, val)?;
+                writeln!(
+                    w,
+                    "                Ok({}) => msg.{} = {}OneOf{}::{}(Box::new({}?)),",
+                    f.tag(),
+                    self.name,
+                    self.get_modules(desc),
+                    self.name,
+                    f.name,
+                    val
+                )?;
             } else {
-                writeln!(w, "                Ok({}) => msg.{} = {}OneOf{}::{}({}?),",
-                       f.tag(), self.name, self.get_modules(desc), self.name, f.name, val_cow)?;
+                writeln!(
+                    w,
+                    "                Ok({}) => msg.{} = {}OneOf{}::{}({}?),",
+                    f.tag(),
+                    self.name,
+                    self.get_modules(desc),
+                    self.name,
+                    f.name,
+                    val_cow
+                )?;
             }
         }
         Ok(())
@@ -1040,14 +1246,33 @@ impl OneOf {
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {
-                writeln!(w, "            {}OneOf{}::{}(_) => {} + {},",
-                         self.get_modules(desc), self.name, f.name, tag_size, f.typ.get_size(""))?;
+                writeln!(
+                    w,
+                    "            {}OneOf{}::{}(_) => {} + {},",
+                    self.get_modules(desc),
+                    self.name,
+                    f.name,
+                    tag_size,
+                    f.typ.get_size("")
+                )?;
             } else {
-                writeln!(w, "            {}OneOf{}::{}(ref m) => {} + {},",
-                         self.get_modules(desc), self.name, f.name, tag_size, f.typ.get_size("m"))?;
+                writeln!(
+                    w,
+                    "            {}OneOf{}::{}(ref m) => {} + {},",
+                    self.get_modules(desc),
+                    self.name,
+                    f.name,
+                    tag_size,
+                    f.typ.get_size("m")
+                )?;
             }
         }
-        writeln!(w, "            {}OneOf{}::None => 0,", self.get_modules(desc), self.name)?;
+        writeln!(
+            w,
+            "            {}OneOf{}::None => 0,",
+            self.get_modules(desc),
+            self.name
+        )?;
         write!(w, "    }}")?;
         Ok(())
     }
@@ -1055,14 +1280,25 @@ impl OneOf {
     fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         write!(w, "        match self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            writeln!(w, "            {}OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},",
-                     self.get_modules(desc), self.name, f.name, f.tag(), f.typ.get_write("m", f.boxed))?;
+            writeln!(
+                w,
+                "            {}OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},",
+                self.get_modules(desc),
+                self.name,
+                f.name,
+                f.tag(),
+                f.typ.get_write("m", f.boxed)
+            )?;
         }
-        writeln!(w, "            {}OneOf{}::None => {{}},", self.get_modules(desc), self.name)?;
+        writeln!(
+            w,
+            "            {}OneOf{}::None => {{}},",
+            self.get_modules(desc),
+            self.name
+        )?;
         write!(w, "    }}")?;
         Ok(())
     }
-
 }
 
 pub struct Config {
@@ -1084,7 +1320,6 @@ pub struct FileDescriptor {
 }
 
 impl FileDescriptor {
-
     pub fn write_proto(config: &Config) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&config.in_file, &config.import_search_path)?;
 
@@ -1107,7 +1342,7 @@ impl FileDescriptor {
         }
 
 
-        let (prefix,file_package) = split_package(&desc.package);
+        let (prefix, file_package) = split_package(&desc.package);
 
         let mut file_stem = if file_package.is_empty() {
             get_file_stem(&config.out_file)?
@@ -1115,12 +1350,12 @@ impl FileDescriptor {
             file_package.to_string()
         };
 
-        if ! file_package.is_empty() {
+        if !file_package.is_empty() {
             sanitize_keyword(&mut file_stem);
         }
         let mut out_file = config.out_file.with_file_name(format!("{}.rs", file_stem));
 
-        if ! prefix.is_empty() {
+        if !prefix.is_empty() {
             use std::fs::create_dir_all;
             // e.g. package is a.b; we need to create directory 'a' and insert it into the path
             let file = PathBuf::from(out_file.file_name().unwrap());
@@ -1128,20 +1363,30 @@ impl FileDescriptor {
             for p in prefix.split('.') {
                 out_file.push(p);
             }
-            if ! out_file.exists() {
+            if !out_file.exists() {
                 create_dir_all(&out_file)?;
                 update_mod_file(&out_file)?;
             }
             out_file.push(file);
         }
         if config.no_output {
-            let imported = |b| if b {" imported"} else {""};
-            println!("source will be written to {}\n",out_file.display());
+            let imported = |b| if b { " imported" } else { "" };
+            println!("source will be written to {}\n", out_file.display());
             for m in &desc.messages {
-                println!("message {} module {}{}",m.name,m.module,imported(m.imported));
+                println!(
+                    "message {} module {}{}",
+                    m.name,
+                    m.module,
+                    imported(m.imported)
+                );
             }
             for e in &desc.enums {
-                println!("enum {} module {}{}",e.name,e.module,imported(e.imported));
+                println!(
+                    "enum {} module {}{}",
+                    e.name,
+                    e.module,
+                    imported(e.imported)
+                );
             }
             return Ok(());
         }
@@ -1185,10 +1430,10 @@ impl FileDescriptor {
     /// Get messages and enums from imports
     fn fetch_imports(&mut self, in_file: &Path, import_search_path: &[PathBuf]) -> Result<()> {
         for m in &mut self.messages {
-            m.set_package("",&self.module);
+            m.set_package("", &self.module);
         }
         for m in &mut self.enums {
-            m.set_package("",&self.module);
+            m.set_package("", &self.module);
         }
 
         for import in &self.import_paths {
@@ -1200,9 +1445,9 @@ impl FileDescriptor {
                 let candidate = if path.is_absolute() {
                     path.join(&import)
                 } else {
-                    in_file.parent()
-                        .map_or_else(|| path.join(&import),
-                         |p| p.join(path).join(&import))
+                    in_file
+                        .parent()
+                        .map_or_else(|| path.join(&import), |p| p.join(path).join(&import))
                 };
                 if candidate.exists() {
                     matching_file = Some(candidate);
@@ -1210,8 +1455,12 @@ impl FileDescriptor {
                 }
             }
             if matching_file.is_none() {
-                return Err(ErrorKind::InvalidImport(
-                        format!("file {} not found on import path", import.display())).into());
+                return Err(
+                    ErrorKind::InvalidImport(format!(
+                        "file {} not found on import path",
+                        import.display()
+                    )).into(),
+                );
             }
             let proto_file = matching_file.unwrap();
             let mut f = FileDescriptor::read_proto(&proto_file, import_search_path)?;
@@ -1220,12 +1469,16 @@ impl FileDescriptor {
             let package = f.package.clone();
             let module = f.module.clone();
             self.messages.extend(f.messages.drain(..).map(|mut m| {
-                if m.package.is_empty() { m.set_package(&package,&module); }
+                if m.package.is_empty() {
+                    m.set_package(&package, &module);
+                }
                 m.set_imported();
                 m
             }));
             self.enums.extend(f.enums.drain(..).map(|mut e| {
-                if e.package.is_empty() { e.set_package(&package,&module); }
+                if e.package.is_empty() {
+                    e.set_package(&package, &module);
+                }
                 e.imported = true;
                 e
             }));
@@ -1233,7 +1486,7 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn set_defaults(&mut self) -> Result<()>{
+    fn set_defaults(&mut self) -> Result<()> {
         // set map fields as required (they are equivalent to repeated message)
         for m in &mut self.messages {
             m.set_map_required();
@@ -1271,7 +1524,11 @@ impl FileDescriptor {
     }
 
     fn write<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
-        println!("Found {} messages, and {} enums", self.messages.len(), self.enums.len());
+        println!(
+            "Found {} messages, and {} enums",
+            self.messages.len(),
+            self.enums.len()
+        );
         self.write_headers(w, filename)?;
         self.write_package_start(w)?;
         self.write_uses(w)?;
@@ -1284,7 +1541,11 @@ impl FileDescriptor {
     }
 
     fn write_headers<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
-        writeln!(w, "//! Automatically generated rust module for '{}' file", filename)?;
+        writeln!(
+            w,
+            "//! Automatically generated rust module for '{}' file",
+            filename
+        )?;
         writeln!(w, "")?;
         writeln!(w, "#![allow(non_snake_case)]")?;
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
@@ -1300,21 +1561,33 @@ impl FileDescriptor {
 
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
         if self.messages.iter().all(|m| m.is_unit()) {
-            writeln!(w, "use quick_protobuf::{{BytesReader, Result, MessageWrite}};")?;
+            writeln!(
+                w,
+                "use quick_protobuf::{{BytesReader, Result, MessageWrite}};"
+            )?;
             return Ok(());
         }
         writeln!(w, "use std::io::Write;")?;
-        if self.messages.iter().any(|m| m.fields.iter()
-                                    .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                                    .any(|f| f.typ.has_cow())) {
+        if self.messages.iter().any(|m| {
+            m.fields
+                .iter()
+                .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
+                .any(|f| f.typ.has_cow())
+        }) {
             writeln!(w, "use std::borrow::Cow;")?;
         }
-        if self.messages.iter().any(|m| m.fields.iter()
-                                    .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                                    .any(|f| f.typ.is_map())) {
+        if self.messages.iter().any(|m| {
+            m.fields
+                .iter()
+                .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
+                .any(|f| f.typ.is_map())
+        }) {
             writeln!(w, "use std::collections::HashMap;")?;
         }
-        writeln!(w, "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};")?;
+        writeln!(
+            w,
+            "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};"
+        )?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
         Ok(())
     }
@@ -1329,9 +1602,9 @@ impl FileDescriptor {
         }
         write!(w, "use ")?;
         for _ in 0..depth {
-            write!(w,"super::")?;
+            write!(w, "super::")?;
         }
-        writeln!(w,"*;")?;
+        writeln!(w, "*;")?;
         Ok(())
     }
 
@@ -1370,12 +1643,14 @@ impl FileDescriptor {
 ///
 /// Cycles means one Message calls itself at some point
 fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
-
     for m in messages.iter_mut() {
         break_cycles(&mut m.messages, leaf_messages);
     }
 
-    let message_names = messages.iter().map(|m| m.name.to_string()).collect::<Vec<_>>();
+    let message_names = messages
+        .iter()
+        .map(|m| m.name.to_string())
+        .collect::<Vec<_>>();
 
     let mut undef_messages = (0..messages.len()).collect::<Vec<_>>();
     while !undef_messages.is_empty() {
@@ -1394,7 +1669,8 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
             let k = undef_messages.pop().unwrap();
             {
                 let mut m = messages[k].clone();
-                for f in m.fields.iter_mut()
+                for f in m.fields
+                    .iter_mut()
                     .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
                 {
                     if !f.is_leaf(&leaf_messages) {
@@ -1414,14 +1690,14 @@ fn tag(number: u32, typ: &FieldType, packed: bool) -> u32 {
 }
 
 /// "" is ("",""), "a" is ("","a"), "a.b" is ("a"."b"), and so forth.
-fn split_package(package: &str) -> (&str,&str) {
+fn split_package(package: &str) -> (&str, &str) {
     if package.is_empty() {
-        ("","")
+        ("", "")
     } else {
         if let Some(i) = package.rfind('.') {
-            (&package[0..i],&package[i+1..])
+            (&package[0..i], &package[i + 1..])
         } else {
-            ("",package)
+            ("", package)
         }
     }
 }
@@ -1433,7 +1709,7 @@ fn update_mod_file(path: &Path) -> Result<()> {
     let mut file = path.to_path_buf();
     use std::fs::OpenOptions;
     use std::io::prelude::*;
-    
+
     let name = file.file_stem().unwrap().to_string_lossy().to_string();
     file.pop();
     file.push("mod.rs");
@@ -1454,7 +1730,7 @@ fn update_mod_file(path: &Path) -> Result<()> {
                 first = false;
             }
             if let Some(i) = line.find(matches) {
-                let rest = &line[i+matches.len()..line.len()-1];
+                let rest = &line[i + matches.len()..line.len() - 1];
                 if rest == name {
                     // we already have a reference to this module...
                     present = true;
@@ -1463,27 +1739,27 @@ fn update_mod_file(path: &Path) -> Result<()> {
             }
         }
     }
-    if ! present {
+    if !present {
         let mut f = if exists {
             OpenOptions::new().append(true).open(&file)?
         } else {
             let mut f = File::create(&file)?;
-            write!(f,"{}\n", MAGIC_HEADER)?;
+            write!(f, "{}\n", MAGIC_HEADER)?;
             f
         };
-        write!(f,"pub mod {};\n",name)?;
+        write!(f, "pub mod {};\n", name)?;
     }
     Ok(())
 }
 
 /// get the proper sanitized file stem from an input file path
 fn get_file_stem(path: &Path) -> Result<String> {
-     let mut file_stem = path.file_stem()
+    let mut file_stem = path.file_stem()
         .and_then(|f| f.to_str())
         .map(|s| s.to_string())
         .ok_or_else(|| Error::from(ErrorKind::OutputFile(path.to_owned())))?;
 
-    file_stem = file_stem.replace(|c: char| ! c.is_alphanumeric(),"_");
+    file_stem = file_stem.replace(|c: char| !c.is_alphanumeric(), "_");
     // will now be properly alphanumeric, but may be a keyword!
     sanitize_keyword(&mut file_stem);
     Ok(file_stem)
