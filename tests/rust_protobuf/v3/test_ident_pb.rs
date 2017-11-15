@@ -11,15 +11,15 @@
 
 use std::io::Write;
 use std::borrow::Cow;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Vec_pb { }
 
-impl Vec_pb {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Vec_pb {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
@@ -30,8 +30,8 @@ impl MessageWrite for Vec_pb { }
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct String_pb { }
 
-impl String_pb {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for String_pb {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
@@ -42,8 +42,8 @@ impl MessageWrite for String_pb { }
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Option_pb { }
 
-impl Option_pb {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Option_pb {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
@@ -54,8 +54,8 @@ impl MessageWrite for Option_pb { }
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct None_pb { }
 
-impl None_pb {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for None_pb {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
@@ -66,8 +66,8 @@ impl MessageWrite for None_pb { }
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Some_pb { }
 
-impl Some_pb {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Some_pb {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
@@ -78,8 +78,8 @@ impl MessageWrite for Some_pb { }
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Message { }
 
-impl Message {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Message {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
@@ -94,8 +94,8 @@ pub struct TestType<'a> {
     pub type_pb: mod_TestType::OneOftype_pb<'a>,
 }
 
-impl<'a> TestType<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestType<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {

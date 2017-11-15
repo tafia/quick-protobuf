@@ -11,7 +11,7 @@
 
 use std::io::Write;
 use std::borrow::Cow;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -60,8 +60,8 @@ pub struct TestDefaultValues<'a> {
     pub enum_field_without_default: Option<test_default_values::EnumForDefaultValue>,
 }
 
-impl<'a> TestDefaultValues<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestDefaultValues<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = TestDefaultValues {
             double_field: 1f64,
             float_field: 2f32,
@@ -162,8 +162,8 @@ pub struct TestExtremeDefaultValues {
     pub nan_float: f32,
 }
 
-impl TestExtremeDefaultValues {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestExtremeDefaultValues {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = TestExtremeDefaultValues {
             inf_double: ::std::f64::INFINITY,
             neg_inf_double: ::std::f64::NEG_INFINITY,

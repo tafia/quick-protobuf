@@ -12,6 +12,7 @@ use std::path::Path;
 use std::fs::File;
 
 use errors::{Result, ErrorKind, Error};
+use message::MessageRead;
 
 use byteorder::LittleEndian as LE;
 use byteorder::ByteOrder;
@@ -29,12 +30,12 @@ const WIRE_TYPE_FIXED32: u8 = 5;
 ///
 /// ```rust
 /// # mod foo_bar {
-/// #     use quick_protobuf::{BytesReader, Result};
+/// #     use quick_protobuf::{MessageRead, BytesReader, Result};
 /// #     pub struct Foo {}
 /// #     pub struct Bar {}
 /// #     pub struct FooBar { pub foos: Vec<Foo>, pub bars: Vec<Bar>, }
-/// #     impl FooBar {
-/// #         pub fn from_reader(_: &mut BytesReader, _: &[u8]) -> Result<Self> {
+/// #     impl<'a> MessageRead<'a> for FooBar {
+/// #         fn from_reader(_: &mut BytesReader, _: &[u8]) -> Result<Self> {
 /// #              Ok(FooBar { foos: vec![], bars: vec![] })
 /// #         }
 /// #     }
@@ -43,7 +44,7 @@ const WIRE_TYPE_FIXED32: u8 = 5;
 /// // FooBar is a message generated from a proto file
 /// // in parcicular it contains a `from_reader` function
 /// use foo_bar::FooBar;
-/// use quick_protobuf::BytesReader;
+/// use quick_protobuf::{MessageRead, BytesReader};
 ///
 /// fn main() {
 ///     // bytes is a buffer on the data we want to deserialize
@@ -60,7 +61,7 @@ const WIRE_TYPE_FIXED32: u8 = 5;
 ///
 ///     // if instead the buffer contains a length delimited stream of message we could use:
 ///     // while !r.is_eof() {
-///     //     let foobar = r.read_message(&bytes, FooBar::from_reader).expect(...);
+///     //     let foobar: FooBar = r.read_message(&bytes).expect(...);
 ///     //     ...
 ///     // }
 ///     println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
@@ -179,7 +180,7 @@ impl BytesReader {
 
         // cannot read more than 10 bytes
         Err(ErrorKind::Varint.into())
-        
+
     }
 
     /// Reads int32 (varint)
@@ -341,10 +342,10 @@ impl BytesReader {
 
     /// Reads a nested message
     #[inline]
-    pub fn read_message<'a, M, F>(&mut self, bytes: &'a[u8], read: F) -> Result<M>
-        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M> 
+    pub fn read_message<'a, M>(&mut self, bytes: &'a[u8]) -> Result<M>
+        where M: MessageRead<'a>
     {
-        self.read_len(bytes, read)
+        self.read_len(bytes, M::from_reader)
     }
 
     /// Reads a map item: (key, value)
@@ -384,7 +385,7 @@ impl BytesReader {
                 let len = self.read_varint64(bytes)? as usize;
                 self.start += len;
             },
-            WIRE_TYPE_START_GROUP | 
+            WIRE_TYPE_START_GROUP |
                 WIRE_TYPE_END_GROUP => { return Err(ErrorKind::Deprecated("group").into()); },
             t => { return Err(ErrorKind::UnknownWireType(t).into()); },
         }
@@ -417,19 +418,19 @@ impl BytesReader {
 ///
 /// ```rust,should_panic
 /// # mod foo_bar {
-/// #     use quick_protobuf::{BytesReader, Result};
+/// #     use quick_protobuf::{MessageRead, BytesReader, Result};
 /// #     pub struct Foo {}
 /// #     pub struct Bar {}
 /// #     pub struct FooBar { pub foos: Vec<Foo>, pub bars: Vec<Bar>, }
-/// #     impl FooBar {
-/// #         pub fn from_reader(_: &mut BytesReader, _: &[u8]) -> Result<Self> {
+/// #     impl<'a> MessageRead<'a> for FooBar {
+/// #         fn from_reader(_: &mut BytesReader, _: &[u8]) -> Result<Self> {
 /// #              Ok(FooBar { foos: vec![], bars: vec![] })
 /// #         }
 /// #     }
 /// # }
 ///
 /// // FooBar is a message generated from a proto file
-/// // in parcicular it contains a `from_reader` function
+/// // In particular it implements the `MessageRead` trait, containing a `from_reader` function.
 /// use foo_bar::FooBar;
 /// use quick_protobuf::Reader;
 ///
@@ -438,19 +439,22 @@ impl BytesReader {
 ///     // this reader will read the entire file into an internal buffer
 ///     let mut reader = Reader::from_file("/path/to/binary/protobuf.bin")
 ///         .expect("Cannot read input file");
-///     
+///
 ///     // Use the generated module fns with the reader to convert your data into rust structs.
 ///     //
 ///     // Depending on your input file, the message can or not be prefixed with the encoded length
-///     // for instance, a *stream* which contains several messages generally split them using this 
+///     // for instance, a *stream* which contains several messages generally split them using this
 ///     // technique (see https://developers.google.com/protocol-buffers/docs/techniques#streaming)
 ///     //
 ///     // To read a message without a length prefix you can directly call `FooBar::from_reader`:
 ///     // let foobar = reader.read(FooBar::from_reader).expect("Cannot read FooBar message");
-///     // 
+///     //
 ///     // Else to read a length then a message, you can use:
-///     let foobar = reader.read(|r, b| r.read_message(b, FooBar::from_reader))
+///     let foobar: FooBar = reader.read(|r, b| r.read_message(b))
 ///         .expect("Cannot read FooBar message");
+///     // Reader::read_message uses `FooBar::from_reader` internally through the `MessageRead`
+///     // trait.
+///
 ///     println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
 /// }
 /// ```
@@ -492,15 +496,15 @@ impl Reader {
     /// Run a `BytesReader` dependent function
     #[inline]
     pub fn read<'a, M, F>(&'a mut self, mut read: F) -> Result<M>
-        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M> 
+        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M>
     {
         read(&mut self.inner, &self.buffer)
     }
-// 
+//
 //     /// Run a `BytesReader` dependent function
 //     #[inline]
 //     pub fn read_len<'a, M, F>(&'a mut self, mut read: F) -> Result<M>
-//         where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M> 
+//         where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M>
 //     {
 //         let len = self.read(|r, b| r.read_varint64(b))?;
 //         let mut remaining = self.buffer.split_off(len as usize + ::sizeofs::sizeof_varint(len));

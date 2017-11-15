@@ -9,14 +9,14 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use quick_protobuf::{BytesReader, Result, MessageWrite};
+use quick_protobuf::{BytesReader, Result, MessageRead, MessageWrite};
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct MessageA { }
 
-impl MessageA {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for MessageA {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
@@ -52,8 +52,8 @@ impl From<i32> for EnumA {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct MessageB { }
 
-impl MessageB {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for MessageB {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }

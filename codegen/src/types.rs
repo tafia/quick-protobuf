@@ -282,11 +282,7 @@ impl FieldType {
         Ok(match *self {
             FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
                 Some(m) => {
-                    let m = format!(
-                        "r.read_message(bytes, {}{}::from_reader)",
-                        m.get_modules(desc),
-                        m.name
-                    );
+                    let m = format!("r.read_message::<{}{}>(bytes)", m.get_modules(desc), m.name);
                     (m.clone(), m)
                 }
                 None => bail!(format!("Could not find message {}", msg)),
@@ -795,11 +791,8 @@ impl Message {
 
     fn write_impl_message_read<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         if self.is_unit() {
-            writeln!(w, "impl {} {{", self.name)?;
-            writeln!(
-                w,
-                "    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{"
-            )?;
+            writeln!(w, "impl<'a> MessageRead<'a> for {} {{", self.name)?;
+            writeln!(w, "    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{")?;
             writeln!(w, "        r.read_to_end();")?;
             writeln!(w, "        Ok(Self::default())")?;
             writeln!(w, "    }}")?;
@@ -808,17 +801,11 @@ impl Message {
         }
 
         if self.has_lifetime(desc) {
-            writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
-            writeln!(
-                w,
-                "    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{"
-            )?;
+            writeln!(w, "impl<'a> MessageRead<'a> for {}<'a> {{", self.name)?;
+            writeln!(w, "    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
         } else {
-            writeln!(w, "impl {} {{", self.name)?;
-            writeln!(
-                w,
-                "    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {{"
-            )?;
+            writeln!(w, "impl<'a> MessageRead<'a> for {} {{", self.name)?;
+            writeln!(w, "    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
         }
 
         let unregular_defaults = self.fields
@@ -1561,10 +1548,7 @@ impl FileDescriptor {
 
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
         if self.messages.iter().all(|m| m.is_unit()) {
-            writeln!(
-                w,
-                "use quick_protobuf::{{BytesReader, Result, MessageWrite}};"
-            )?;
+            writeln!(w, "use quick_protobuf::{{BytesReader, Result, MessageRead, MessageWrite}};")?;
             return Ok(());
         }
         writeln!(w, "use std::io::Write;")?;
@@ -1584,10 +1568,7 @@ impl FileDescriptor {
         }) {
             writeln!(w, "use std::collections::HashMap;")?;
         }
-        writeln!(
-            w,
-            "use quick_protobuf::{{MessageWrite, BytesReader, Writer, Result}};"
-        )?;
+        writeln!(w, "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};")?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
         Ok(())
     }
