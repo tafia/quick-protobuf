@@ -36,7 +36,7 @@ macro_rules! test_serialize_deserialize_length_delimited {
             writer.write_message($msg).unwrap();
         }
         let mut reader = BytesReader::from_bytes(&serialized);
-        let parsed = reader.read_message(&serialized, $name::from_reader).unwrap();
+        let parsed: $name = reader.read_message(&serialized).unwrap();
         assert!($msg.eq(&parsed));
     }
 }

@@ -11,7 +11,7 @@
 
 use std::io::Write;
 use std::borrow::Cow;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -40,8 +40,8 @@ pub struct MessageForOneof {
     pub f: Option<i32>,
 }
 
-impl MessageForOneof {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for MessageForOneof {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -72,8 +72,8 @@ pub struct TestOneof<'a> {
     pub one: mod_TestOneof::OneOfone<'a>,
 }
 
-impl<'a> TestOneof<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestOneof<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -94,7 +94,7 @@ impl<'a> TestOneof<'a> {
                 Ok(114) => msg.one = mod_TestOneof::OneOfone::string_field(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(122) => msg.one = mod_TestOneof::OneOfone::bytes_field(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(128) => msg.one = mod_TestOneof::OneOfone::enum_field(r.read_enum(bytes)?),
-                Ok(138) => msg.one = mod_TestOneof::OneOfone::message_field(r.read_message(bytes, MessageForOneof::from_reader)?),
+                Ok(138) => msg.one = mod_TestOneof::OneOfone::message_field(r.read_message::<MessageForOneof>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }

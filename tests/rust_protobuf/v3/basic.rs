@@ -11,7 +11,7 @@
 
 use std::io::Write;
 use std::borrow::Cow;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -46,8 +46,8 @@ pub struct Test1 {
     pub a: Option<i32>,
 }
 
-impl Test1 {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Test1 {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -77,8 +77,8 @@ pub struct Test2<'a> {
     pub b: Option<Cow<'a, str>>,
 }
 
-impl<'a> Test2<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Test2<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -108,12 +108,12 @@ pub struct Test3 {
     pub c: Option<basic::Test1>,
 }
 
-impl Test3 {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Test3 {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(26) => msg.c = Some(r.read_message(bytes, basic::Test1::from_reader)?),
+                Ok(26) => msg.c = Some(r.read_message::<basic::Test1>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -139,8 +139,8 @@ pub struct Test4 {
     pub d: Vec<i32>,
 }
 
-impl Test4 {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Test4 {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -171,8 +171,8 @@ pub struct TestPackedUnpacked {
     pub packed: Vec<i32>,
 }
 
-impl TestPackedUnpacked {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestPackedUnpacked {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -205,8 +205,8 @@ pub struct TestEmpty {
     pub foo: Option<i32>,
 }
 
-impl TestEmpty {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestEmpty {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -236,8 +236,8 @@ pub struct Test {
     pub b: Option<bool>,
 }
 
-impl Test {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Test {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -267,8 +267,8 @@ pub struct TestUnknownFields {
     pub a: Option<i32>,
 }
 
-impl TestUnknownFields {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestUnknownFields {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -299,13 +299,13 @@ pub struct TestSelfReference {
     pub r2: Option<Box<basic::TestSelfReference>>,
 }
 
-impl TestSelfReference {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestSelfReference {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.r1 = Some(Box::new(r.read_message(bytes, basic::TestSelfReference::from_reader)?)),
-                Ok(18) => msg.r2 = Some(Box::new(r.read_message(bytes, basic::TestSelfReference::from_reader)?)),
+                Ok(10) => msg.r1 = Some(Box::new(r.read_message::<basic::TestSelfReference>(bytes)?)),
+                Ok(18) => msg.r2 = Some(Box::new(r.read_message::<basic::TestSelfReference>(bytes)?)),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -333,8 +333,8 @@ pub struct TestDefaultInstanceField<'a> {
     pub s: Option<Cow<'a, str>>,
 }
 
-impl<'a> TestDefaultInstanceField<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestDefaultInstanceField<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -364,12 +364,12 @@ pub struct TestDefaultInstance<'a> {
     pub field: Option<basic::TestDefaultInstanceField<'a>>,
 }
 
-impl<'a> TestDefaultInstance<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestDefaultInstance<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.field = Some(r.read_message(bytes, basic::TestDefaultInstanceField::from_reader)?),
+                Ok(10) => msg.field = Some(r.read_message::<basic::TestDefaultInstanceField>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -395,8 +395,8 @@ pub struct TestDescriptor {
     pub stuff: Option<i32>,
 }
 
-impl TestDescriptor {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestDescriptor {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -441,8 +441,8 @@ pub struct TestTypesSingular<'a> {
     pub enum_field: Option<basic::TestEnumDescriptor>,
 }
 
-impl<'a> TestTypesSingular<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestTypesSingular<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -532,8 +532,8 @@ pub struct TestTypesRepeated<'a> {
     pub enum_field: Vec<basic::TestEnumDescriptor>,
 }
 
-impl<'a> TestTypesRepeated<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestTypesRepeated<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -623,8 +623,8 @@ pub struct TestTypesRepeatedPacked<'a> {
     pub enum_field: Vec<basic::TestEnumDescriptor>,
 }
 
-impl<'a> TestTypesRepeatedPacked<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestTypesRepeatedPacked<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -697,8 +697,8 @@ impl<'a> MessageWrite for TestTypesRepeatedPacked<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestInvalidTag { }
 
-impl TestInvalidTag {
-    pub fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestInvalidTag {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
@@ -711,8 +711,8 @@ pub struct TestTruncated<'a> {
     pub ints: Cow<'a, [u32]>,
 }
 
-impl<'a> TestTruncated<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestTruncated<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -743,8 +743,8 @@ pub struct TestBugSint {
     pub s64: Option<i64>,
 }
 
-impl TestBugSint {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestBugSint {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
