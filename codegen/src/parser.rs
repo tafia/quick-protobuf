@@ -40,7 +40,8 @@ named!(package<String>,
 named!(reserved_nums<Vec<i32>>,
        do_parse!(tag!("reserved") >> many1!(br) >>
                  nums: many1!(do_parse!(num: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >>
-                                        many0!(alt!(br | tag!(",") => { |_| () })) >> (num))) >>
+                                        many0!(alt!(br | tag!(",") => { |_| () })) >> (num))) >> 
+                 many0!(br) >> tag!(";") >>
                 (nums) ));
 
 named!(reserved_names<Vec<String>>,
@@ -48,6 +49,7 @@ named!(reserved_names<Vec<String>>,
                  names: many1!(do_parse!(tag!("\"") >> name: word >> tag!("\"") >>
                                         many0!(alt!(br | tag!(",") => { |_| () })) >>
                                         (name))) >>
+                 many0!(br) >> tag!(";") >>
                 (names) ));
 
 named!(key_val<(&str, &str)>,
@@ -142,7 +144,7 @@ named!(message_event<MessageEvent>, alt!(reserved_nums => { |r| MessageEvent::Re
                                          br => { |_| MessageEvent::Ignore }));
 
 named!(message_events<(String, Vec<MessageEvent>)>,
-       do_parse!(tag!("message") >> many0!(br) >>
+       do_parse!(tag!("message") >> many1!(br) >>
                  name: word >> many0!(br) >>
                  tag!("{") >> many0!(br) >>
                  events: many0!(message_event) >>
@@ -378,4 +380,24 @@ mod test {
             assert_eq!(3, mess.oneofs[0].fields.len());
         }
     }
+
+    #[test]
+    fn test_reserved() {
+        let msg = r#"message Sample {
+       reserved 4, 5;
+       reserved "foo", "bar";
+       uint64 age =1;
+       bytes name =2;
+    }"#;
+
+        let mess = message(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(Some(vec![4, 5]), mess.reserved_nums);
+            assert_eq!(Some(vec!["foo".to_string(), "bar".to_string()]), mess.reserved_names);
+            assert_eq!(2, mess.fields.len());
+        } else {
+            panic!("Could not parse reserved_num message");
+        }
+    }
+
 }
