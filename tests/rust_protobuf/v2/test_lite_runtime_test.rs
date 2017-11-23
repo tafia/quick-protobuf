@@ -1,5 +1,5 @@
 use quick_protobuf::*;
-use rust_protobuf::hex::{encode_hex, decode_hex};
+use rust_protobuf::hex::{decode_hex, encode_hex};
 
 use super::test_lite_runtime::*;
 

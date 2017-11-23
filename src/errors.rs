@@ -34,7 +34,7 @@ unsafe impl Sync for Error {}
 
 impl Into<::std::io::Error> for Error {
     fn into(self) -> ::std::io::Error {
-        use ::std::io;
+        use std::io;
         match self {
             Error(ErrorKind::Io(x), _) => x,
             Error(ErrorKind::StrUtf8(x), _) => io::Error::new(io::ErrorKind::InvalidData, x),

@@ -57,7 +57,6 @@ pub struct Writer<W> {
 }
 
 impl<W: Write> Writer<W> {
-
     /// Creates a new `ProtobufWriter`
     pub fn new(w: W) -> Writer<W> {
         Writer { inner: w }
@@ -153,7 +152,9 @@ impl<W: Write> Writer<W> {
     /// Writes a `bool` 1 = true, 0 = false
     #[inline(always)]
     pub fn write_bool(&mut self, v: bool) -> Result<()> {
-        self.inner.write_u8(if v { 1 } else { 0 }).map_err(|e| e.into())
+        self.inner
+            .write_u8(if v { 1 } else { 0 })
+            .map_err(|e| e.into())
     }
 
     /// Writes an `enum` converting it to a `i32` first
@@ -177,8 +178,9 @@ impl<W: Write> Writer<W> {
 
     /// Writes packed repeated field: length first then the chunk of data
     pub fn write_packed<M, F, S>(&mut self, v: &[M], mut write: F, size: &S) -> Result<()>
-        where F: FnMut(&mut Self, &M) -> Result<()>,
-              S: Fn(&M) -> usize,
+    where
+        F: FnMut(&mut Self, &M) -> Result<()>,
+        S: Fn(&M) -> usize,
     {
         if v.is_empty() {
             return Ok(());
@@ -214,7 +216,8 @@ impl<W: Write> Writer<W> {
     /// Writes another item prefixed with tag
     #[inline]
     pub fn write_with_tag<F>(&mut self, tag: u32, mut write: F) -> Result<()>
-        where F: FnMut(&mut Self) -> Result<()>
+    where
+        F: FnMut(&mut Self) -> Result<()>,
     {
         self.write_tag(tag)?;
         write(self)
@@ -223,13 +226,16 @@ impl<W: Write> Writer<W> {
     /// Writes tag then repeated field
     ///
     /// If array is empty, then do nothing (do not even write the tag)
-    pub fn write_packed_with_tag<M, F, S>(&mut self, 
-                                          tag: u32, 
-                                          v: &[M], 
-                                          mut write: F, 
-                                          size: &S) -> Result<()>
-        where F: FnMut(&mut Self, &M) -> Result<()>,
-              S: Fn(&M) -> usize,
+    pub fn write_packed_with_tag<M, F, S>(
+        &mut self,
+        tag: u32,
+        v: &[M],
+        mut write: F,
+        size: &S,
+    ) -> Result<()>
+    where
+        F: FnMut(&mut Self, &M) -> Result<()>,
+        S: Fn(&M) -> usize,
     {
         if v.is_empty() {
             return Ok(());
@@ -247,8 +253,7 @@ impl<W: Write> Writer<W> {
     /// Writes tag then repeated field
     ///
     /// If array is empty, then do nothing (do not even write the tag)
-    pub fn write_packed_fixed_with_tag<M>(&mut self, tag: u32, v: &[M]) -> Result<()>
-    {
+    pub fn write_packed_fixed_with_tag<M>(&mut self, tag: u32, v: &[M]) -> Result<()> {
         if v.is_empty() {
             return Ok(());
         }
@@ -262,25 +267,34 @@ impl<W: Write> Writer<W> {
     /// Writes tag then repeated field with fixed length item size
     ///
     /// If array is empty, then do nothing (do not even write the tag)
-    pub fn write_packed_fixed_size_with_tag<M>(&mut self, 
-                                               tag: u32, 
-                                               v: &[M], 
-                                               item_size: usize) -> Result<()> {
+    pub fn write_packed_fixed_size_with_tag<M>(
+        &mut self,
+        tag: u32,
+        v: &[M],
+        item_size: usize,
+    ) -> Result<()> {
         if v.is_empty() {
             return Ok(());
         }
         self.write_tag(tag)?;
         let len = v.len() * item_size;
-        let bytes = unsafe { ::std::slice::from_raw_parts(v as *const [M] as *const M as *const u8, len) };
+        let bytes =
+            unsafe { ::std::slice::from_raw_parts(v as *const [M] as *const M as *const u8, len) };
         self.write_bytes(bytes)
     }
 
     /// Write entire map
-    pub fn write_map<FK, FV>(&mut self, size: usize,
-                             tag_key: u32, mut write_key: FK,
-                             tag_val: u32, mut write_val: FV) -> Result<()>
-        where FK: FnMut(&mut Self) -> Result<()>,
-              FV: FnMut(&mut Self) -> Result<()>,
+    pub fn write_map<FK, FV>(
+        &mut self,
+        size: usize,
+        tag_key: u32,
+        mut write_key: FK,
+        tag_val: u32,
+        mut write_val: FV,
+    ) -> Result<()>
+    where
+        FK: FnMut(&mut Self) -> Result<()>,
+        FV: FnMut(&mut Self) -> Result<()>,
     {
         self.write_varint(size as u64)?;
         self.write_tag(tag_key)?;

@@ -16,20 +16,25 @@ fn test_sync() {
         r
     });
 
-    let threads: Vec<_> = (0..4).map(|_| {
-        let m_copy = m.clone();
-        thread::spawn(move || {
-            let mut bytes = Vec::new();
-            {
-                let mut writer = Writer::new(&mut bytes);
-                m_copy.write_message(&mut writer).unwrap();
-            }
-            let mut reader = BytesReader::from_bytes(&bytes);
-            let read = TestTypesSingular::from_reader(&mut reader, &bytes).unwrap();
-            read.int32_field
+    let threads: Vec<_> = (0..4)
+        .map(|_| {
+            let m_copy = m.clone();
+            thread::spawn(move || {
+                let mut bytes = Vec::new();
+                {
+                    let mut writer = Writer::new(&mut bytes);
+                    m_copy.write_message(&mut writer).unwrap();
+                }
+                let mut reader = BytesReader::from_bytes(&bytes);
+                let read = TestTypesSingular::from_reader(&mut reader, &bytes).unwrap();
+                read.int32_field
+            })
         })
-    }).collect();
+        .collect();
 
-    let results = threads.into_iter().map(|t| t.join().unwrap()).collect::<Vec<_>>();
+    let results = threads
+        .into_iter()
+        .map(|t| t.join().unwrap())
+        .collect::<Vec<_>>();
     assert_eq!(&[Some(23), Some(23), Some(23), Some(23)], &results[..]);
 }

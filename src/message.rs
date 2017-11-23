@@ -2,7 +2,7 @@
 //!
 //! Creates the struct and implements a reader
 
-use std::io::{Write, BufWriter};
+use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::fs::File;
 
@@ -12,7 +12,6 @@ use reader::BytesReader;
 
 /// A trait to handle deserialization based on parsed `Field`s
 pub trait MessageWrite: Sized {
-
     /// Writes `Self` into W writer
     fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> {
         Ok(())

@@ -26,7 +26,10 @@ fn test_default_value_simple() {
     assert_eq!("abc\n22", d.string_field);
     assert_eq!(Cow::Borrowed(b"cde\n33"), d.bytes_field);
     assert!(EnumForDefaultValue::TWO.eq(&d.enum_field));
-    assert!(d.enum_field_without_default.map_or(true, |e| e.eq(&EnumForDefaultValue::ONE)));
+    assert!(
+        d.enum_field_without_default
+            .map_or(true, |e| e.eq(&EnumForDefaultValue::ONE))
+    );
 }
 
 #[test]

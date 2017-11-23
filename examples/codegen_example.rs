@@ -14,12 +14,10 @@ use codegen::a::b::ImportedMessage;
 use quick_protobuf::{BytesReader, Writer};
 
 fn main() {
-
     // Generate a message, somehow
     //
     // For the example we will leverage the `Default` derive of all messages
     let message = FooMessage {
-
         // Regular field work as expected, optional leverages on rust Option<>
         f_int32: Some(54),
 
@@ -34,14 +32,16 @@ fn main() {
 
         // nested messages are encapsulated into a rust module mod_Message
         f_nested: Some(data_types::mod_BazMessage::Nested {
-            f_nested: data_types::mod_BazMessage::mod_Nested::NestedMessage { f_nested: 2 }
+            f_nested: data_types::mod_BazMessage::mod_Nested::NestedMessage { f_nested: 2 },
         }),
 
         // nested enums too
         f_nested_enum: Some(data_types::mod_BazMessage::mod_Nested::NestedEnum::Baz),
 
         // a map!
-        f_map: vec![(Cow::Borrowed("foo"), 1), (Cow::Borrowed("bar"), 2)].into_iter().collect(),
+        f_map: vec![(Cow::Borrowed("foo"), 1), (Cow::Borrowed("bar"), 2)]
+            .into_iter()
+            .collect(),
 
         // a oneof value
         test_oneof: OneOftest_oneof::f1(2),
@@ -54,19 +54,23 @@ fn main() {
     let mut out = Vec::new();
     {
         let mut writer = Writer::new(&mut out);
-        writer.write_message(&message).expect("Cannot write message!");
+        writer
+            .write_message(&message)
+            .expect("Cannot write message!");
     }
     println!("Message written successfully!");
 
     // Try to read it back and confirm that we still have the exact same message
     //
-    // In general, if we had written the data to say, a file, or if someone else have written that
-    // data, it would be more convenient to use a `Reader` which will feed an internal, owned, buffer
-    // Here, on the contrary, we already hold the `out` buffer. Thus it is more efficient
-    // to directly use a `BytesWriter`.
+    // In general, if we had written the data to say, a file, or if someone else
+    // have written that data, it would be more convenient to use a `Reader` which
+    // will feed an internal, owned, buffer. Here, on the contrary, we already hold
+    // the `out` buffer. Thus it is more efficient to directly use a `BytesWriter`.
     let read_message = {
         let mut reader = BytesReader::from_bytes(&out);
-        reader.read_message::<FooMessage>(&out).expect("Cannot read message")
+        reader
+            .read_message::<FooMessage>(&out)
+            .expect("Cannot read message")
     };
     assert_eq!(message, read_message);
 
