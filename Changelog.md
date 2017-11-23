@@ -8,6 +8,13 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+##0.6.0
+- feat: add MessageRead trait (thanks @daboross !)
+- fix: nested enums
+- fix: fix reserved fields management
+- perf: avoid varint decoding for bools
+- chore: have travis run rustfmt
+
 ## 0.5.0
 - fix: removed one unwanting println
 - feat: add automatic `std::io::Error` conversion
