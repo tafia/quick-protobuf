@@ -4,10 +4,10 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-use std::io::{Write};
+use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{BytesReader, MessageWrite, Result, Writer};
 use quick_protobuf::sizeofs::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -21,7 +21,9 @@ impl Test1 {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.value = Some(r.read_int32(bytes)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -31,11 +33,15 @@ impl Test1 {
 
 impl MessageWrite for Test1 {
     fn get_size(&self) -> usize {
-        self.value.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        self.value
+            .as_ref()
+            .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.value { w.write_with_tag(8, |w| w.write_int32(*s))?; }
+        if let Some(ref s) = self.value {
+            w.write_with_tag(8, |w| w.write_int32(*s))?;
+        }
         Ok(())
     }
 }
@@ -51,7 +57,9 @@ impl TestRepeatedBool {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.values.push(r.read_bool(bytes)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -61,11 +69,16 @@ impl TestRepeatedBool {
 
 impl MessageWrite for TestRepeatedBool {
     fn get_size(&self) -> usize {
-        self.values.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        self.values
+            .iter()
+            .map(|s| 1 + sizeof_varint(*(s) as u64))
+            .sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        for s in &self.values { w.write_with_tag(8, |w| w.write_bool(*s))?; }
+        for s in &self.values {
+            w.write_with_tag(8, |w| w.write_bool(*s))?;
+        }
         Ok(())
     }
 }
@@ -81,7 +94,9 @@ impl TestRepeatedPackedInt32 {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.values = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -91,11 +106,23 @@ impl TestRepeatedPackedInt32 {
 
 impl MessageWrite for TestRepeatedPackedInt32 {
     fn get_size(&self) -> usize {
-        if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
+        if self.values.is_empty() {
+            0
+        } else {
+            1
+                + sizeof_len(
+                    self.values
+                        .iter()
+                        .map(|s| sizeof_varint(*(s) as u64))
+                        .sum::<usize>(),
+                )
+        }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        w.write_packed_with_tag(10, &self.values, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
+        w.write_packed_with_tag(10, &self.values, |w, m| w.write_int32(*m), &|m| {
+            sizeof_varint(*(m) as u64)
+        })?;
         Ok(())
     }
 }
@@ -111,7 +138,9 @@ impl<'a> TestRepeatedPackedFloat<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.values = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -121,7 +150,11 @@ impl<'a> TestRepeatedPackedFloat<'a> {
 
 impl<'a> MessageWrite for TestRepeatedPackedFloat<'a> {
     fn get_size(&self) -> usize {
-        if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.len() * 4) }
+        if self.values.is_empty() {
+            0
+        } else {
+            1 + sizeof_len(self.values.len() * 4)
+        }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -142,10 +175,15 @@ impl TestRepeatedMessages {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.messages1.push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(18) => msg.messages2.push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(26) => msg.messages3.push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(10) => msg.messages1
+                    .push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
+                Ok(18) => msg.messages2
+                    .push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
+                Ok(26) => msg.messages3
+                    .push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -155,15 +193,30 @@ impl TestRepeatedMessages {
 
 impl MessageWrite for TestRepeatedMessages {
     fn get_size(&self) -> usize {
-        self.messages1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.messages2.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.messages3.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        self.messages1
+            .iter()
+            .map(|s| 1 + sizeof_len((s).get_size()))
+            .sum::<usize>()
+            + self.messages2
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.messages3
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        for s in &self.messages1 { w.write_with_tag(10, |w| w.write_message(s))?; }
-        for s in &self.messages2 { w.write_with_tag(18, |w| w.write_message(s))?; }
-        for s in &self.messages3 { w.write_with_tag(26, |w| w.write_message(s))?; }
+        for s in &self.messages1 {
+            w.write_with_tag(10, |w| w.write_message(s))?;
+        }
+        for s in &self.messages2 {
+            w.write_with_tag(18, |w| w.write_message(s))?;
+        }
+        for s in &self.messages3 {
+            w.write_with_tag(26, |w| w.write_message(s))?;
+        }
         Ok(())
     }
 }
@@ -180,10 +233,24 @@ impl TestOptionalMessages {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.message1 = Some(Box::new(r.read_message(bytes, TestOptionalMessages::from_reader)?)),
-                Ok(18) => msg.message2 = Some(Box::new(r.read_message(bytes, TestOptionalMessages::from_reader)?)),
-                Ok(26) => msg.message3 = Some(Box::new(r.read_message(bytes, TestOptionalMessages::from_reader)?)),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(10) => {
+                    msg.message1 = Some(Box::new(
+                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
+                    ))
+                }
+                Ok(18) => {
+                    msg.message2 = Some(Box::new(
+                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
+                    ))
+                }
+                Ok(26) => {
+                    msg.message3 = Some(Box::new(
+                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
+                    ))
+                }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -193,15 +260,27 @@ impl TestOptionalMessages {
 
 impl MessageWrite for TestOptionalMessages {
     fn get_size(&self) -> usize {
-        self.message1.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
-        + self.message2.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
-        + self.message3.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        self.message1
+            .as_ref()
+            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+            + self.message2
+                .as_ref()
+                .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+            + self.message3
+                .as_ref()
+                .map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.message1 { w.write_with_tag(10, |w| w.write_message(&**s))?; }
-        if let Some(ref s) = self.message2 { w.write_with_tag(18, |w| w.write_message(&**s))?; }
-        if let Some(ref s) = self.message3 { w.write_with_tag(26, |w| w.write_message(&**s))?; }
+        if let Some(ref s) = self.message1 {
+            w.write_with_tag(10, |w| w.write_message(&**s))?;
+        }
+        if let Some(ref s) = self.message2 {
+            w.write_with_tag(18, |w| w.write_message(&**s))?;
+        }
+        if let Some(ref s) = self.message3 {
+            w.write_with_tag(26, |w| w.write_message(&**s))?;
+        }
         Ok(())
     }
 }
@@ -221,7 +300,9 @@ impl<'a> TestStrings<'a> {
                 Ok(10) => msg.s1 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(18) => msg.s2 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(26) => msg.s3 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -232,14 +313,20 @@ impl<'a> TestStrings<'a> {
 impl<'a> MessageWrite for TestStrings<'a> {
     fn get_size(&self) -> usize {
         self.s1.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
-        + self.s2.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
-        + self.s3.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+            + self.s2.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+            + self.s3.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.s1 { w.write_with_tag(10, |w| w.write_string(&**s))?; }
-        if let Some(ref s) = self.s2 { w.write_with_tag(18, |w| w.write_string(&**s))?; }
-        if let Some(ref s) = self.s3 { w.write_with_tag(26, |w| w.write_string(&**s))?; }
+        if let Some(ref s) = self.s1 {
+            w.write_with_tag(10, |w| w.write_string(&**s))?;
+        }
+        if let Some(ref s) = self.s2 {
+            w.write_with_tag(18, |w| w.write_string(&**s))?;
+        }
+        if let Some(ref s) = self.s3 {
+            w.write_with_tag(26, |w| w.write_string(&**s))?;
+        }
         Ok(())
     }
 }
@@ -255,7 +342,9 @@ impl<'a> TestBytes<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.b1 = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -269,7 +358,9 @@ impl<'a> MessageWrite for TestBytes<'a> {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.b1 { w.write_with_tag(10, |w| w.write_bytes(&**s))?; }
+        if let Some(ref s) = self.b1 {
+            w.write_with_tag(10, |w| w.write_bytes(&**s))?;
+        }
         Ok(())
     }
 }
@@ -285,10 +376,16 @@ impl<'a> TestMap<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_uint32(bytes))?;
+                    let (key, value) = r.read_map(
+                        bytes,
+                        |r, bytes| r.read_string(bytes).map(Cow::Borrowed),
+                        |r, bytes| r.read_uint32(bytes),
+                    )?;
                     msg.value.insert(key, value);
                 }
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -298,11 +395,26 @@ impl<'a> TestMap<'a> {
 
 impl<'a> MessageWrite for TestMap<'a> {
     fn get_size(&self) -> usize {
-        self.value.iter().map(|(k, v)| 1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))).sum::<usize>()
+        self.value
+            .iter()
+            .map(|(k, v)| {
+                1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))
+            })
+            .sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        for (k, v) in self.value.iter() { w.write_with_tag(10, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_uint32(*v)))?; }
+        for (k, v) in self.value.iter() {
+            w.write_with_tag(10, |w| {
+                w.write_map(
+                    2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64),
+                    10,
+                    |w| w.write_string(&**k),
+                    16,
+                    |w| w.write_uint32(*v),
+                )
+            })?;
+        }
         Ok(())
     }
 }
@@ -327,16 +439,27 @@ impl<'a> PerftestData<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.test1.push(r.read_message(bytes, Test1::from_reader)?),
-                Ok(18) => msg.test_repeated_bool.push(r.read_message(bytes, TestRepeatedBool::from_reader)?),
-                Ok(26) => msg.test_repeated_messages.push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(34) => msg.test_optional_messages.push(r.read_message(bytes, TestOptionalMessages::from_reader)?),
-                Ok(42) => msg.test_strings.push(r.read_message(bytes, TestStrings::from_reader)?),
-                Ok(50) => msg.test_repeated_packed_int32.push(r.read_message(bytes, TestRepeatedPackedInt32::from_reader)?),
-                Ok(58) => msg.test_repeated_packed_float.push(r.read_message(bytes, TestRepeatedPackedFloat::from_reader)?),
-                Ok(66) => msg.test_small_bytearrays.push(r.read_message(bytes, TestBytes::from_reader)?),
-                Ok(74) => msg.test_large_bytearrays.push(r.read_message(bytes, TestBytes::from_reader)?),
-                Ok(82) => msg.test_map.push(r.read_message(bytes, TestMap::from_reader)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(18) => msg.test_repeated_bool
+                    .push(r.read_message(bytes, TestRepeatedBool::from_reader)?),
+                Ok(26) => msg.test_repeated_messages
+                    .push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
+                Ok(34) => msg.test_optional_messages
+                    .push(r.read_message(bytes, TestOptionalMessages::from_reader)?),
+                Ok(42) => msg.test_strings
+                    .push(r.read_message(bytes, TestStrings::from_reader)?),
+                Ok(50) => msg.test_repeated_packed_int32
+                    .push(r.read_message(bytes, TestRepeatedPackedInt32::from_reader)?),
+                Ok(58) => msg.test_repeated_packed_float
+                    .push(r.read_message(bytes, TestRepeatedPackedFloat::from_reader)?),
+                Ok(66) => msg.test_small_bytearrays
+                    .push(r.read_message(bytes, TestBytes::from_reader)?),
+                Ok(74) => msg.test_large_bytearrays
+                    .push(r.read_message(bytes, TestBytes::from_reader)?),
+                Ok(82) => msg.test_map
+                    .push(r.read_message(bytes, TestMap::from_reader)?),
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -346,29 +469,79 @@ impl<'a> PerftestData<'a> {
 
 impl<'a> MessageWrite for PerftestData<'a> {
     fn get_size(&self) -> usize {
-        self.test1.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_repeated_bool.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_repeated_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_optional_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_strings.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_repeated_packed_int32.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_repeated_packed_float.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_small_bytearrays.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_large_bytearrays.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
-        + self.test_map.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        self.test1
+            .iter()
+            .map(|s| 1 + sizeof_len((s).get_size()))
+            .sum::<usize>()
+            + self.test_repeated_bool
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.test_repeated_messages
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.test_optional_messages
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.test_strings
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.test_repeated_packed_int32
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.test_repeated_packed_float
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.test_small_bytearrays
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.test_large_bytearrays
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
+            + self.test_map
+                .iter()
+                .map(|s| 1 + sizeof_len((s).get_size()))
+                .sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        for s in &self.test1 { w.write_with_tag(10, |w| w.write_message(s))?; }
-        for s in &self.test_repeated_bool { w.write_with_tag(18, |w| w.write_message(s))?; }
-        for s in &self.test_repeated_messages { w.write_with_tag(26, |w| w.write_message(s))?; }
-        for s in &self.test_optional_messages { w.write_with_tag(34, |w| w.write_message(s))?; }
-        for s in &self.test_strings { w.write_with_tag(42, |w| w.write_message(s))?; }
-        for s in &self.test_repeated_packed_int32 { w.write_with_tag(50, |w| w.write_message(s))?; }
-        for s in &self.test_repeated_packed_float { w.write_with_tag(58, |w| w.write_message(s))?; }
-        for s in &self.test_small_bytearrays { w.write_with_tag(66, |w| w.write_message(s))?; }
-        for s in &self.test_large_bytearrays { w.write_with_tag(74, |w| w.write_message(s))?; }
-        for s in &self.test_map { w.write_with_tag(82, |w| w.write_message(s))?; }
+        for s in &self.test1 {
+            w.write_with_tag(10, |w| w.write_message(s))?;
+        }
+        for s in &self.test_repeated_bool {
+            w.write_with_tag(18, |w| w.write_message(s))?;
+        }
+        for s in &self.test_repeated_messages {
+            w.write_with_tag(26, |w| w.write_message(s))?;
+        }
+        for s in &self.test_optional_messages {
+            w.write_with_tag(34, |w| w.write_message(s))?;
+        }
+        for s in &self.test_strings {
+            w.write_with_tag(42, |w| w.write_message(s))?;
+        }
+        for s in &self.test_repeated_packed_int32 {
+            w.write_with_tag(50, |w| w.write_message(s))?;
+        }
+        for s in &self.test_repeated_packed_float {
+            w.write_with_tag(58, |w| w.write_message(s))?;
+        }
+        for s in &self.test_small_bytearrays {
+            w.write_with_tag(66, |w| w.write_message(s))?;
+        }
+        for s in &self.test_large_bytearrays {
+            w.write_with_tag(74, |w| w.write_message(s))?;
+        }
+        for s in &self.test_map {
+            w.write_with_tag(82, |w| w.write_message(s))?;
+        }
         Ok(())
     }
 }

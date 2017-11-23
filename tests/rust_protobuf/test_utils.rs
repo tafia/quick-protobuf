@@ -58,4 +58,3 @@ macro_rules! test_serialize_deserialize {
 //     let parsed = parse_from_bytes::<M>(&serialized_bytes).unwrap();
 //     assert!(*msg == parsed);
 // }
-

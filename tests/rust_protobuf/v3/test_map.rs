@@ -1,7 +1,7 @@
 use quick_protobuf::*;
 
 use std::borrow::Cow;
-use rust_protobuf::hex::{encode_hex, decode_hex};
+use rust_protobuf::hex::{decode_hex, encode_hex};
 use super::test_map_pb::*;
 
 #[test]
@@ -39,10 +39,10 @@ fn test_map_with_object() {
 // #[test]
 // fn text_format() {
 //     let mut map = TestMap::new();
-// 
+//
 //     assert_eq!(&*print_to_string(&map), "");
-// 
+//
 //     map.mut_m().insert("two".to_owned(), 2);
-// 
+//
 //     assert_eq!(&*print_to_string(&map), "m {key: \"two\" value: 2}")
 // }

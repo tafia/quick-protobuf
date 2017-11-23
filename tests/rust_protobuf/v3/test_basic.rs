@@ -1,7 +1,7 @@
 use quick_protobuf::*;
 
 use std::borrow::Cow;
-use rust_protobuf::hex::{encode_hex, decode_hex};
+use rust_protobuf::hex::{decode_hex, encode_hex};
 use super::basic::*;
 
 #[test]
@@ -162,23 +162,24 @@ fn test_default_instance() {
 // #[test]
 // fn test_message_descriptor() {
 //     assert_eq!("TestDescriptor", TestDescriptor::new().descriptor().name());
-// 
+//
 //     let d = reflect::MessageDescriptor::for_type::<TestDescriptor>();
 //     assert_eq!("TestDescriptor", d.name());
 //     assert_eq!("basic.TestDescriptor", d.full_name());
-// 
+//
 //     let mut t = TestDescriptor::new();
 //     t.set_stuff(55);
-// 
+//
 //     let field = d.field_by_name("stuff");
 //     assert_eq!(55, field.get_i32(&t));
 // }
-// 
+//
 // #[test]
 // fn test_enum_descriptor() {
 //     let d = TestEnumDescriptor::RED.enum_descriptor();
 //     assert_eq!("TestEnumDescriptor", d.name());
-//     assert_eq!("TestEnumDescriptor", reflect::EnumDescriptor::for_type::<TestEnumDescriptor>().name());
+//     assert_eq!("TestEnumDescriptor", \
+//                 reflect::EnumDescriptor::for_type::<TestEnumDescriptor>().name());
 //     assert_eq!("GREEN", d.value_by_name("GREEN").name());
 // }
 

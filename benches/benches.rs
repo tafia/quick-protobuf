@@ -6,7 +6,7 @@ extern crate test;
 #[macro_use]
 extern crate lazy_static;
 
-use test::{Bencher, black_box};
+use test::{black_box, Bencher};
 
 use quick_protobuf::{BytesReader, Writer};
 

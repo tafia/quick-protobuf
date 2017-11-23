@@ -11,7 +11,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::fs::File;
 
-use errors::{Result, ErrorKind, Error};
+use errors::{Error, ErrorKind, Result};
 use message::MessageRead;
 
 use byteorder::LittleEndian as LE;
@@ -74,12 +74,11 @@ pub struct BytesReader {
 }
 
 impl BytesReader {
-
     /// Creates a new reader from chunks of data
     pub fn from_bytes(bytes: &[u8]) -> BytesReader {
         BytesReader {
             start: 0,
-            end: bytes.len()
+            end: bytes.len(),
         }
     }
 
@@ -91,10 +90,9 @@ impl BytesReader {
 
     #[inline(always)]
     fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
-        let b = bytes
-            .get(self.start)
-            .ok_or_else::<Error, _>(|| io::Error::new(io::ErrorKind::UnexpectedEof,
-                                                      "Cannot read next bytes").into())?;
+        let b = bytes.get(self.start).ok_or_else::<Error, _>(|| {
+            io::Error::new(io::ErrorKind::UnexpectedEof, "Cannot read next bytes").into()
+        })?;
         self.start += 1;
         Ok(*b)
     }
@@ -103,28 +101,40 @@ impl BytesReader {
     #[inline(always)]
     pub fn read_varint32(&mut self, bytes: &[u8]) -> Result<u32> {
         let mut b = self.read_u8(bytes)?;
-        if b & 0x80 == 0 { return Ok(b as u32); }
+        if b & 0x80 == 0 {
+            return Ok(b as u32);
+        }
         let mut r = (b & 0x7f) as u32;
 
         b = self.read_u8(bytes)?;
         r |= ((b & 0x7f) as u32) << 7;
-        if b & 0x80 == 0 { return Ok(r); }
+        if b & 0x80 == 0 {
+            return Ok(r);
+        }
 
         b = self.read_u8(bytes)?;
         r |= ((b & 0x7f) as u32) << 14;
-        if b & 0x80 == 0 { return Ok(r); }
+        if b & 0x80 == 0 {
+            return Ok(r);
+        }
 
         b = self.read_u8(bytes)?;
         r |= ((b & 0x7f) as u32) << 21;
-        if b & 0x80 == 0 { return Ok(r); }
+        if b & 0x80 == 0 {
+            return Ok(r);
+        }
 
         b = self.read_u8(bytes)?;
         r |= ((b & 0xf) as u32) << 28;
-        if b & 0x80 == 0 { return Ok(r); }
+        if b & 0x80 == 0 {
+            return Ok(r);
+        }
 
         // discards extra bytes
         for _ in 0..5 {
-            if self.read_u8(bytes)? & 0x80 == 0 { return Ok(r); }
+            if self.read_u8(bytes)? & 0x80 == 0 {
+                return Ok(r);
+            }
         }
 
         // cannot read more than 10 bytes
@@ -134,53 +144,71 @@ impl BytesReader {
     /// Reads the next varint encoded u64
     #[inline(always)]
     pub fn read_varint64(&mut self, bytes: &[u8]) -> Result<u64> {
-
         // part0
         let mut b = self.read_u8(bytes)?;
-        if b & 0x80 == 0 { return Ok(b as u64); }
+        if b & 0x80 == 0 {
+            return Ok(b as u64);
+        }
         let mut r0 = (b & 0x7f) as u32;
 
         b = self.read_u8(bytes)?;
         r0 |= ((b & 0x7f) as u32) << 7;
-        if b & 0x80 == 0 { return Ok(r0 as u64); }
+        if b & 0x80 == 0 {
+            return Ok(r0 as u64);
+        }
 
         b = self.read_u8(bytes)?;
         r0 |= ((b & 0x7f) as u32) << 14;
-        if b & 0x80 == 0 { return Ok(r0 as u64); }
+        if b & 0x80 == 0 {
+            return Ok(r0 as u64);
+        }
 
         b = self.read_u8(bytes)?;
         r0 |= ((b & 0x7f) as u32) << 21;
-        if b & 0x80 == 0 { return Ok(r0 as u64); }
+        if b & 0x80 == 0 {
+            return Ok(r0 as u64);
+        }
 
         // part1
         b = self.read_u8(bytes)?;
         let mut r1 = (b & 0x7f) as u32;
-        if b & 0x80 == 0 { return Ok((r0 as u64 | (r1 as u64) << 28)); }
+        if b & 0x80 == 0 {
+            return Ok((r0 as u64 | (r1 as u64) << 28));
+        }
 
         b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 7;
-        if b & 0x80 == 0 { return Ok((r0 as u64 | (r1 as u64) << 28)); }
+        if b & 0x80 == 0 {
+            return Ok((r0 as u64 | (r1 as u64) << 28));
+        }
 
         b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 14;
-        if b & 0x80 == 0 { return Ok((r0 as u64 | (r1 as u64) << 28)); }
+        if b & 0x80 == 0 {
+            return Ok((r0 as u64 | (r1 as u64) << 28));
+        }
 
         b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 21;
-        if b & 0x80 == 0 { return Ok((r0 as u64 | (r1 as u64) << 28)); }
+        if b & 0x80 == 0 {
+            return Ok((r0 as u64 | (r1 as u64) << 28));
+        }
 
         // part2
         b = self.read_u8(bytes)?;
         let mut r2 = (b & 0x7f) as u32;
-        if b & 0x80 == 0 { return Ok(((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56)); }
+        if b & 0x80 == 0 {
+            return Ok(((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56));
+        }
 
         b = self.read_u8(bytes)?;
         r2 |= (b as u32) << 7;
-        if b & 0x80 == 0 { return Ok(((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56)); }
+        if b & 0x80 == 0 {
+            return Ok(((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56));
+        }
 
         // cannot read more than 10 bytes
         Err(ErrorKind::Varint.into())
-
     }
 
     /// Reads int32 (varint)
@@ -226,7 +254,7 @@ impl BytesReader {
     /// Reads fixed64 (little endian u64)
     #[inline]
     fn read_fixed<M, F: Fn(&[u8]) -> M>(&mut self, bytes: &[u8], len: usize, read: F) -> Result<M> {
-        let v = read(&bytes[self.start .. self.start + len]);
+        let v = read(&bytes[self.start..self.start + len]);
         self.start += len;
         Ok(v)
     }
@@ -281,7 +309,8 @@ impl BytesReader {
 
     #[inline(always)]
     fn read_len<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<M>
-        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M>,
+    where
+        F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
     {
         let len = self.read_varint32(bytes)? as usize;
         let cur_end = self.end;
@@ -294,14 +323,16 @@ impl BytesReader {
 
     /// Reads bytes (Vec<u8>)
     #[inline]
-    pub fn read_bytes<'a>(&mut self, bytes: &'a[u8]) -> Result<&'a[u8]> {
+    pub fn read_bytes<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a [u8]> {
         self.read_len(bytes, |r, b| Ok(&b[r.start..r.end]))
     }
 
     /// Reads string (String)
     #[inline]
-    pub fn read_string<'a>(&mut self, bytes: &'a[u8]) -> Result<&'a str> {
-        self.read_len(bytes, |r, b| ::std::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into()))
+    pub fn read_string<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a str> {
+        self.read_len(bytes, |r, b| {
+            ::std::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into())
+        })
     }
 
     /// Reads packed repeated field (Vec<M>)
@@ -309,8 +340,9 @@ impl BytesReader {
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
     #[inline]
-    pub fn read_packed<'a, M, F>(&mut self, bytes: &'a[u8], mut read: F) -> Result<Vec<M>>
-        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M>,
+    pub fn read_packed<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<Vec<M>>
+    where
+        F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
     {
         self.read_len(bytes, |r, b| {
             let mut v = Vec::new();
@@ -326,15 +358,22 @@ impl BytesReader {
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
     #[inline]
-    pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a[u8]) -> Result<&'a[M]> {
+    pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a [u8]) -> Result<&'a [M]> {
         let len = self.read_varint32(bytes)? as usize;
         if self.len() < len {
-            return Err(io::Error::new(io::ErrorKind::UnexpectedEof,
-                                      "Cannot read fixed packed field").into());
+            return Err(
+                io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "Cannot read fixed packed field",
+                ).into(),
+            );
         }
         let n = len / ::std::mem::size_of::<M>();
         let slice = unsafe {
-            ::std::slice::from_raw_parts(bytes.get_unchecked(self.start) as * const u8 as * const M, n)
+            ::std::slice::from_raw_parts(
+                bytes.get_unchecked(self.start) as *const u8 as *const M,
+                n,
+            )
         };
         self.start += len;
         Ok(slice)
@@ -342,22 +381,26 @@ impl BytesReader {
 
     /// Reads a nested message
     #[inline]
-    pub fn read_message<'a, M>(&mut self, bytes: &'a[u8]) -> Result<M>
-        where M: MessageRead<'a>
+    pub fn read_message<'a, M>(&mut self, bytes: &'a [u8]) -> Result<M>
+    where
+        M: MessageRead<'a>,
     {
         self.read_len(bytes, M::from_reader)
     }
 
     /// Reads a map item: (key, value)
     #[inline]
-    pub fn read_map<'a, K, V, F, G>(&mut self,
-                                    bytes: &'a[u8],
-                                    mut read_key: F,
-                                    mut read_val: G) -> Result<(K, V)>
-        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<K>,
-              G: FnMut(&mut BytesReader, &'a[u8]) -> Result<V>,
-              K: ::std::fmt::Debug + Default,
-              V: ::std::fmt::Debug + Default,
+    pub fn read_map<'a, K, V, F, G>(
+        &mut self,
+        bytes: &'a [u8],
+        mut read_key: F,
+        mut read_val: G,
+    ) -> Result<(K, V)>
+    where
+        F: FnMut(&mut BytesReader, &'a [u8]) -> Result<K>,
+        G: FnMut(&mut BytesReader, &'a [u8]) -> Result<V>,
+        K: ::std::fmt::Debug + Default,
+        V: ::std::fmt::Debug + Default,
     {
         self.read_len(bytes, |r, bytes| {
             let mut k = K::default();
@@ -378,16 +421,21 @@ impl BytesReader {
     #[inline]
     pub fn read_unknown(&mut self, bytes: &[u8], tag_value: u32) -> Result<()> {
         match (tag_value & 0x7) as u8 {
-            WIRE_TYPE_VARINT => { self.read_varint64(bytes)?; },
+            WIRE_TYPE_VARINT => {
+                self.read_varint64(bytes)?;
+            }
             WIRE_TYPE_FIXED64 => self.start += 8,
             WIRE_TYPE_FIXED32 => self.start += 4,
             WIRE_TYPE_LENGTH_DELIMITED => {
                 let len = self.read_varint64(bytes)? as usize;
                 self.start += len;
-            },
-            WIRE_TYPE_START_GROUP |
-                WIRE_TYPE_END_GROUP => { return Err(ErrorKind::Deprecated("group").into()); },
-            t => { return Err(ErrorKind::UnknownWireType(t).into()); },
+            }
+            WIRE_TYPE_START_GROUP | WIRE_TYPE_END_GROUP => {
+                return Err(ErrorKind::Deprecated("group").into());
+            }
+            t => {
+                return Err(ErrorKind::UnknownWireType(t).into());
+            }
         }
         Ok(())
     }
@@ -464,11 +512,12 @@ pub struct Reader {
 }
 
 impl Reader {
-
     /// Creates a new `Reader`
     pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {
         let mut buf = Vec::with_capacity(capacity);
-        unsafe { buf.set_len(capacity); }
+        unsafe {
+            buf.set_len(capacity);
+        }
         buf.shrink_to_fit();
         r.read_exact(&mut buf)?;
         Ok(Reader::from_bytes(buf))
@@ -496,21 +545,11 @@ impl Reader {
     /// Run a `BytesReader` dependent function
     #[inline]
     pub fn read<'a, M, F>(&'a mut self, mut read: F) -> Result<M>
-        where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M>
+    where
+        F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
     {
         read(&mut self.inner, &self.buffer)
     }
-//
-//     /// Run a `BytesReader` dependent function
-//     #[inline]
-//     pub fn read_len<'a, M, F>(&'a mut self, mut read: F) -> Result<M>
-//         where F: FnMut(&mut BytesReader, &'a[u8]) -> Result<M>
-//     {
-//         let len = self.read(|r, b| r.read_varint64(b))?;
-//         let mut remaining = self.buffer.split_off(len as usize + ::sizeofs::sizeof_varint(len));
-//         ::std::mem::swap(&mut self.buffer, &mut remaining);
-//         read(&mut self.inner, &remaining)
-//     }
 
     /// Gets the inner `BytesReader`
     pub fn inner(&mut self) -> &mut BytesReader {
@@ -521,7 +560,6 @@ impl Reader {
     pub fn buffer(&self) -> &[u8] {
         &self.buffer
     }
-
 }
 
 #[test]
