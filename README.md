@@ -56,7 +56,6 @@ quick-protobuf = "0.4.0"
  - 3. Have fun
 
 ```rust
-// main.rs or lib.rs
 extern crate quick_protobuf;
 
 mod foo_bar; // (see 1.)
@@ -71,30 +70,30 @@ use quick_protobuf::Reader;
 //     repeated Foo foos = 1;
 //     repeated Bar bars = 2;
 // }
-use foo_bar::{FooBar};
+// FooBar is a message generated from a proto file
+// in parcicular it contains a `from_reader` function
+use foo_bar::FooBar;
+use quick_protobuf::{MessageRead, BytesReader};
 
 fn main() {
-    // create a reader, which will parse the protobuf binary file and pop events
-    // this reader will read the entire file into an internal buffer
-    let mut reader = Reader::from_file("/path/to/binary/protobuf.bin")
-        .expect("Cannot read input file");
-    
-    // Use the generated module fns with the reader to convert your data into rust structs.
-    //
-    // Depending on your input file, the message can or not be prefixed with the encoded length
-    // for instance, a *stream* which contains several messages generally split them using this
-    // technique (see https://developers.google.com/protocol-buffers/docs/techniques#streaming)
-    //
-    // To read a message without a length prefix you can directly call `FooBar::from_reader`:
-    // let foobar = reader.read(FooBar::from_reader).expect("Cannot read FooBar message");
-    // 
-    // Else to read a length then a message, you can use:
-    let foobar: FooBar = reader.read(|r, b| r.read_message(b))
-        .expect("Cannot read FooBar message");
-    // Reader::read_message uses `FooBar::from_reader` internally through the `MessageRead`
-    // trait.
+    // bytes is a buffer on the data we want to deserialize
+    // typically bytes is read from a `Read`:
+    // r.read_to_end(&mut bytes).expect("cannot read bytes");
+    let mut bytes: Vec<u8>;
+    # bytes = vec![];
 
-    println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
+    // we can build a bytes reader directly out of the bytes
+    let mut reader = BytesReader::from_bytes(&bytes);
+
+    // now using the generated module decoding is as easy as:
+    let foobar = FooBar::from_reader(&mut reader, &bytes).expect("Cannot read FooBar");
+
+    // if instead the buffer contains a length delimited stream of message we could use:
+    // while !r.is_eof() {
+    //     let foobar: FooBar = r.read_message(&bytes).expect(...);
+    //     ...
+    // }
+    println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
 }
 ```
 
