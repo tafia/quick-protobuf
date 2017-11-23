@@ -1,68 +1,129 @@
 use std::str;
 use std::path::{Path, PathBuf};
 
-use types::{Frequency, Field, Message, Enumerator, OneOf, FileDescriptor, Syntax, FieldType};
-use nom::{multispace, digit, hex_digit};
+use types::{Enumerator, Field, FieldType, FileDescriptor, Frequency, Message, OneOf, Syntax};
+use nom::{digit, hex_digit, multispace};
 
 fn is_word(b: u8) -> bool {
     match b {
         b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' | b'.' => true,
-        _ => false
+        _ => false,
     }
 }
 
-named!(word<String>, map_res!(take_while!(is_word), |b: &[u8]| String::from_utf8(b.to_vec())));
-named!(word_ref<&str>, map_res!(take_while!(is_word), str::from_utf8));
+named!(
+    word<String>,
+    map_res!(
+        take_while!(is_word),
+        |b: &[u8]| String::from_utf8(b.to_vec())
+    )
+);
+named!(
+    word_ref<&str>,
+    map_res!(take_while!(is_word), str::from_utf8)
+);
 
-named!(comment<()>, do_parse!(tag!("//") >> take_until_and_consume!("\n") >> ()));
-named!(block_comment<()>, do_parse!(tag!("/*") >> take_until_and_consume!("*/") >> ()));
+named!(
+    hex_integer<i32>,
+    do_parse!(
+        tag!("0x") >>
+        num: map_res!(
+            map_res!(hex_digit,str::from_utf8),
+            |s| i32::from_str_radix(s,16)
+        ) >> (num)
+    )
+);
+
+named!(
+    integer<i32>,
+    map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str)
+);
+
+named!(
+    comment<()>,
+    do_parse!(tag!("//") >> take_until_and_consume!("\n") >> ())
+);
+named!(
+    block_comment<()>,
+    do_parse!(tag!("/*") >> take_until_and_consume!("*/") >> ())
+);
 
 /// word break: multispace or comment
-named!(br<()>, alt!(map!(multispace, |_| ()) | comment | block_comment));
+named!(
+    br<()>,
+    alt!(map!(multispace, |_| ()) | comment | block_comment)
+);
 
-named!(syntax<Syntax>,
-       do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >> many0!(br) >>
+named!(
+    syntax<Syntax>,
+    do_parse!(tag!("syntax") >> many0!(br) >> tag!("=") >> many0!(br) >>
                  proto: alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } |
                              tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >>
                  many0!(br) >> tag!(";") >>
-                 (proto) ));
+                 (proto) )
+);
 
-named!(import<PathBuf>,
-       do_parse!(tag!("import")>> many1!(br) >> tag!("\"") >>
-                 path: map!(map_res!(take_until!("\""), str::from_utf8), |s| Path::new(s).into()) >> tag!("\"") >>
+named!(
+    import<PathBuf>,
+    do_parse!(tag!("import") >> many1!(br) >> tag!("\"") >>
+                 path: map!(map_res!(take_until!("\""), str::from_utf8),
+                                     |s| Path::new(s).into()) >> tag!("\"") >>
                  many0!(br) >> tag!(";") >>
-                 (path) ));
+                 (path) )
+);
 
-named!(package<String>,
-       do_parse!(tag!("package") >> many1!(br) >> package: word >> many0!(br) >> tag!(";") >>
-                 (package) ));
+named!(
+    package<String>,
+    do_parse!(
+        tag!("package") >> many1!(br) >> package: word >> many0!(br) >> tag!(";") >> (package)
+    )
+);
 
-named!(reserved_nums<Vec<i32>>,
-       do_parse!(tag!("reserved") >> many1!(br) >>
-                 nums: many1!(do_parse!(num: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >>
-                                        many0!(alt!(br | tag!(",") => { |_| () })) >> (num))) >>
-                (nums) ));
+named!(
+    num_range<Vec<i32>>,
+    do_parse!(
+        from_: integer >> many1!(br) >> tag!("to") >> many1!(br) >> to_: integer
+            >> ((from_..(to_ + 1)).collect())
+    )
+);
 
-named!(reserved_names<Vec<String>>,
-       do_parse!(tag!("reserved") >> many1!(br) >>
+named!(
+    reserved_nums<Vec<i32>>,
+    do_parse!(tag!("reserved") >> many1!(br) >>
+                 nums: separated_list!(do_parse!(many0!(br) >> tag!(",") >> many0!(br) >> (())),
+                                       alt!(num_range | integer => { |i| vec![i] })) >>
+                 many0!(br) >> tag!(";") >>
+                (nums.into_iter().flat_map(|v| v.into_iter()).collect()) )
+);
+
+named!(
+    reserved_names<Vec<String>>,
+    do_parse!(tag!("reserved") >> many1!(br) >>
                  names: many1!(do_parse!(tag!("\"") >> name: word >> tag!("\"") >>
                                         many0!(alt!(br | tag!(",") => { |_| () })) >>
                                         (name))) >>
-                (names) ));
+                 many0!(br) >> tag!(";") >>
+                (names) )
+);
 
-named!(key_val<(&str, &str)>,
-       do_parse!(tag!("[") >> many0!(br) >>
+named!(
+    key_val<(&str, &str)>,
+    do_parse!(tag!("[") >> many0!(br) >>
                  key: word_ref >> many0!(br) >> tag!("=") >> many0!(br) >>
                  value: map_res!(is_not!("]"), str::from_utf8) >> tag!("]") >> many0!(br) >>
-                 ((key, value.trim())) ));
+                 ((key, value.trim())) )
+);
 
-named!(frequency<Frequency>,
-       alt!(tag!("optional") => { |_| Frequency::Optional } |
+named!(
+    frequency<Frequency>,
+    alt!(tag!("optional") => { |_| Frequency::Optional } |
             tag!("repeated") => { |_| Frequency::Repeated } |
-            tag!("required") => { |_| Frequency::Required } ));
+            tag!("required") => { |_| Frequency::Required } )
+);
 
-named!(field_type<FieldType>,
-       alt!(tag!("int32") => { |_| FieldType::Int32 } |
+named!(
+    field_type<FieldType>,
+    alt!(tag!("int32") => { |_| FieldType::Int32 } |
             tag!("int64") => { |_| FieldType::Int64 } |
             tag!("uint32") => { |_| FieldType::Uint32 } |
             tag!("uint64") => { |_| FieldType::Uint64 } |
@@ -78,16 +139,20 @@ named!(field_type<FieldType>,
             tag!("float") => { |_| FieldType::Float } |
             tag!("double") => { |_| FieldType::Double } |
             map_field => { |(k, v)| FieldType::Map(Box::new((k, v))) } |
-            word => { |w| FieldType::Message(w) }));
+            word => { |w| FieldType::Message(w) })
+);
 
-named!(map_field<(FieldType, FieldType)>,
-       do_parse!(tag!("map") >> many0!(br) >> tag!("<") >> many0!(br) >>
-                 key: field_type >> many0!(br) >> tag!(",") >> many0!(br) >>
-                 value: field_type >> tag!(">") >>
-                 ((key, value)) ));
+named!(
+    map_field<(FieldType, FieldType)>,
+    do_parse!(
+        tag!("map") >> many0!(br) >> tag!("<") >> many0!(br) >> key: field_type >> many0!(br)
+            >> tag!(",") >> many0!(br) >> value: field_type >> tag!(">") >> ((key, value))
+    )
+);
 
-named!(one_of<OneOf>,
-       do_parse!(tag!("oneof") >> many1!(br) >>
+named!(
+    one_of<OneOf>,
+    do_parse!(tag!("oneof") >> many1!(br) >>
                  name: word >> many0!(br) >> tag!("{") >>
                  fields: many1!(message_field) >> many0!(br) >> tag!("}") >> many0!(br) >>
                  (OneOf {
@@ -96,13 +161,15 @@ named!(one_of<OneOf>,
                      package: "".to_string(),
                      module: "".to_string(),
                      imported: false
-                 }) ));
+                 }) )
+);
 
-named!(message_field<Field>,
-       do_parse!(frequency: opt!(frequency) >> many0!(br) >>
+named!(
+    message_field<Field>,
+    do_parse!(frequency: opt!(frequency) >> many0!(br) >>
                  typ: field_type >> many1!(br) >>
                  name: word >> many0!(br) >> tag!("=") >> many0!(br) >>
-                 number: map_res!(map_res!(digit, str::from_utf8), str::FromStr::from_str) >> many0!(br) >>
+                 number: integer >> many0!(br) >>
                  key_vals: many0!(key_val) >> tag!(";") >>
                  (Field {
                       name: name,
@@ -121,7 +188,8 @@ named!(message_field<Field>,
                                   .find(|&&(k, _)| k == "deprecated")
                                   .map_or(false, |&(_, v)| str::FromStr::from_str(v)
                                           .expect("Cannot parse Deprecated value")),
-                 }) ));
+                 }) )
+);
 
 enum MessageEvent {
     Message(Message),
@@ -133,61 +201,66 @@ enum MessageEvent {
     Ignore,
 }
 
-named!(message_event<MessageEvent>, alt!(reserved_nums => { |r| MessageEvent::ReservedNums(r) } |
+named!(
+    message_event<MessageEvent>,
+    alt!(reserved_nums => { |r| MessageEvent::ReservedNums(r) } |
                                          reserved_names => { |r| MessageEvent::ReservedNames(r) } |
                                          message_field => { |f| MessageEvent::Field(f) } |
                                          message => { |m| MessageEvent::Message(m) } |
                                          enumerator => { |e| MessageEvent::Enumerator(e) } |
                                          one_of => { |o| MessageEvent::OneOf(o) } |
-                                         br => { |_| MessageEvent::Ignore }));
+                                         br => { |_| MessageEvent::Ignore })
+);
 
-named!(message_events<(String, Vec<MessageEvent>)>,
-       do_parse!(tag!("message") >> many0!(br) >>
+named!(
+    message_events<(String, Vec<MessageEvent>)>,
+    do_parse!(tag!("message") >> many1!(br) >>
                  name: word >> many0!(br) >>
                  tag!("{") >> many0!(br) >>
                  events: many0!(message_event) >>
                  many0!(br) >> tag!("}") >>
                  many0!(br) >> many0!(tag!(";")) >>
-                 ((name, events)) ));
+                 ((name, events)) )
+);
 
-named!(message<Message>,
-       map!(message_events, |(name, events): (String, Vec<MessageEvent>)| {
-           let mut msg = Message { name: name.clone(), .. Message::default() };
-           for e in events {
-               match e {
-                   MessageEvent::Field(f) => msg.fields.push(f),
-                   MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
-                   MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
-                   MessageEvent::Message(m) => msg.messages.push(m),
-                   MessageEvent::Enumerator(e) => msg.enums.push(e),
-                   MessageEvent::OneOf(o) => msg.oneofs.push(o),
-                   MessageEvent::Ignore => (),
-               }
-           }
-           msg
-       }));
+named!(
+    message<Message>,
+    map!(
+        message_events,
+        |(name, events): (String, Vec<MessageEvent>)| {
+            let mut msg = Message {
+                name: name.clone(),
+                ..Message::default()
+            };
+            for e in events {
+                match e {
+                    MessageEvent::Field(f) => msg.fields.push(f),
+                    MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
+                    MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
+                    MessageEvent::Message(m) => msg.messages.push(m),
+                    MessageEvent::Enumerator(e) => msg.enums.push(e),
+                    MessageEvent::OneOf(o) => msg.oneofs.push(o),
+                    MessageEvent::Ignore => (),
+                }
+            }
+            msg
+        }
+    )
+);
 
-named!(hex_integer<i32>,
-    do_parse!(
-        tag!("0x") >>
-        num: map_res!(
-            map_res!(hex_digit,str::from_utf8),
-            |s| i32::from_str_radix(s,16)
-        ) >> (num)
-    ));
-
-named!(integer<i32>,  map_res!( map_res!(digit,str::from_utf8), str::FromStr::from_str));
-
-named!(enum_field<(String, i32)>,
-       do_parse!(name: word >> many0!(br) >>
+named!(
+    enum_field<(String, i32)>,
+    do_parse!(name: word >> many0!(br) >>
                  tag!("=") >> many0!(br) >>
                  number: alt!(hex_integer | integer) >> many0!(br) >>
                  tag!(";") >> many0!(br) >>
-                 ((name, number))));
+                 ((name, number)))
+);
 
 
-named!(enumerator<Enumerator>,
-       do_parse!(tag!("enum") >> many1!(br) >> name: word >> many0!(br) >>
+named!(
+    enumerator<Enumerator>,
+    do_parse!(tag!("enum") >> many1!(br) >> name: word >> many0!(br) >>
                  tag!("{") >> many0!(br) >> fields: many0!(enum_field) >> many0!(br) >> tag!("}") >>
                  many0!(br) >> many0!(tag!(";")) >>
                  (Enumerator {
@@ -196,14 +269,21 @@ named!(enumerator<Enumerator>,
                      imported: false,
                      package: "".to_string(),
                      module: "".to_string()
-                 })));
+                 }))
+);
 
-named!(option_ignore<()>,
-       do_parse!(tag!("option") >> many1!(br) >> take_until_and_consume!(";") >> ()));
+named!(
+    option_ignore<()>,
+    do_parse!(tag!("option") >> many1!(br) >> take_until_and_consume!(";") >> ())
+);
 
-named!(service_ignore<()>,
-       do_parse!(tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{") >>
-                 take_until_and_consume!("}") >> ()));
+named!(
+    service_ignore<()>,
+    do_parse!(
+        tag!("service") >> many1!(br) >> word >> many0!(br) >> tag!("{")
+            >> take_until_and_consume!("}") >> ()
+    )
+);
 
 enum Event {
     Syntax(Syntax),
@@ -211,18 +291,20 @@ enum Event {
     Package(String),
     Message(Message),
     Enum(Enumerator),
-    Ignore
+    Ignore,
 }
 
-named!(event<Event>,
-       alt!(syntax => { |s| Event::Syntax(s) } |
+named!(
+    event<Event>,
+    alt!(syntax => { |s| Event::Syntax(s) } |
             import => { |i| Event::Import(i) } |
             package => { |p| Event::Package(p) } |
             message => { |m| Event::Message(m) } |
             enumerator => { |e| Event::Enum(e) } |
             option_ignore => { |_| Event::Ignore } |
             service_ignore => { |_| Event::Ignore } |
-            br => { |_| Event::Ignore }));
+            br => { |_| Event::Ignore })
+);
 
 named!(pub file_descriptor<FileDescriptor>,
        map!(many0!(event), |events: Vec<Event>| {
@@ -303,7 +385,10 @@ mod test {
     }
     "#;
         let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
-        assert_eq!(vec![Path::new("test_import_nested_imported_pb.proto")], desc.import_paths);
+        assert_eq!(
+            vec![Path::new("test_import_nested_imported_pb.proto")],
+            desc.import_paths
+        );
     }
 
     #[test]
@@ -378,4 +463,27 @@ mod test {
             assert_eq!(3, mess.oneofs[0].fields.len());
         }
     }
+
+    #[test]
+    fn test_reserved() {
+        let msg = r#"message Sample {
+       reserved 4, 15, 17 to 20, 30;
+       reserved "foo", "bar";
+       uint64 age =1;
+       bytes name =2;
+    }"#;
+
+        let mess = message(msg.as_bytes());
+        if let ::nom::IResult::Done(_, mess) = mess {
+            assert_eq!(Some(vec![4, 15, 17, 18, 19, 20, 30]), mess.reserved_nums);
+            assert_eq!(
+                Some(vec!["foo".to_string(), "bar".to_string()]),
+                mess.reserved_names
+            );
+            assert_eq!(2, mess.fields.len());
+        } else {
+            panic!("Could not parse reserved fields message");
+        }
+    }
+
 }
