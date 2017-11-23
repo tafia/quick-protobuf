@@ -10,7 +10,7 @@
 
 
 use std::io::Write;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -20,12 +20,12 @@ pub struct ContainsImportedNested {
     pub e: Option<test_import_nested_imported_pb::mod_ContainerForNested::NestedEnum>,
 }
 
-impl ContainsImportedNested {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for ContainsImportedNested {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.m = Some(r.read_message(bytes, test_import_nested_imported_pb::mod_ContainerForNested::NestedMessage::from_reader)?),
+                Ok(10) => msg.m = Some(r.read_message::<test_import_nested_imported_pb::mod_ContainerForNested::NestedMessage>(bytes)?),
                 Ok(16) => msg.e = Some(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),

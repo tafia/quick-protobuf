@@ -12,7 +12,7 @@
 use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -43,8 +43,8 @@ pub struct BarMessage {
     pub b_required_int32: i32,
 }
 
-impl BarMessage {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for BarMessage {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
@@ -100,8 +100,8 @@ pub struct FooMessage<'a> {
     pub test_oneof: mod_FooMessage::OneOftest_oneof<'a>,
 }
 
-impl<'a> FooMessage<'a> {
-    pub fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for FooMessage<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = FooMessage {
             f_sint64: 4i64,
             f_bool: true,
@@ -125,14 +125,14 @@ impl<'a> FooMessage<'a> {
                 Ok(117) => msg.f_float = Some(r.read_float(bytes)?),
                 Ok(122) => msg.f_bytes = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(130) => msg.f_string = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(138) => msg.f_self_message = Some(Box::new(r.read_message(bytes, FooMessage::from_reader)?)),
-                Ok(146) => msg.f_bar_message = Some(r.read_message(bytes, BarMessage::from_reader)?),
+                Ok(138) => msg.f_self_message = Some(Box::new(r.read_message::<FooMessage>(bytes)?)),
+                Ok(146) => msg.f_bar_message = Some(r.read_message::<BarMessage>(bytes)?),
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
                 Ok(162) => msg.f_repeated_packed_int32 = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
                 Ok(170) => msg.f_repeated_packed_float = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(178) => msg.f_imported = Some(r.read_message(bytes, a::b::ImportedMessage::from_reader)?),
-                Ok(186) => msg.f_baz = Some(r.read_message(bytes, BazMessage::from_reader)?),
-                Ok(194) => msg.f_nested = Some(r.read_message(bytes, mod_BazMessage::Nested::from_reader)?),
+                Ok(178) => msg.f_imported = Some(r.read_message::<a::b::ImportedMessage>(bytes)?),
+                Ok(186) => msg.f_baz = Some(r.read_message::<BazMessage>(bytes)?),
+                Ok(194) => msg.f_nested = Some(r.read_message::<mod_BazMessage::Nested>(bytes)?),
                 Ok(200) => msg.f_nested_enum = Some(r.read_enum(bytes)?),
                 Ok(210) => {
                     let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_int32(bytes))?;
@@ -245,12 +245,12 @@ pub struct BazMessage {
     pub nested: Option<mod_BazMessage::Nested>,
 }
 
-impl BazMessage {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for BazMessage {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.nested = Some(r.read_message(bytes, mod_BazMessage::Nested::from_reader)?),
+                Ok(10) => msg.nested = Some(r.read_message::<mod_BazMessage::Nested>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -280,12 +280,12 @@ pub struct Nested {
     pub f_nested: mod_BazMessage::mod_Nested::NestedMessage,
 }
 
-impl Nested {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for Nested {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.f_nested = r.read_message(bytes, mod_BazMessage::mod_Nested::NestedMessage::from_reader)?,
+                Ok(10) => msg.f_nested = r.read_message::<mod_BazMessage::mod_Nested::NestedMessage>(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -315,8 +315,8 @@ pub struct NestedMessage {
     pub f_nested: i32,
 }
 
-impl NestedMessage {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for NestedMessage {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {

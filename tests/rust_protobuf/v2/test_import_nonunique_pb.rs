@@ -10,7 +10,7 @@
 
 
 use std::io::Write;
-use quick_protobuf::{MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -20,13 +20,13 @@ pub struct TestImportNonunque {
     pub n2: Option<nonunique_2::Nonunique>,
 }
 
-impl TestImportNonunque {
-    pub fn from_reader(r: &mut BytesReader, bytes: &[u8]) -> Result<Self> {
+impl<'a> MessageRead<'a> for TestImportNonunque {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.n1 = Some(r.read_message(bytes, nonunique_1::Nonunique::from_reader)?),
-                Ok(18) => msg.n2 = Some(r.read_message(bytes, nonunique_2::Nonunique::from_reader)?),
+                Ok(10) => msg.n1 = Some(r.read_message::<nonunique_1::Nonunique>(bytes)?),
+                Ok(18) => msg.n2 = Some(r.read_message::<nonunique_2::Nonunique>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }

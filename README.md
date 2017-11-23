@@ -82,15 +82,17 @@ fn main() {
     // Use the generated module fns with the reader to convert your data into rust structs.
     //
     // Depending on your input file, the message can or not be prefixed with the encoded length
-    // for instance, a *stream* which contains several messages generally split them using this 
+    // for instance, a *stream* which contains several messages generally split them using this
     // technique (see https://developers.google.com/protocol-buffers/docs/techniques#streaming)
     //
     // To read a message without a length prefix you can directly call `FooBar::from_reader`:
     // let foobar = reader.read(FooBar::from_reader).expect("Cannot read FooBar message");
     // 
     // Else to read a length then a message, you can use:
-    let foobar = reader.read(|r, b| r.read_message(b, FooBar::from_reader))
+    let foobar: FooBar = reader.read(|r, b| r.read_message(b))
         .expect("Cannot read FooBar message");
+    // Reader::read_message uses `FooBar::from_reader` internally through the `MessageRead`
+    // trait.
 
     println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
 }
