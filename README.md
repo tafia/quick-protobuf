@@ -36,13 +36,13 @@ It provides both:
 
 ## Example: protobuf_example project
 
- - 1. Use `pb-rs` binary, located into `codegen` directory to automatically generate a foo_bar.rs module from a foo_bar.proto proto file
+ - 1. Install **pb-rs** binary to convert your proto file into a **quick-protobuf** compatible source code
 
 ```sh
-git clone https://github.com/tafia/quick-protobuf
-cd quick-protobuf/codegen
-cargo run ../../protobuf_example/foo_bar.proto
-cd ../../protobuf_example
+cargo install pb-rs
+pb-rs /path/to/your/protobuf/file.proto
+# will generate a 
+# /path/to/your/protobuf/file.rs
 ```
 
  - 2. Add a dependency to quick-protobuf
@@ -50,7 +50,7 @@ cd ../../protobuf_example
 ```toml
 # Cargo.toml
 [dependencies]
-quick-protobuf = "0.4.0"
+quick-protobuf = "0.6.0"
 ```
 
  - 3. Have fun
