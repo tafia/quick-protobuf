@@ -2,7 +2,6 @@
 //!
 //! This module is used primilarly when implementing the `MessageWrite::get_size`
 
-
 /// Computes the binary size of the varint encoded u64
 ///
 /// https://developers.google.com/protocol-buffers/docs/encoding

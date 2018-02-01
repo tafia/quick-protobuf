@@ -234,19 +234,22 @@ impl TestOptionalMessages {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => {
-                    msg.message1 = Some(Box::new(
-                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
-                    ))
+                    msg.message1 = Some(Box::new(r.read_message(
+                        bytes,
+                        TestOptionalMessages::from_reader,
+                    )?))
                 }
                 Ok(18) => {
-                    msg.message2 = Some(Box::new(
-                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
-                    ))
+                    msg.message2 = Some(Box::new(r.read_message(
+                        bytes,
+                        TestOptionalMessages::from_reader,
+                    )?))
                 }
                 Ok(26) => {
-                    msg.message3 = Some(Box::new(
-                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
-                    ))
+                    msg.message3 = Some(Box::new(r.read_message(
+                        bytes,
+                        TestOptionalMessages::from_reader,
+                    )?))
                 }
                 Ok(t) => {
                     r.read_unknown(bytes, t)?;
@@ -397,9 +400,7 @@ impl<'a> MessageWrite for TestMap<'a> {
     fn get_size(&self) -> usize {
         self.value
             .iter()
-            .map(|(k, v)| {
-                1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))
-            })
+            .map(|(k, v)| 1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64)))
             .sum::<usize>()
     }
 

@@ -11,7 +11,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::fs::File;
 
-use errors::{Error, ErrorKind, Result};
+use errors::{Error, Result};
 use message::MessageRead;
 
 use byteorder::LittleEndian as LE;
@@ -91,7 +91,10 @@ impl BytesReader {
     #[inline(always)]
     fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
         let b = bytes.get(self.start).ok_or_else::<Error, _>(|| {
-            io::Error::new(io::ErrorKind::UnexpectedEof, "Cannot read next bytes").into()
+            Error::Io(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Cannot read next bytes",
+            ))
         })?;
         self.start += 1;
         Ok(*b)
@@ -138,7 +141,7 @@ impl BytesReader {
         }
 
         // cannot read more than 10 bytes
-        Err(ErrorKind::Varint.into())
+        Err(Error::Varint)
     }
 
     /// Reads the next varint encoded u64
@@ -208,7 +211,7 @@ impl BytesReader {
         }
 
         // cannot read more than 10 bytes
-        Err(ErrorKind::Varint.into())
+        Err(Error::Varint)
     }
 
     /// Reads int32 (varint)
@@ -361,12 +364,10 @@ impl BytesReader {
     pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a [u8]) -> Result<&'a [M]> {
         let len = self.read_varint32(bytes)? as usize;
         if self.len() < len {
-            return Err(
-                io::Error::new(
-                    io::ErrorKind::UnexpectedEof,
-                    "Cannot read fixed packed field",
-                ).into(),
-            );
+            return Err(Error::Io(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Cannot read fixed packed field",
+            )));
         }
         let n = len / ::std::mem::size_of::<M>();
         let slice = unsafe {
@@ -410,7 +411,7 @@ impl BytesReader {
                 match t >> 3 {
                     1 => k = read_key(r, bytes)?,
                     2 => v = read_val(r, bytes)?,
-                    t => return Err(ErrorKind::Map(t).into()),
+                    t => return Err(Error::Map(t)),
                 }
             }
             Ok((k, v))
@@ -431,10 +432,10 @@ impl BytesReader {
                 self.start += len;
             }
             WIRE_TYPE_START_GROUP | WIRE_TYPE_END_GROUP => {
-                return Err(ErrorKind::Deprecated("group").into());
+                return Err(Error::Deprecated("group"));
             }
             t => {
-                return Err(ErrorKind::UnknownWireType(t).into());
+                return Err(Error::UnknownWireType(t));
             }
         }
         Ok(())

@@ -2,7 +2,6 @@ use quick_protobuf::*;
 
 use super::test_required::*;
 
-
 #[test]
 fn test_write_missing_required() {
     let mut buf = Vec::new();

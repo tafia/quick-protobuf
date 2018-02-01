@@ -1,44 +1,56 @@
 //! A module to handle all errors via error-chain crate
 
-#![allow(missing_docs)]
+use std::io;
+use failure::Fail;
 
-error_chain! {
-    foreign_links {
-        Io(::std::io::Error);
-        StrUtf8(::std::str::Utf8Error);
-    }
-    errors {
-        Deprecated(feat: &'static str) {
-            description("deprecated feature")
-            display("feature '{}' has been deprecated", feat)
-        }
-        UnknownWireType(t: u8) {
-            description("unknown wire type")
-            display("wire type must be less than 6, found {}", t)
-        }
-        Varint {
-            description("cannot decode varint")
-        }
-        ParseMessage(s: String) {
-            description("error while parsing message")
-            display("error while parsing message: {}", s)
-        }
-        Map(tag: u8) {
-            description("unexpected map tag")
-            display("expecting a tag number 1 or 2, got {}", tag)
+/// An error enum which derives `Fail`
+#[derive(Debug, Fail)]
+pub enum Error {
+    /// Io error
+    #[fail(display = "{}", _0)]
+    Io(#[cause] io::Error),
+    /// Utf8 Error
+    #[fail(display = "{}", _0)]
+    Utf8(#[cause] ::std::str::Utf8Error),
+
+    /// Deprecated feature (in protocol buffer specification)
+    #[fail(display = "Feature '{}' has been deprecated", _0)]
+    Deprecated(&'static str),
+    /// Unknown wire type
+    #[fail(display = "Unknown wire type '{}', must be less than 6", _0)]
+    UnknownWireType(u8),
+    /// Varint decoding error
+    #[fail(display = "Cannot decode varint")]
+    Varint,
+    /// Error while parsing protocol buffer message
+    #[fail(display = "Error while parsing message: {}", _0)]
+    Message(String),
+    /// Unexpected map tag
+    #[fail(display = "Unexpected map tag: '{}', expecting 1 or 2", _0)]
+    Map(u8),
+}
+
+/// A wrapper for `Result<T, Error>`
+pub type Result<T> = ::std::result::Result<T, Error>;
+
+impl Into<io::Error> for Error {
+    fn into(self) -> ::std::io::Error {
+        match self {
+            Error::Io(x) => x,
+            Error::Utf8(x) => io::Error::new(io::ErrorKind::InvalidData, x),
+            x => io::Error::new(io::ErrorKind::Other, x.compat()),
         }
     }
 }
 
-unsafe impl Sync for Error {}
+impl From<io::Error> for Error {
+    fn from(e: io::Error) -> Error {
+        Error::Io(e)
+    }
+}
 
-impl Into<::std::io::Error> for Error {
-    fn into(self) -> ::std::io::Error {
-        use std::io;
-        match self {
-            Error(ErrorKind::Io(x), _) => x,
-            Error(ErrorKind::StrUtf8(x), _) => io::Error::new(io::ErrorKind::InvalidData, x),
-            x => io::Error::new(io::ErrorKind::Other, x),
-        }
+impl From<::std::str::Utf8Error> for Error {
+    fn from(e: ::std::str::Utf8Error) -> Error {
+        Error::Utf8(e)
     }
 }
