@@ -1,8 +1,12 @@
 [package]
 name = "pb-rs"
 version = "0.2.0"
-authors = ["Johann Tuffe"]
 description = "A converter from proto files into quick-protobuf compatible rust module"
+authors = ["Johann Tuffe <tafia973@gmail.com>"]
+keywords = ["protobuf", "parser", "quick-protobuf"]
+license = "MIT"
+readme = "README.md" 
+repository = "https://github.com/tafia/quick-protobuf"
 
 [dependencies]
 nom = "3.2.1"
