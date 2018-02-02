@@ -43,8 +43,8 @@ impl MessageWrite for TestImportNonunque {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.n1 { w.write_with_tag(10, |w| w.write_message(s))?; }
-        if let Some(ref s) = self.n2 { w.write_with_tag(18, |w| w.write_message(s))?; }
+        if let Some(ref s) =self.n1 { w.write_with_tag(10, |w| w.write_message(s))?; }
+        if let Some(ref s) =self.n2 { w.write_with_tag(18, |w| w.write_message(s))?; }
         Ok(())
     }
 }

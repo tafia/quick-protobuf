@@ -61,7 +61,7 @@ impl MessageWrite for MessageForOneof {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.f { w.write_with_tag(8, |w| w.write_int32(*s))?; }
+        if let Some(ref s) =self.f { w.write_with_tag(8, |w| w.write_int32(*s))?; }
         Ok(())
     }
 }
@@ -129,7 +129,7 @@ impl<'a> MessageWrite for TestOneof<'a> {
     }    }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.s { w.write_with_tag(234, |w| w.write_string(&**s))?; }
+        if let Some(ref s) =self.s { w.write_with_tag(234, |w| w.write_string(&**s))?; }
         match self.one {            mod_TestOneof::OneOfone::double_field(ref m) => { w.write_with_tag(9, |w| w.write_double(*m))? },
             mod_TestOneof::OneOfone::float_field(ref m) => { w.write_with_tag(21, |w| w.write_float(*m))? },
             mod_TestOneof::OneOfone::int32_field(ref m) => { w.write_with_tag(24, |w| w.write_int32(*m))? },

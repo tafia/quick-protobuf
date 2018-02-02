@@ -146,11 +146,16 @@ fn path_vec(maybe_vec: std::result::Result<Vec<String>, clap::Error>) -> Vec<Pat
 }
 
 fn main() {
-    if let Err(e) = run() {
-        eprintln!("pb-rs fatal error");
-        let mut e = &e;
-        for e in e.causes() {
-            eprintln!("  - {}", e);
+    ::std::process::exit({
+        if let Err(e) = run() {
+            eprintln!("pb-rs fatal error");
+            let mut e = &e;
+            for e in e.causes() {
+                eprintln!("  - {}", e);
+            }
+            1
+        } else {
+            0
         }
-    }
+    });
 }

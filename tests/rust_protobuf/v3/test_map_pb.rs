@@ -83,7 +83,7 @@ impl MessageWrite for TestMapEntry {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.v { w.write_with_tag(8, |w| w.write_int64(*s))?; }
+        if let Some(ref s) =self.v { w.write_with_tag(8, |w| w.write_int64(*s))?; }
         Ok(())
     }
 }

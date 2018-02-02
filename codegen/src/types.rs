@@ -1533,6 +1533,11 @@ impl FileDescriptor {
         Ok(())
     }
 
+    fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
+        writeln!(w, "")?;
+        Ok(())
+    }
+
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
         if self.messages.iter().all(|m| m.is_unit()) {
             writeln!(w, "use quick_protobuf::{{BytesReader, Result, MessageRead, MessageWrite}};")?;
@@ -1573,11 +1578,6 @@ impl FileDescriptor {
             write!(w, "super::")?;
         }
         writeln!(w, "*;")?;
-        Ok(())
-    }
-
-    fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
-        writeln!(w, "")?;
         Ok(())
     }
 

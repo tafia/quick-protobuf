@@ -63,7 +63,7 @@ impl MessageWrite for TestMessage {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.value { w.write_with_tag(80, |w| w.write_int32(*s))?; }
+        if let Some(ref s) =self.value { w.write_with_tag(80, |w| w.write_int32(*s))?; }
         Ok(())
     }
 }
@@ -193,23 +193,23 @@ impl<'a> MessageWrite for TestTypes<'a> {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.double_singular { w.write_with_tag(9, |w| w.write_double(*s))?; }
-        if let Some(ref s) = self.float_singular { w.write_with_tag(21, |w| w.write_float(*s))?; }
-        if let Some(ref s) = self.int32_singular { w.write_with_tag(24, |w| w.write_int32(*s))?; }
-        if let Some(ref s) = self.int64_singular { w.write_with_tag(32, |w| w.write_int64(*s))?; }
-        if let Some(ref s) = self.uint32_singular { w.write_with_tag(40, |w| w.write_uint32(*s))?; }
-        if let Some(ref s) = self.uint64_singular { w.write_with_tag(48, |w| w.write_uint64(*s))?; }
-        if let Some(ref s) = self.sint32_singular { w.write_with_tag(56, |w| w.write_sint32(*s))?; }
-        if let Some(ref s) = self.sint64_singular { w.write_with_tag(64, |w| w.write_sint64(*s))?; }
-        if let Some(ref s) = self.fixed32_singular { w.write_with_tag(77, |w| w.write_fixed32(*s))?; }
-        if let Some(ref s) = self.fixed64_singular { w.write_with_tag(81, |w| w.write_fixed64(*s))?; }
-        if let Some(ref s) = self.sfixed32_singular { w.write_with_tag(93, |w| w.write_sfixed32(*s))?; }
-        if let Some(ref s) = self.sfixed64_singular { w.write_with_tag(97, |w| w.write_sfixed64(*s))?; }
-        if let Some(ref s) = self.bool_singular { w.write_with_tag(104, |w| w.write_bool(*s))?; }
-        if let Some(ref s) = self.string_singular { w.write_with_tag(114, |w| w.write_string(&**s))?; }
-        if let Some(ref s) = self.bytes_singular { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
-        if let Some(ref s) = self.test_enum_singular { w.write_with_tag(128, |w| w.write_enum(*s as i32))?; }
-        if let Some(ref s) = self.test_message_singular { w.write_with_tag(138, |w| w.write_message(s))?; }
+        if let Some(ref s) =self.double_singular { w.write_with_tag(9, |w| w.write_double(*s))?; }
+        if let Some(ref s) =self.float_singular { w.write_with_tag(21, |w| w.write_float(*s))?; }
+        if let Some(ref s) =self.int32_singular { w.write_with_tag(24, |w| w.write_int32(*s))?; }
+        if let Some(ref s) =self.int64_singular { w.write_with_tag(32, |w| w.write_int64(*s))?; }
+        if let Some(ref s) =self.uint32_singular { w.write_with_tag(40, |w| w.write_uint32(*s))?; }
+        if let Some(ref s) =self.uint64_singular { w.write_with_tag(48, |w| w.write_uint64(*s))?; }
+        if let Some(ref s) =self.sint32_singular { w.write_with_tag(56, |w| w.write_sint32(*s))?; }
+        if let Some(ref s) =self.sint64_singular { w.write_with_tag(64, |w| w.write_sint64(*s))?; }
+        if let Some(ref s) =self.fixed32_singular { w.write_with_tag(77, |w| w.write_fixed32(*s))?; }
+        if let Some(ref s) =self.fixed64_singular { w.write_with_tag(81, |w| w.write_fixed64(*s))?; }
+        if let Some(ref s) =self.sfixed32_singular { w.write_with_tag(93, |w| w.write_sfixed32(*s))?; }
+        if let Some(ref s) =self.sfixed64_singular { w.write_with_tag(97, |w| w.write_sfixed64(*s))?; }
+        if let Some(ref s) =self.bool_singular { w.write_with_tag(104, |w| w.write_bool(*s))?; }
+        if let Some(ref s) =self.string_singular { w.write_with_tag(114, |w| w.write_string(&**s))?; }
+        if let Some(ref s) =self.bytes_singular { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
+        if let Some(ref s) =self.test_enum_singular { w.write_with_tag(128, |w| w.write_enum(*s as i32))?; }
+        if let Some(ref s) =self.test_message_singular { w.write_with_tag(138, |w| w.write_message(s))?; }
         for s in &self.double_repeated { w.write_with_tag(249, |w| w.write_double(*s))?; }
         for s in &self.float_repeated { w.write_with_tag(261, |w| w.write_float(*s))?; }
         for s in &self.int32_repeated { w.write_with_tag(264, |w| w.write_int32(*s))?; }
@@ -257,7 +257,7 @@ impl MessageWrite for TestTextFormatRustIdentifier {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.const_pb { w.write_with_tag(8, |w| w.write_bool(*s))?; }
+        if let Some(ref s) =self.const_pb { w.write_with_tag(8, |w| w.write_bool(*s))?; }
         Ok(())
     }
 }
