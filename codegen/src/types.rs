@@ -2,7 +2,7 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 
-use errors::{Error, ErrorKind, Result};
+use errors::{Error, Result};
 use parser::file_descriptor;
 use keywords::sanitize_keyword;
 
@@ -86,14 +86,14 @@ impl FieldType {
 
     fn wire_type_num_non_packed(&self) -> u32 {
         match *self {
-            FieldType::Int32 |
-            FieldType::Sint32 |
-            FieldType::Int64 |
-            FieldType::Sint64 |
-            FieldType::Uint32 |
-            FieldType::Uint64 |
-            FieldType::Bool |
-            FieldType::Enum(_) => 0,
+            FieldType::Int32
+            | FieldType::Sint32
+            | FieldType::Int64
+            | FieldType::Sint64
+            | FieldType::Uint32
+            | FieldType::Uint64
+            | FieldType::Bool
+            | FieldType::Enum(_) => 0,
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => 1,
             FieldType::String_ | FieldType::Bytes | FieldType::Message(_) | FieldType::Map(_) => 2,
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
@@ -226,12 +226,12 @@ impl FieldType {
             FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
             FieldType::Message(_) => self.find_message(&desc.messages)
                 .map_or(false, |m| m.has_lifetime(desc)),
-            FieldType::Fixed64 |
-            FieldType::Sfixed64 |
-            FieldType::Double |
-            FieldType::Fixed32 |
-            FieldType::Sfixed32 |
-            FieldType::Float => packed, // Cow<[M]>
+            FieldType::Fixed64
+            | FieldType::Sfixed64
+            | FieldType::Double
+            | FieldType::Fixed32
+            | FieldType::Sfixed32
+            | FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref m) => {
                 let &(ref key, ref value) = &**m;
                 key.has_lifetime(desc, false) || value.has_lifetime(desc, false)
@@ -253,18 +253,14 @@ impl FieldType {
             FieldType::Bool => "bool".to_string(),
             FieldType::Enum(ref e) => match self.find_enum(&desc.messages, &desc.enums) {
                 Some(e) => format!("{}{}", e.get_modules(desc), e.name),
-                None => bail!("Could not find enum {} in {:?}", e, desc.enums),
+                None => return Err(Error::EnumNotFound(e.to_string())),
             },
             FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
                 Some(m) => {
                     let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
                     format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
                 }
-                None => bail!(format!(
-                    "Could not find message {} in {:?}",
-                    msg,
-                    desc.messages
-                )),
+                None => return Err(Error::MessageNotFound(msg.to_string())),
             },
             FieldType::Map(ref t) => {
                 let &(ref key, ref value) = &**t;
@@ -285,9 +281,9 @@ impl FieldType {
                     let m = format!("r.read_message::<{}{}>(bytes)", m.get_modules(desc), m.name);
                     (m.clone(), m)
                 }
-                None => bail!(format!("Could not find message {}", msg)),
+                None => return Err(Error::MessageNotFound(msg.to_string())),
             },
-            FieldType::Map(_) => bail!("There should be a special case for maps"),
+            FieldType::Map(_) => return Err(Error::ReadFnMap),
             FieldType::String_ | FieldType::Bytes => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let cow = format!("{}.map(Cow::Borrowed)", m);
@@ -302,12 +298,12 @@ impl FieldType {
 
     fn get_size(&self, s: &str) -> String {
         match *self {
-            FieldType::Int32 |
-            FieldType::Int64 |
-            FieldType::Uint32 |
-            FieldType::Uint64 |
-            FieldType::Bool |
-            FieldType::Enum(_) => format!("sizeof_varint(*({}) as u64)", s),
+            FieldType::Int32
+            | FieldType::Int64
+            | FieldType::Uint32
+            | FieldType::Uint64
+            | FieldType::Bool
+            | FieldType::Enum(_) => format!("sizeof_varint(*({}) as u64)", s),
             FieldType::Sint32 => format!("sizeof_sint32(*({}))", s),
             FieldType::Sint64 => format!("sizeof_sint64(*({}))", s),
 
@@ -329,19 +325,19 @@ impl FieldType {
         match *self {
             FieldType::Enum(_) => format!("write_enum(*{} as i32)", s),
 
-            FieldType::Int32 |
-            FieldType::Sint32 |
-            FieldType::Int64 |
-            FieldType::Sint64 |
-            FieldType::Uint32 |
-            FieldType::Uint64 |
-            FieldType::Bool |
-            FieldType::Fixed64 |
-            FieldType::Sfixed64 |
-            FieldType::Double |
-            FieldType::Fixed32 |
-            FieldType::Sfixed32 |
-            FieldType::Float => format!("write_{}(*{})", self.proto_type(), s),
+            FieldType::Int32
+            | FieldType::Sint32
+            | FieldType::Int64
+            | FieldType::Sint64
+            | FieldType::Uint32
+            | FieldType::Uint64
+            | FieldType::Bool
+            | FieldType::Fixed64
+            | FieldType::Sfixed64
+            | FieldType::Double
+            | FieldType::Fixed32
+            | FieldType::Sfixed32
+            | FieldType::Float => format!("write_{}(*{})", self.proto_type(), s),
 
             FieldType::String_ => format!("write_string(&**{})", s),
             FieldType::Bytes => format!("write_bytes(&**{})", s),
@@ -494,8 +490,7 @@ impl Field {
                 writeln!(
                     w,
                     "msg.{} = r.read_packed(bytes, |r, bytes| {})?,",
-                    name,
-                    val_cow
+                    name, val_cow
                 )?;
             }
             Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val_cow)?,
@@ -546,8 +541,7 @@ impl Field {
                 write!(
                     w,
                     "if self.{}.is_empty() {{ 0 }} else {{ {} + ",
-                    self.name,
-                    tag_size
+                    self.name, tag_size
                 )?;
                 match self.typ.wire_type_num_non_packed() {
                     1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
@@ -600,7 +594,7 @@ impl Field {
                 None => {
                     writeln!(
                         w,
-                        "        if let Some(ref s) =\
+                        "        if let Some(ref s) = \
                          self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
                         self.name,
                         self.tag(),
@@ -661,7 +655,6 @@ fn get_modules(module: &str, imported: bool, desc: &FileDescriptor) -> String {
         .collect()
 }
 
-
 #[derive(Debug, Clone, Default)]
 pub struct Message {
     pub name: String,
@@ -707,7 +700,6 @@ impl Message {
             e.imported = true;
         }
     }
-
 
     fn get_modules(&self, desc: &FileDescriptor) -> String {
         get_modules(&self.module, self.imported, desc)
@@ -792,7 +784,10 @@ impl Message {
     fn write_impl_message_read<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         if self.is_unit() {
             writeln!(w, "impl<'a> MessageRead<'a> for {} {{", self.name)?;
-            writeln!(w, "    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{")?;
+            writeln!(
+                w,
+                "    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {{"
+            )?;
             writeln!(w, "        r.read_to_end();")?;
             writeln!(w, "        Ok(Self::default())")?;
             writeln!(w, "    }}")?;
@@ -802,10 +797,16 @@ impl Message {
 
         if self.has_lifetime(desc) {
             writeln!(w, "impl<'a> MessageRead<'a> for {}<'a> {{", self.name)?;
-            writeln!(w, "    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
+            writeln!(
+                w,
+                "    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{"
+            )?;
         } else {
             writeln!(w, "impl<'a> MessageRead<'a> for {} {{", self.name)?;
-            writeln!(w, "    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{")?;
+            writeln!(
+                w,
+                "    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {{"
+            )?;
         }
 
         let unregular_defaults = self.fields
@@ -912,13 +913,11 @@ impl Message {
                     .as_ref()
                     .map_or(false, |nums| nums.contains(&f.number))
             {
-                return Err(
-                    ErrorKind::InvalidMessage(format!(
-                        "Error in message {}\nField {:?} conflict with reserved fields",
-                        self.name,
-                        f
-                    )).into(),
-                );
+                return Err(Error::InvalidMessage(format!(
+                    "Error in message {}\n\
+                     Field {:?} conflict with reserved fields",
+                    self.name, f
+                )));
             }
         }
         Ok(())
@@ -1312,7 +1311,7 @@ impl FileDescriptor {
 
         if desc.messages.is_empty() && desc.enums.is_empty() {
             // There could had been unsupported structures, so bail early
-            bail!(ErrorKind::EmptyRead);
+            return Err(Error::EmptyRead);
         }
 
         desc.set_enums();
@@ -1327,7 +1326,6 @@ impl FileDescriptor {
         if config.single_module {
             desc.package = "".to_string();
         }
-
 
         let (prefix, file_package) = split_package(&desc.package);
 
@@ -1392,7 +1390,7 @@ impl FileDescriptor {
             let mut reader = BufReader::new(f);
             reader.read_to_end(&mut buf)?;
         }
-        let mut desc = file_descriptor(&buf).to_result()?;
+        let mut desc = file_descriptor(&buf).to_result().map_err(Error::Nom)?;
 
         // proto files with no packages are given an implicit module,
         // since every generated Rust source file represents a module
@@ -1412,7 +1410,6 @@ impl FileDescriptor {
         }
         Ok(())
     }
-
 
     /// Get messages and enums from imports
     fn fetch_imports(&mut self, in_file: &Path, import_search_path: &[PathBuf]) -> Result<()> {
@@ -1442,12 +1439,10 @@ impl FileDescriptor {
                 }
             }
             if matching_file.is_none() {
-                return Err(
-                    ErrorKind::InvalidImport(format!(
-                        "file {} not found on import path",
-                        import.display()
-                    )).into(),
-                );
+                return Err(Error::InvalidImport(format!(
+                    "file {} not found on import path",
+                    import.display()
+                )));
             }
             let proto_file = matching_file.unwrap();
             let mut f = FileDescriptor::read_proto(&proto_file, import_search_path)?;
@@ -1546,9 +1541,17 @@ impl FileDescriptor {
         Ok(())
     }
 
+    fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
+        writeln!(w, "")?;
+        Ok(())
+    }
+
     fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
         if self.messages.iter().all(|m| m.is_unit()) {
-            writeln!(w, "use quick_protobuf::{{BytesReader, Result, MessageRead, MessageWrite}};")?;
+            writeln!(
+                w,
+                "use quick_protobuf::{{BytesReader, Result, MessageRead, MessageWrite}};"
+            )?;
             return Ok(());
         }
         writeln!(w, "use std::io::Write;")?;
@@ -1568,7 +1571,10 @@ impl FileDescriptor {
         }) {
             writeln!(w, "use std::collections::HashMap;")?;
         }
-        writeln!(w, "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};")?;
+        writeln!(
+            w,
+            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
+        )?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
         Ok(())
     }
@@ -1586,11 +1592,6 @@ impl FileDescriptor {
             write!(w, "super::")?;
         }
         writeln!(w, "*;")?;
-        Ok(())
-    }
-
-    fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
-        writeln!(w, "")?;
         Ok(())
     }
 
@@ -1738,7 +1739,7 @@ fn get_file_stem(path: &Path) -> Result<String> {
     let mut file_stem = path.file_stem()
         .and_then(|f| f.to_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| Error::from(ErrorKind::OutputFile(path.to_owned())))?;
+        .ok_or_else(|| Error::from(Error::OutputFile(format!("{}", path.display()))))?;
 
     file_stem = file_stem.replace(|c: char| !c.is_alphanumeric(), "_");
     // will now be properly alphanumeric, but may be a keyword!
