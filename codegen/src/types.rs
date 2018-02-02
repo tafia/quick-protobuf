@@ -594,7 +594,7 @@ impl Field {
                 None => {
                     writeln!(
                         w,
-                        "        if let Some(ref s) =\
+                        "        if let Some(ref s) = \
                          self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
                         self.name,
                         self.tag(),

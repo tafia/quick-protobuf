@@ -224,7 +224,7 @@ impl MessageWrite for TestEmpty {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) =self.foo { w.write_with_tag(80, |w| w.write_int32(*s))?; }
+        if let Some(ref s) = self.foo { w.write_with_tag(80, |w| w.write_int32(*s))?; }
         Ok(())
     }
 }
@@ -289,8 +289,8 @@ impl MessageWrite for TestSelfReference {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) =self.r1 { w.write_with_tag(10, |w| w.write_message(&**s))?; }
-        if let Some(ref s) =self.r2 { w.write_with_tag(18, |w| w.write_message(&**s))?; }
+        if let Some(ref s) = self.r1 { w.write_with_tag(10, |w| w.write_message(&**s))?; }
+        if let Some(ref s) = self.r2 { w.write_with_tag(18, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
@@ -321,7 +321,7 @@ impl<'a> MessageWrite for TestDefaultInstanceField<'a> {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) =self.s { w.write_with_tag(10, |w| w.write_string(&**s))?; }
+        if let Some(ref s) = self.s { w.write_with_tag(10, |w| w.write_string(&**s))?; }
         Ok(())
     }
 }
@@ -352,7 +352,7 @@ impl<'a> MessageWrite for TestDefaultInstance<'a> {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) =self.field { w.write_with_tag(10, |w| w.write_message(s))?; }
+        if let Some(ref s) = self.field { w.write_with_tag(10, |w| w.write_message(s))?; }
         Ok(())
     }
 }
@@ -383,7 +383,7 @@ impl MessageWrite for TestDescriptor {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) =self.stuff { w.write_with_tag(80, |w| w.write_int32(*s))?; }
+        if let Some(ref s) = self.stuff { w.write_with_tag(80, |w| w.write_int32(*s))?; }
         Ok(())
     }
 }
@@ -459,22 +459,22 @@ impl<'a> MessageWrite for TestTypesSingular<'a> {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) =self.double_field { w.write_with_tag(9, |w| w.write_double(*s))?; }
-        if let Some(ref s) =self.float_field { w.write_with_tag(21, |w| w.write_float(*s))?; }
-        if let Some(ref s) =self.int32_field { w.write_with_tag(24, |w| w.write_int32(*s))?; }
-        if let Some(ref s) =self.int64_field { w.write_with_tag(32, |w| w.write_int64(*s))?; }
-        if let Some(ref s) =self.uint32_field { w.write_with_tag(40, |w| w.write_uint32(*s))?; }
-        if let Some(ref s) =self.uint64_field { w.write_with_tag(48, |w| w.write_uint64(*s))?; }
-        if let Some(ref s) =self.sint32_field { w.write_with_tag(56, |w| w.write_sint32(*s))?; }
-        if let Some(ref s) =self.sint64_field { w.write_with_tag(64, |w| w.write_sint64(*s))?; }
-        if let Some(ref s) =self.fixed32_field { w.write_with_tag(77, |w| w.write_fixed32(*s))?; }
-        if let Some(ref s) =self.fixed64_field { w.write_with_tag(81, |w| w.write_fixed64(*s))?; }
-        if let Some(ref s) =self.sfixed32_field { w.write_with_tag(93, |w| w.write_sfixed32(*s))?; }
-        if let Some(ref s) =self.sfixed64_field { w.write_with_tag(97, |w| w.write_sfixed64(*s))?; }
-        if let Some(ref s) =self.bool_field { w.write_with_tag(104, |w| w.write_bool(*s))?; }
-        if let Some(ref s) =self.string_field { w.write_with_tag(114, |w| w.write_string(&**s))?; }
-        if let Some(ref s) =self.bytes_field { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
-        if let Some(ref s) =self.enum_field { w.write_with_tag(128, |w| w.write_enum(*s as i32))?; }
+        if let Some(ref s) = self.double_field { w.write_with_tag(9, |w| w.write_double(*s))?; }
+        if let Some(ref s) = self.float_field { w.write_with_tag(21, |w| w.write_float(*s))?; }
+        if let Some(ref s) = self.int32_field { w.write_with_tag(24, |w| w.write_int32(*s))?; }
+        if let Some(ref s) = self.int64_field { w.write_with_tag(32, |w| w.write_int64(*s))?; }
+        if let Some(ref s) = self.uint32_field { w.write_with_tag(40, |w| w.write_uint32(*s))?; }
+        if let Some(ref s) = self.uint64_field { w.write_with_tag(48, |w| w.write_uint64(*s))?; }
+        if let Some(ref s) = self.sint32_field { w.write_with_tag(56, |w| w.write_sint32(*s))?; }
+        if let Some(ref s) = self.sint64_field { w.write_with_tag(64, |w| w.write_sint64(*s))?; }
+        if let Some(ref s) = self.fixed32_field { w.write_with_tag(77, |w| w.write_fixed32(*s))?; }
+        if let Some(ref s) = self.fixed64_field { w.write_with_tag(81, |w| w.write_fixed64(*s))?; }
+        if let Some(ref s) = self.sfixed32_field { w.write_with_tag(93, |w| w.write_sfixed32(*s))?; }
+        if let Some(ref s) = self.sfixed64_field { w.write_with_tag(97, |w| w.write_sfixed64(*s))?; }
+        if let Some(ref s) = self.bool_field { w.write_with_tag(104, |w| w.write_bool(*s))?; }
+        if let Some(ref s) = self.string_field { w.write_with_tag(114, |w| w.write_string(&**s))?; }
+        if let Some(ref s) = self.bytes_field { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
+        if let Some(ref s) = self.enum_field { w.write_with_tag(128, |w| w.write_enum(*s as i32))?; }
         Ok(())
     }
 }
@@ -733,8 +733,8 @@ impl MessageWrite for TestBugSint {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) =self.s32 { w.write_with_tag(8, |w| w.write_sint32(*s))?; }
-        if let Some(ref s) =self.s64 { w.write_with_tag(16, |w| w.write_sint64(*s))?; }
+        if let Some(ref s) = self.s32 { w.write_with_tag(8, |w| w.write_sint32(*s))?; }
+        if let Some(ref s) = self.s64 { w.write_with_tag(16, |w| w.write_sint64(*s))?; }
         Ok(())
     }
 }

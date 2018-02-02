@@ -148,7 +148,6 @@ fn main() {
     ::std::process::exit({
         if let Err(e) = run() {
             eprintln!("pb-rs fatal error");
-            let mut e = &e;
             for e in e.causes() {
                 eprintln!("  - {}", e);
             }

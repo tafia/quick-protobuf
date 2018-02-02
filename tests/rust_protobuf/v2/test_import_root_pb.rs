@@ -43,8 +43,8 @@ impl MessageWrite for ContainsImported {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) =self.imported_message { w.write_with_tag(10, |w| w.write_message(s))?; }
-        if let Some(ref s) =self.imported_enum { w.write_with_tag(16, |w| w.write_enum(*s as i32))?; }
+        if let Some(ref s) = self.imported_message { w.write_with_tag(10, |w| w.write_message(s))?; }
+        if let Some(ref s) = self.imported_enum { w.write_with_tag(16, |w| w.write_enum(*s as i32))?; }
         Ok(())
     }
 }

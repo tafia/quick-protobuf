@@ -147,7 +147,7 @@ impl<'a> MessageWrite for TestDefaultValues<'a> {
         if self.string_field != Cow::Borrowed("abc\n22") { w.write_with_tag(114, |w| w.write_string(&**&self.string_field))?; }
         if self.bytes_field != Cow::Borrowed(b"cde\n33") { w.write_with_tag(122, |w| w.write_bytes(&**&self.bytes_field))?; }
         if self.enum_field != test_default_values::EnumForDefaultValue::TWO { w.write_with_tag(128, |w| w.write_enum(*&self.enum_field as i32))?; }
-        if let Some(ref s) =self.enum_field_without_default { w.write_with_tag(136, |w| w.write_enum(*s as i32))?; }
+        if let Some(ref s) = self.enum_field_without_default { w.write_with_tag(136, |w| w.write_enum(*s as i32))?; }
         Ok(())
     }
 }
