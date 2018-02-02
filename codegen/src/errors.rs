@@ -50,7 +50,6 @@ pub enum Error {
     /// read_fn implementation for Maps
     #[fail(display = "There should be a special case for maps")]
     ReadFnMap,
-    
 }
 
 /// A wrapper for `Result<T, Error>`

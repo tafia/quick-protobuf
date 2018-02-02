@@ -1,8 +1,8 @@
 #[macro_use]
 extern crate clap;
+extern crate failure;
 #[macro_use]
 extern crate failure_derive;
-extern crate failure;
 #[macro_use]
 extern crate nom;
 
@@ -14,7 +14,7 @@ mod keywords;
 use std::path::{Path, PathBuf};
 use clap::{App, Arg};
 use types::{Config, FileDescriptor};
-use failure::{ResultExt};
+use failure::ResultExt;
 use errors::Error;
 
 fn run() -> Result<(), ::failure::Error> {
@@ -74,12 +74,12 @@ fn run() -> Result<(), ::failure::Error> {
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
     if in_files.is_empty() {
-        return Err(Error::NoProto.into())
+        return Err(Error::NoProto.into());
     }
 
     for f in &in_files {
         if !f.exists() {
-            return Err(Error::InputFile(format!("{}", f.display())).into())
+            return Err(Error::InputFile(format!("{}", f.display())).into());
         }
     }
 
@@ -90,7 +90,7 @@ fn run() -> Result<(), ::failure::Error> {
     }
 
     if in_files.len() > 1 && matches.value_of("OUTPUT").is_some() {
-        return Err(Error::OutputMultipleInputs.into())
+        return Err(Error::OutputMultipleInputs.into());
     }
 
     for in_file in in_files {
@@ -101,7 +101,7 @@ fn run() -> Result<(), ::failure::Error> {
         } else if let Some(dir) = matches.value_of("OUTPUT_DIR") {
             let mut directory = PathBuf::from(dir);
             if !directory.is_dir() {
-                return Err(Error::OutputDirectory(format!("{}", directory.display())).into())
+                return Err(Error::OutputDirectory(format!("{}", directory.display())).into());
             }
             directory.push(out_file.file_name().unwrap());
             out_file = directory;
@@ -116,11 +116,10 @@ fn run() -> Result<(), ::failure::Error> {
         };
 
         FileDescriptor::write_proto(&config).context(format!(
-                "Could not convert {} into {}",
-                config.in_file.display(),
-                config.out_file.display()
-            )
-        )?;
+            "Could not convert {} into {}",
+            config.in_file.display(),
+            config.out_file.display()
+        ))?;
     }
     Ok(())
 }
