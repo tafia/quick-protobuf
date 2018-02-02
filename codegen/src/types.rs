@@ -2,7 +2,7 @@ use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 use std::fs::File;
 
-use errors::{Error, ErrorKind, Result};
+use errors::{Error, Result};
 use parser::file_descriptor;
 use keywords::sanitize_keyword;
 
@@ -253,19 +253,15 @@ impl FieldType {
             FieldType::Bool => "bool".to_string(),
             FieldType::Enum(ref e) => match self.find_enum(&desc.messages, &desc.enums) {
                 Some(e) => format!("{}{}", e.get_modules(desc), e.name),
-                None => bail!("Could not find enum {} in {:?}", e, desc.enums),
-            },
+                None => return Err(Error::EnumNotFound(e.to_string())),
+            }
             FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
                 Some(m) => {
                     let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
                     format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
                 }
-                None => bail!(format!(
-                    "Could not find message {} in {:?}",
-                    msg,
-                    desc.messages
-                )),
-            },
+                None => return Err(Error::MessageNotFound(msg.to_string())),
+            }
             FieldType::Map(ref t) => {
                 let &(ref key, ref value) = &**t;
                 format!(
@@ -285,9 +281,9 @@ impl FieldType {
                     let m = format!("r.read_message::<{}{}>(bytes)", m.get_modules(desc), m.name);
                     (m.clone(), m)
                 }
-                None => bail!(format!("Could not find message {}", msg)),
+                None => return Err(Error::MessageNotFound(msg.to_string())),
             },
-            FieldType::Map(_) => bail!("There should be a special case for maps"),
+            FieldType::Map(_) => return Err(Error::ReadFnMap),
             FieldType::String_ | FieldType::Bytes => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let cow = format!("{}.map(Cow::Borrowed)", m);
@@ -912,13 +908,8 @@ impl Message {
                     .as_ref()
                     .map_or(false, |nums| nums.contains(&f.number))
             {
-                return Err(
-                    ErrorKind::InvalidMessage(format!(
-                        "Error in message {}\nField {:?} conflict with reserved fields",
-                        self.name,
-                        f
-                    )).into(),
-                );
+                return Err(Error::InvalidMessage(format!("Error in message {}\n\
+                    Field {:?} conflict with reserved fields", self.name, f)));
             }
         }
         Ok(())
@@ -1312,7 +1303,7 @@ impl FileDescriptor {
 
         if desc.messages.is_empty() && desc.enums.is_empty() {
             // There could had been unsupported structures, so bail early
-            bail!(ErrorKind::EmptyRead);
+            return Err(Error::EmptyRead);
         }
 
         desc.set_enums();
@@ -1392,7 +1383,7 @@ impl FileDescriptor {
             let mut reader = BufReader::new(f);
             reader.read_to_end(&mut buf)?;
         }
-        let mut desc = file_descriptor(&buf).to_result()?;
+        let mut desc = file_descriptor(&buf).to_result().map_err(Error::Nom)?;
 
         // proto files with no packages are given an implicit module,
         // since every generated Rust source file represents a module
@@ -1442,12 +1433,8 @@ impl FileDescriptor {
                 }
             }
             if matching_file.is_none() {
-                return Err(
-                    ErrorKind::InvalidImport(format!(
-                        "file {} not found on import path",
-                        import.display()
-                    )).into(),
-                );
+                return Err(Error::InvalidImport(format!("file {} not found on import path",
+                                                        import.display())));
             }
             let proto_file = matching_file.unwrap();
             let mut f = FileDescriptor::read_proto(&proto_file, import_search_path)?;
@@ -1738,7 +1725,7 @@ fn get_file_stem(path: &Path) -> Result<String> {
     let mut file_stem = path.file_stem()
         .and_then(|f| f.to_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| Error::from(ErrorKind::OutputFile(path.to_owned())))?;
+        .ok_or_else(|| Error::from(Error::OutputFile(format!("{}", path.display()))))?;
 
     file_stem = file_stem.replace(|c: char| !c.is_alphanumeric(), "_");
     // will now be properly alphanumeric, but may be a keyword!

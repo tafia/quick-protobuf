@@ -1,7 +1,8 @@
 #[macro_use]
 extern crate clap;
 #[macro_use]
-extern crate error_chain;
+extern crate failure_derive;
+extern crate failure;
 #[macro_use]
 extern crate nom;
 
@@ -13,10 +14,10 @@ mod keywords;
 use std::path::{Path, PathBuf};
 use clap::{App, Arg};
 use types::{Config, FileDescriptor};
+use failure::{ResultExt};
+use errors::Error;
 
-use errors::*;
-
-fn run() -> Result<()> {
+fn run() -> Result<(), ::failure::Error> {
     let matches = App::new(crate_name!())
         .about(crate_description!())
         .author(crate_authors!("\n"))
@@ -73,12 +74,12 @@ fn run() -> Result<()> {
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
     if in_files.is_empty() {
-        bail!("no .proto files provided!");
+        return Err(Error::NoProto.into())
     }
 
     for f in &in_files {
         if !f.exists() {
-            bail!(format!("input file {:?} does not exist", f));
+            return Err(Error::InputFile(format!("{}", f.display())).into())
         }
     }
 
@@ -89,7 +90,7 @@ fn run() -> Result<()> {
     }
 
     if in_files.len() > 1 && matches.value_of("OUTPUT").is_some() {
-        bail!("--output only allowed for single input file");
+        return Err(Error::OutputMultipleInputs.into())
     }
 
     for in_file in in_files {
@@ -100,8 +101,7 @@ fn run() -> Result<()> {
         } else if let Some(dir) = matches.value_of("OUTPUT_DIR") {
             let mut directory = PathBuf::from(dir);
             if !directory.is_dir() {
-                // we can create? But only last dir
-                bail!(format!("output directory {:?} does not exist", directory));
+                return Err(Error::OutputDirectory(format!("{}", directory.display())).into())
             }
             directory.push(out_file.file_name().unwrap());
             out_file = directory;
@@ -115,13 +115,12 @@ fn run() -> Result<()> {
             no_output: matches.is_present("NO_OUTPUT"),
         };
 
-        FileDescriptor::write_proto(&config).chain_err(|| {
-            format!(
+        FileDescriptor::write_proto(&config).context(format!(
                 "Could not convert {} into {}",
                 config.in_file.display(),
                 config.out_file.display()
             )
-        })?;
+        )?;
     }
     Ok(())
 }
@@ -146,5 +145,12 @@ fn path_vec(maybe_vec: std::result::Result<Vec<String>, clap::Error>) -> Vec<Pat
         .collect()
 }
 
-
-quick_main!(run);
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("pb-rs fatal error");
+        let mut e = &e;
+        for e in e.causes() {
+            eprintln!("  - {}", e);
+        }
+    }
+}
