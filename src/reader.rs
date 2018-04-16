@@ -176,38 +176,38 @@ impl BytesReader {
         b = self.read_u8(bytes)?;
         let mut r1 = (b & 0x7f) as u32;
         if b & 0x80 == 0 {
-            return Ok((r0 as u64 | (r1 as u64) << 28));
+            return Ok(r0 as u64 | (r1 as u64) << 28);
         }
 
         b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 7;
         if b & 0x80 == 0 {
-            return Ok((r0 as u64 | (r1 as u64) << 28));
+            return Ok(r0 as u64 | (r1 as u64) << 28);
         }
 
         b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 14;
         if b & 0x80 == 0 {
-            return Ok((r0 as u64 | (r1 as u64) << 28));
+            return Ok(r0 as u64 | (r1 as u64) << 28);
         }
 
         b = self.read_u8(bytes)?;
         r1 |= ((b & 0x7f) as u32) << 21;
         if b & 0x80 == 0 {
-            return Ok((r0 as u64 | (r1 as u64) << 28));
+            return Ok(r0 as u64 | (r1 as u64) << 28);
         }
 
         // part2
         b = self.read_u8(bytes)?;
         let mut r2 = (b & 0x7f) as u32;
         if b & 0x80 == 0 {
-            return Ok(((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56));
+            return Ok((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56);
         }
 
         b = self.read_u8(bytes)?;
         r2 |= (b as u32) << 7;
         if b & 0x80 == 0 {
-            return Ok(((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56));
+            return Ok((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56);
         }
 
         // cannot read more than 10 bytes
