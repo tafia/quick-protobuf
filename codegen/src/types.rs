@@ -1459,17 +1459,25 @@ impl FileDescriptor {
                     m.set_package(&package, &module);
                 }
                 m.set_imported();
-                m.path = proto_file.clone();
-                m.import = import.clone();
+                if m.path.as_os_str().is_empty() {
+                    m.path = proto_file.clone();
+                }
+                if m.import.as_os_str().is_empty() {
+                    m.import = import.clone();
+                }
                 m
             }));
             self.enums.extend(f.enums.drain(..).map(|mut e| {
                 if e.package.is_empty() {
                     e.set_package(&package, &module);
                 }
+                if e.path.as_os_str().is_empty() {
+                    e.path = proto_file.clone();
+                }
+                if e.import.as_os_str().is_empty() {
+                    e.import = import.clone();
+                }
                 e.imported = true;
-                e.path = proto_file.clone();
-                e.import = import.clone();
                 e
             }));
         }
