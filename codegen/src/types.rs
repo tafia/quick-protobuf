@@ -1458,13 +1458,13 @@ impl FileDescriptor {
                 if m.package.is_empty() {
                     m.set_package(&package, &module);
                 }
-                m.set_imported();
                 if m.path.as_os_str().is_empty() {
                     m.path = proto_file.clone();
                 }
                 if m.import.as_os_str().is_empty() {
                     m.import = import.clone();
                 }
+                m.set_imported();
                 m
             }));
             self.enums.extend(f.enums.drain(..).map(|mut e| {
