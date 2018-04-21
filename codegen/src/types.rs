@@ -1040,6 +1040,8 @@ pub struct Enumerator {
     pub imported: bool,
     pub package: String,
     pub module: String,
+    pub path: PathBuf,
+    pub import: PathBuf,
 }
 
 impl Enumerator {
@@ -1466,6 +1468,8 @@ impl FileDescriptor {
                     e.set_package(&package, &module);
                 }
                 e.imported = true;
+                e.path = proto_file.clone();
+                e.import = import.clone();
                 e
             }));
         }
