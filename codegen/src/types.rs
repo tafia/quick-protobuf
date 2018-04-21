@@ -667,6 +667,8 @@ pub struct Message {
     pub messages: Vec<Message>, // nested messages
     pub enums: Vec<Enumerator>, // nested enums
     pub module: String,         // 'package' corresponding to actual generated Rust module
+    pub path: PathBuf,
+    pub import: PathBuf,
 }
 
 impl Message {
@@ -1383,7 +1385,7 @@ impl FileDescriptor {
     }
 
     /// Opens a proto file, reads it and returns raw parsed data
-    fn read_proto(in_file: &Path, import_search_path: &[PathBuf]) -> Result<FileDescriptor> {
+    pub fn read_proto(in_file: &Path, import_search_path: &[PathBuf]) -> Result<FileDescriptor> {
         let mut buf = Vec::new();
         {
             let f = File::open(in_file)?;
@@ -1455,6 +1457,9 @@ impl FileDescriptor {
                     m.set_package(&package, &module);
                 }
                 m.set_imported();
+                // m.path = proto_file.clone();
+                m.path = proto_file.clone();
+                m.import = import.clone();
                 m
             }));
             self.enums.extend(f.enums.drain(..).map(|mut e| {
