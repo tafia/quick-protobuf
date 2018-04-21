@@ -1457,7 +1457,6 @@ impl FileDescriptor {
                     m.set_package(&package, &module);
                 }
                 m.set_imported();
-                // m.path = proto_file.clone();
                 m.path = proto_file.clone();
                 m.import = import.clone();
                 m
