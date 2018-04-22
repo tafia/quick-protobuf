@@ -38,6 +38,16 @@ impl From<i32> for FooEnum {
     }
 }
 
+impl<'a> From<&'a str> for FooEnum {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "FIRST_VALUE" => FooEnum::FIRST_VALUE,
+            "SECOND_VALUE" => FooEnum::SECOND_VALUE,
+            _ => Self::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct BarMessage {
     pub b_required_int32: i32,
@@ -360,6 +370,17 @@ impl From<i32> for NestedEnum {
             0 => NestedEnum::Foo,
             1 => NestedEnum::Bar,
             2 => NestedEnum::Baz,
+            _ => Self::default(),
+        }
+    }
+}
+
+impl<'a> From<&'a str> for NestedEnum {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "Foo" => NestedEnum::Foo,
+            "Bar" => NestedEnum::Bar,
+            "Baz" => NestedEnum::Baz,
             _ => Self::default(),
         }
     }

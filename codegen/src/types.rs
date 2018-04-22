@@ -1068,7 +1068,9 @@ impl Enumerator {
         } else {
             self.write_impl_default(w)?;
             writeln!(w, "")?;
-            self.write_from_i32(w)
+            self.write_from_i32(w)?;
+            writeln!(w, "")?;
+            self.write_from_str(w)
         }
     }
 
@@ -1098,6 +1100,20 @@ impl Enumerator {
         writeln!(w, "        match i {{")?;
         for &(ref f, ref number) in &self.fields {
             writeln!(w, "            {} => {}::{},", number, self.name, f)?;
+        }
+        writeln!(w, "            _ => Self::default(),")?;
+        writeln!(w, "        }}")?;
+        writeln!(w, "    }}")?;
+        writeln!(w, "}}")?;
+        Ok(())
+    }
+
+    fn write_from_str<W: Write>(&self, w: &mut W) -> Result<()> {
+        writeln!(w, "impl<'a> From<&'a str> for {} {{", self.name)?;
+        writeln!(w, "    fn from(s: &'a str) -> Self {{")?;
+        writeln!(w, "        match s {{")?;
+        for &(ref f, _) in &self.fields {
+            writeln!(w, "            {:?} => {}::{},", f, self.name, f)?;
         }
         writeln!(w, "            _ => Self::default(),")?;
         writeln!(w, "        }}")?;
@@ -1609,6 +1625,8 @@ impl FileDescriptor {
             m.write_impl_default(w)?;
             writeln!(w, "")?;
             m.write_from_i32(w)?;
+            writeln!(w, "")?;
+            m.write_from_str(w)?;
         }
         Ok(())
     }
