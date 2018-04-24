@@ -187,7 +187,7 @@ impl FieldType {
     }
 
     /// Searches for enum corresponding to the current type
-    fn find_enum<'a, 'b>(
+    pub fn find_enum<'a, 'b>(
         &'a self,
         msgs: &'b [Message],
         enums: &'b [Enumerator],
@@ -1395,7 +1395,16 @@ impl FileDescriptor {
             reader.read_to_end(&mut buf)?;
         }
         let mut desc = file_descriptor(&buf).to_result().map_err(Error::Nom)?;
-
+        for mut m in &mut desc.messages {
+            if m.path.as_os_str().is_empty() {
+                m.path = in_file.clone().to_path_buf();
+                if &import_search_path.len() > &0 {
+                    if let Ok(p) = m.path.clone().strip_prefix(&import_search_path[0]) {
+                        m.import = p.to_path_buf();
+                    }
+                }
+            }
+        }
         // proto files with no packages are given an implicit module,
         // since every generated Rust source file represents a module
         desc.module = if desc.package.is_empty() {
