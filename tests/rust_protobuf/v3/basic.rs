@@ -41,6 +41,18 @@ impl From<i32> for TestEnumDescriptor {
     }
 }
 
+impl<'a> From<&'a str> for TestEnumDescriptor {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "UNKNOWN" => TestEnumDescriptor::UNKNOWN,
+            "RED" => TestEnumDescriptor::RED,
+            "BLUE" => TestEnumDescriptor::BLUE,
+            "GREEN" => TestEnumDescriptor::GREEN,
+            _ => Self::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Test1 {
     pub a: Option<i32>,

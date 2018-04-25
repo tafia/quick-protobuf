@@ -47,6 +47,15 @@ impl From<i32> for EnumA {
     }
 }
 
+impl<'a> From<&'a str> for EnumA {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "FOO" => EnumA::FOO,
+            _ => Self::default(),
+        }
+    }
+}
+
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -79,6 +88,15 @@ impl From<i32> for EnumB {
     fn from(i: i32) -> Self {
         match i {
             0 => EnumB::FOO,
+            _ => Self::default(),
+        }
+    }
+}
+
+impl<'a> From<&'a str> for EnumB {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "FOO" => EnumB::FOO,
             _ => Self::default(),
         }
     }

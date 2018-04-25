@@ -60,5 +60,14 @@ impl From<i32> for NestedEnum {
     }
 }
 
+impl<'a> From<&'a str> for NestedEnum {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "RED" => NestedEnum::RED,
+            _ => Self::default(),
+        }
+    }
+}
+
 }
 

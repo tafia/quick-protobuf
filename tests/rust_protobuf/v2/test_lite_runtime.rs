@@ -36,6 +36,16 @@ impl From<i32> for EnumTestLiteRuntime {
     }
 }
 
+impl<'a> From<&'a str> for EnumTestLiteRuntime {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "ONE" => EnumTestLiteRuntime::ONE,
+            "TWO" => EnumTestLiteRuntime::TWO,
+            _ => Self::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestLiteRuntime {
     pub v: Option<i32>,

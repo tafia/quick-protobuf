@@ -38,3 +38,15 @@ impl From<i32> for TestEnumValuesEnum {
     }
 }
 
+impl<'a> From<&'a str> for TestEnumValuesEnum {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "WINTER" => TestEnumValuesEnum::WINTER,
+            "SPRING" => TestEnumValuesEnum::SPRING,
+            "SUMMER" => TestEnumValuesEnum::SUMMER,
+            "AUTUMN" => TestEnumValuesEnum::AUTUMN,
+            _ => Self::default(),
+        }
+    }
+}
+

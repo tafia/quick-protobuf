@@ -37,6 +37,16 @@ impl From<i32> for TestEnum {
     }
 }
 
+impl<'a> From<&'a str> for TestEnum {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "DARK" => TestEnum::DARK,
+            "LIGHT" => TestEnum::LIGHT,
+            _ => Self::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestMessage {
     pub value: Option<i32>,

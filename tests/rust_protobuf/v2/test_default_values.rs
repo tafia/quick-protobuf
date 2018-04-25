@@ -39,6 +39,17 @@ impl From<i32> for EnumForDefaultValue {
     }
 }
 
+impl<'a> From<&'a str> for EnumForDefaultValue {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "ONE" => EnumForDefaultValue::ONE,
+            "TWO" => EnumForDefaultValue::TWO,
+            "THREE" => EnumForDefaultValue::THREE,
+            _ => Self::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestDefaultValues<'a> {
     pub double_field: f64,

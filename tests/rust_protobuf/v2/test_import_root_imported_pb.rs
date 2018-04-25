@@ -32,6 +32,15 @@ impl From<i32> for ImportedEnum {
     }
 }
 
+impl<'a> From<&'a str> for ImportedEnum {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "SOMETHING" => ImportedEnum::SOMETHING,
+            _ => Self::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ImportedMessage { }
 

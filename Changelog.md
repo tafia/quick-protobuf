@@ -8,6 +8,10 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.3.1
+- feat: codegen, add `From<&str>` for enums
+- feat: dependable codegen
+
 ##0.6.0
 - feat: add MessageRead trait (thanks @daboross !)
 - fix: nested enums

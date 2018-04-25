@@ -35,6 +35,15 @@ impl From<i32> for EnumForOneof {
     }
 }
 
+impl<'a> From<&'a str> for EnumForOneof {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "A" => EnumForOneof::A,
+            _ => Self::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct MessageForOneof {
     pub f: Option<i32>,
