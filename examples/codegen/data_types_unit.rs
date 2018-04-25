@@ -32,6 +32,15 @@ impl From<i32> for test {
     }
 }
 
+impl<'a> From<&'a str> for test {
+    fn from(s: &'a str) -> Self {
+        match s {
+            "a" => test::a,
+            _ => Self::default(),
+        }
+    }
+}
+
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct unit_message { }
 
