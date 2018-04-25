@@ -25,9 +25,12 @@ named!(
 named!(
     hex_integer<i32>,
     do_parse!(
-        tag!("0x") >> num: map_res!(map_res!(hex_digit, str::from_utf8), |s| {
-            i32::from_str_radix(s, 16)
-        }) >> (num)
+        tag!("0x")
+            >> num:
+                map_res!(
+                    map_res!(hex_digit, str::from_utf8),
+                    |s| i32::from_str_radix(s, 16)
+                ) >> (num)
     )
 );
 
@@ -274,6 +277,8 @@ named!(
             imported: false,
             package: "".to_string(),
             module: "".to_string(),
+            import: PathBuf::new(),
+            path: PathBuf::new(),
         })
     )
 );

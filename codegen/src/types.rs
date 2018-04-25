@@ -187,7 +187,7 @@ impl FieldType {
     }
 
     /// Searches for enum corresponding to the current type
-    fn find_enum<'a, 'b>(
+    pub fn find_enum<'a, 'b>(
         &'a self,
         msgs: &'b [Message],
         enums: &'b [Enumerator],
@@ -667,6 +667,8 @@ pub struct Message {
     pub messages: Vec<Message>, // nested messages
     pub enums: Vec<Enumerator>, // nested enums
     pub module: String,         // 'package' corresponding to actual generated Rust module
+    pub path: PathBuf,
+    pub import: PathBuf,
 }
 
 impl Message {
@@ -1038,6 +1040,8 @@ pub struct Enumerator {
     pub imported: bool,
     pub package: String,
     pub module: String,
+    pub path: PathBuf,
+    pub import: PathBuf,
 }
 
 impl Enumerator {
@@ -1399,7 +1403,7 @@ impl FileDescriptor {
     }
 
     /// Opens a proto file, reads it and returns raw parsed data
-    fn read_proto(in_file: &Path, import_search_path: &[PathBuf]) -> Result<FileDescriptor> {
+    pub fn read_proto(in_file: &Path, import_search_path: &[PathBuf]) -> Result<FileDescriptor> {
         let mut buf = Vec::new();
         {
             let f = File::open(in_file)?;
@@ -1407,7 +1411,16 @@ impl FileDescriptor {
             reader.read_to_end(&mut buf)?;
         }
         let mut desc = file_descriptor(&buf).to_result().map_err(Error::Nom)?;
-
+        for mut m in &mut desc.messages {
+            if m.path.as_os_str().is_empty() {
+                m.path = in_file.clone().to_path_buf();
+                if &import_search_path.len() > &0 {
+                    if let Ok(p) = m.path.clone().strip_prefix(&import_search_path[0]) {
+                        m.import = p.to_path_buf();
+                    }
+                }
+            }
+        }
         // proto files with no packages are given an implicit module,
         // since every generated Rust source file represents a module
         desc.module = if desc.package.is_empty() {
@@ -1470,12 +1483,24 @@ impl FileDescriptor {
                 if m.package.is_empty() {
                     m.set_package(&package, &module);
                 }
+                if m.path.as_os_str().is_empty() {
+                    m.path = proto_file.clone();
+                }
+                if m.import.as_os_str().is_empty() {
+                    m.import = import.clone();
+                }
                 m.set_imported();
                 m
             }));
             self.enums.extend(f.enums.drain(..).map(|mut e| {
                 if e.package.is_empty() {
                     e.set_package(&package, &module);
+                }
+                if e.path.as_os_str().is_empty() {
+                    e.path = proto_file.clone();
+                }
+                if e.import.as_os_str().is_empty() {
+                    e.import = import.clone();
                 }
                 e.imported = true;
                 e
