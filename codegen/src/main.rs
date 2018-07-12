@@ -6,16 +6,16 @@ extern crate failure_derive;
 #[macro_use]
 extern crate nom;
 
-mod parser;
-mod types;
 mod errors;
 mod keywords;
+mod parser;
+mod types;
 
-use std::path::{Path, PathBuf};
 use clap::{App, Arg};
-use types::{Config, FileDescriptor};
-use failure::ResultExt;
 use errors::Error;
+use failure::ResultExt;
+use std::path::{Path, PathBuf};
+use types::{Config, FileDescriptor};
 
 fn run() -> Result<(), ::failure::Error> {
     let matches = App::new(crate_name!())

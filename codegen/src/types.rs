@@ -1,10 +1,10 @@
+use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
-use std::fs::File;
 
 use errors::{Error, Result};
-use parser::file_descriptor;
 use keywords::sanitize_keyword;
+use parser::file_descriptor;
 
 fn sizeof_varint(v: u32) -> usize {
     match v {

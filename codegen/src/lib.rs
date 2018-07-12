@@ -3,7 +3,7 @@ extern crate failure;
 extern crate failure_derive;
 #[macro_use]
 extern crate nom;
-pub mod parser;
-pub mod types;
 pub mod errors;
 pub mod keywords;
+pub mod parser;
+pub mod types;
