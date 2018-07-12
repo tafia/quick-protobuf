@@ -7,15 +7,15 @@
 //!
 //! It is advised, for convenience to directly work with a `Reader`.
 
+use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
-use std::fs::File;
 
 use errors::{Error, Result};
 use message::MessageRead;
 
-use byteorder::LittleEndian as LE;
 use byteorder::ByteOrder;
+use byteorder::LittleEndian as LE;
 
 const WIRE_TYPE_VARINT: u8 = 0;
 const WIRE_TYPE_FIXED64: u8 = 1;
@@ -453,7 +453,14 @@ impl BytesReader {
         self.start == self.end
     }
 
-    /// Advance inner cursor to the end
+    /// Advances inner cursor by length bytes without overflow, and returns the amount of bytes actually advanced
+    pub fn advance(&mut self, length: usize) -> usize {
+        let length = length.min(self.len());
+        self.start += length;
+        length
+    }
+
+    /// Advances inner cursor to the end
     pub fn read_to_end(&mut self) {
         self.start = self.end;
     }

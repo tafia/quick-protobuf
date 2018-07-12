@@ -38,6 +38,18 @@ write_read_primitive!(wr_float, read_float, write_float, 5.8);
 write_read_primitive!(wr_double, read_double, write_double, 5.8);
 
 #[test]
+fn advance() {
+    let buf: Vec<u8> = vec![0xDE, 0xAD, 0x00, 0x60, 0x0D, 0xCA, 0xFE];
+    let mut r = BytesReader::from_bytes(&buf);
+    let advanced = r.advance(2);
+    assert_eq!(advanced, 2);
+    assert_eq!(0, r.read_uint32(&buf).unwrap());
+    let advanced = r.advance(18);
+    assert_eq!(advanced, 4);
+    assert!(r.is_eof());
+}
+
+#[test]
 fn wr_bytes() {
     let v = b"test_write_read";
     let mut buf = Vec::new();
