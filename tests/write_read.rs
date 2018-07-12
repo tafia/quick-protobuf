@@ -1,26 +1,28 @@
 extern crate quick_protobuf;
 
-use std::collections::HashMap;
-use std::borrow::Cow;
-use std::io::Write;
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Reader, Result, Writer};
 use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Reader, Result, Writer};
+use std::borrow::Cow;
+use std::collections::HashMap;
+use std::io::Write;
 
 macro_rules! write_read_primitive {
-    ($name:ident, $read:ident, $write:ident) => (write_read_primitive!($name, $read, $write, 145););
-    ($name:ident, $read:ident, $write:ident, $def:expr) => (
-#[test]
-fn $name(){
-    let v = $def;
-    let mut buf = Vec::new();
-    {
-        let mut w = Writer::new(&mut buf);
-        w.$write(v).unwrap();
-    }
-    let mut r = BytesReader::from_bytes(&*buf);
-    assert_eq!(v, r.$read(&buf).unwrap());
-}
-    );
+    ($name:ident, $read:ident, $write:ident) => {
+        write_read_primitive!($name, $read, $write, 145);
+    };
+    ($name:ident, $read:ident, $write:ident, $def:expr) => {
+        #[test]
+        fn $name() {
+            let v = $def;
+            let mut buf = Vec::new();
+            {
+                let mut w = Writer::new(&mut buf);
+                w.$write(v).unwrap();
+            }
+            let mut r = BytesReader::from_bytes(&*buf);
+            assert_eq!(v, r.$read(&buf).unwrap());
+        }
+    };
 }
 
 write_read_primitive!(wr_int32, read_int32, write_int32);

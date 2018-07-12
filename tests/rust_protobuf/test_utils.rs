@@ -14,7 +14,7 @@ macro_rules! test_serialize {
         let serialized_hex = encode_hex(&serialized);
         let hex = encode_hex(&decode_hex($hex));
         assert_eq!(serialized_hex, hex);
-    }
+    };
 }
 
 macro_rules! test_deserialize {
@@ -25,7 +25,7 @@ macro_rules! test_deserialize {
             let parsed = $name::from_reader(&mut reader, &bytes).unwrap();
             assert!($msg.eq(&parsed));
         }
-    }
+    };
 }
 
 macro_rules! test_serialize_deserialize_length_delimited {
@@ -38,19 +38,18 @@ macro_rules! test_serialize_deserialize_length_delimited {
         let mut reader = BytesReader::from_bytes(&serialized);
         let parsed: $name = reader.read_message(&serialized).unwrap();
         assert!($msg.eq(&parsed));
-    }
+    };
 }
 
 macro_rules! test_serialize_deserialize {
     ($hex:expr, $msg:expr, $name:ident) => {
-
         let expected_bytes = decode_hex($hex);
         assert_eq!(expected_bytes.len(), $msg.get_size() as usize);
 
         test_serialize!($hex, $msg);
         test_deserialize!($hex, $msg, $name);
         test_serialize_deserialize_length_delimited!($msg, $name);
-    }
+    };
 }
 
 // pub fn test_serialize_deserialize_no_hex<M : Message + MessageStatic>(msg: &M) {

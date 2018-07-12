@@ -2,13 +2,13 @@
 //!
 //! Creates the struct and implements a reader
 
+use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
-use std::fs::File;
 
 use errors::Result;
-use writer::Writer;
 use reader::BytesReader;
+use writer::Writer;
 
 /// A trait to handle deserialization based on parsed `Field`s
 pub trait MessageWrite: Sized {

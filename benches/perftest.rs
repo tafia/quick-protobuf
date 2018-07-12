@@ -5,14 +5,14 @@ extern crate test;
 
 mod perftest_data;
 
-use std::cmp::min;
 use std::borrow::Cow;
+use std::cmp::min;
 
 use perftest_data::*;
 
-use test::{black_box, Bencher};
-use quick_protobuf::{BytesReader, Reader, Writer};
 use quick_protobuf::message::MessageWrite;
+use quick_protobuf::{BytesReader, Reader, Writer};
+use test::{black_box, Bencher};
 
 #[bench]
 fn read_file(b: &mut Bencher) {
@@ -23,37 +23,37 @@ fn read_file(b: &mut Bencher) {
 }
 
 macro_rules! perfbench {
-    ($gen: ident, $m:ident, $write:ident, $read:ident) => {
-#[bench]
-fn $write(b: &mut Bencher) {
-    let v = $gen();
-    b.iter(|| {
-        let mut buf = black_box(Vec::new());
-        let mut w = Writer::new(&mut buf);
-        for i in &v {
-            i.write_message(&mut w).unwrap();
+    ($gen:ident, $m:ident, $write:ident, $read:ident) => {
+        #[bench]
+        fn $write(b: &mut Bencher) {
+            let v = $gen();
+            b.iter(|| {
+                let mut buf = black_box(Vec::new());
+                let mut w = Writer::new(&mut buf);
+                for i in &v {
+                    i.write_message(&mut w).unwrap();
+                }
+            })
         }
-    })
-}
 
-#[bench]
-fn $read(b: &mut Bencher) {
-    let v = $gen();
-    let mut buf = Vec::new();
-    {
-        let mut w = Writer::new(&mut buf);
-        for i in &v {
-            i.write_message(&mut w).unwrap();
+        #[bench]
+        fn $read(b: &mut Bencher) {
+            let v = $gen();
+            let mut buf = Vec::new();
+            {
+                let mut w = Writer::new(&mut buf);
+                for i in &v {
+                    i.write_message(&mut w).unwrap();
+                }
+            }
+            b.iter(|| {
+                let mut r = BytesReader::from_bytes(&buf);
+                while !r.is_eof() {
+                    let _ = black_box($m::from_reader(&mut r, &buf).unwrap());
+                }
+            })
         }
-    }
-    b.iter(|| {
-        let mut r = BytesReader::from_bytes(&buf);
-        while !r.is_eof() {
-            let _ = black_box($m::from_reader(&mut r, &buf).unwrap());
-        }
-    })
-}
-    }
+    };
 }
 
 fn generate_test1() -> Vec<Test1> {
@@ -247,20 +247,18 @@ fn generate_map() -> Vec<TestMap<'static>> {
 perfbench!(generate_map, TestMap, write_map, read_map);
 
 fn generate_all() -> Vec<PerftestData<'static>> {
-    vec![
-        PerftestData {
-            test1: generate_test1(),
-            test_repeated_bool: generate_repeated_bool(),
-            test_repeated_messages: generate_repeated_messages(),
-            test_optional_messages: generate_optional_messages(),
-            test_strings: generate_strings(),
-            test_repeated_packed_int32: generate_repeated_packed_int32(),
-            test_repeated_packed_float: generate_repeated_packed_float(),
-            test_small_bytearrays: generate_small_bytes(),
-            test_large_bytearrays: generate_large_bytes(),
-            test_map: generate_map(),
-        },
-    ]
+    vec![PerftestData {
+        test1: generate_test1(),
+        test_repeated_bool: generate_repeated_bool(),
+        test_repeated_messages: generate_repeated_messages(),
+        test_optional_messages: generate_optional_messages(),
+        test_strings: generate_strings(),
+        test_repeated_packed_int32: generate_repeated_packed_int32(),
+        test_repeated_packed_float: generate_repeated_packed_float(),
+        test_small_bytearrays: generate_small_bytes(),
+        test_large_bytearrays: generate_large_bytes(),
+        test_map: generate_map(),
+    }]
 }
 
 perfbench!(generate_all, PerftestData, write_all, read_all);
