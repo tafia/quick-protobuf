@@ -7,15 +7,15 @@
 //!
 //! It is advised, for convenience to directly work with a `Reader`.
 
+use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
-use std::fs::File;
 
 use errors::{Error, Result};
 use message::MessageRead;
 
-use byteorder::LittleEndian as LE;
 use byteorder::ByteOrder;
+use byteorder::LittleEndian as LE;
 
 const WIRE_TYPE_VARINT: u8 = 0;
 const WIRE_TYPE_FIXED64: u8 = 1;

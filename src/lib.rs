@@ -13,10 +13,10 @@ extern crate failure_derive;
 pub mod errors;
 pub mod message;
 pub mod reader;
-pub mod writer;
 pub mod sizeofs;
+pub mod writer;
 
-pub use errors::{Result, Error};
+pub use errors::{Error, Result};
 pub use message::{MessageRead, MessageWrite};
 pub use reader::{BytesReader, Reader};
 pub use writer::Writer;

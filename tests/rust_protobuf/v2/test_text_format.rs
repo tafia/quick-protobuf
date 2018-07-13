@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use super::test_text_format_pb::*;
+use std::borrow::Cow;
 
 // use protobuf::text_format::print_to_string;
 

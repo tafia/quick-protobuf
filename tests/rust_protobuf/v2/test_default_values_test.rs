@@ -1,6 +1,6 @@
+use std::borrow::Cow;
 use std::f32;
 use std::f64;
-use std::borrow::Cow;
 
 use super::test_default_values::*;
 use quick_protobuf::*;

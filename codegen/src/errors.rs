@@ -28,16 +28,24 @@ pub enum Error {
     #[fail(display = "--output only allowed for single input file")]
     OutputMultipleInputs,
     /// Invalid message
-    #[fail(display = "Message checks errored: {}\r\n\
-    Proto definition might be invalid or something got wrong in the parsing", _0)]
+    #[fail(
+        display = "Message checks errored: {}\r\n\
+                   Proto definition might be invalid or something got wrong in the parsing",
+        _0
+    )]
     InvalidMessage(String),
     /// Varint decoding error
-    #[fail(display = "Cannot convert protobuf import into module import:: {}\r\n\
-    Import definition might be invalid, some characters may not be supported", _0)]
+    #[fail(
+        display = "Cannot convert protobuf import into module import:: {}\r\n\
+                   Import definition might be invalid, some characters may not be supported",
+        _0
+    )]
     InvalidImport(String),
     /// Empty read
-    #[fail(display = "No message or enum were read;\
-    either definition might be invalid or there were only unsupported structures")]
+    #[fail(
+        display = "No message or enum were read;\
+                   either definition might be invalid or there were only unsupported structures"
+    )]
     EmptyRead,
     /// enum not found
 

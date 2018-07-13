@@ -4,11 +4,11 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_camel_case_types)]
 
-use std::io::Write;
+use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, MessageWrite, Result, Writer};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use quick_protobuf::{BytesReader, MessageWrite, Result, Writer};
-use quick_protobuf::sizeofs::*;
+use std::io::Write;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Test1 {
@@ -109,13 +109,12 @@ impl MessageWrite for TestRepeatedPackedInt32 {
         if self.values.is_empty() {
             0
         } else {
-            1
-                + sizeof_len(
-                    self.values
-                        .iter()
-                        .map(|s| sizeof_varint(*(s) as u64))
-                        .sum::<usize>(),
-                )
+            1 + sizeof_len(
+                self.values
+                    .iter()
+                    .map(|s| sizeof_varint(*(s) as u64))
+                    .sum::<usize>(),
+            )
         }
     }
 

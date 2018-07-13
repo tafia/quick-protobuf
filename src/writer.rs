@@ -5,8 +5,8 @@ use std::io::Write;
 use errors::Result;
 use message::MessageWrite;
 
-use byteorder::WriteBytesExt;
 use byteorder::LittleEndian as LE;
+use byteorder::WriteBytesExt;
 
 /// A struct to write protobuf messages
 ///
