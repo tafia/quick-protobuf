@@ -62,6 +62,11 @@ impl<W: Write> Writer<W> {
         Writer { inner: w }
     }
 
+    /// Writes a byte which is NOT internally coded as a `varint`
+    pub fn write_u8(&mut self, byte: u8) -> Result<()> {
+        self.inner.write_u8(byte).map_err(|e| e.into())
+    }
+
     /// Writes a `varint` (compacted `u64`)
     pub fn write_varint(&mut self, mut v: u64) -> Result<()> {
         while v > 0x7F {

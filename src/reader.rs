@@ -88,8 +88,9 @@ impl BytesReader {
         self.read_varint32(bytes)
     }
 
+    /// Reads the next byte
     #[inline(always)]
-    fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
+    pub fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
         let b = bytes.get(self.start).ok_or_else::<Error, _>(|| {
             Error::Io(io::Error::new(
                 io::ErrorKind::UnexpectedEof,
