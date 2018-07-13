@@ -453,7 +453,14 @@ impl BytesReader {
         self.start == self.end
     }
 
-    /// Advance inner cursor to the end
+    /// Advances inner cursor by length bytes without overflow, and returns the amount of bytes actually advanced
+    pub fn advance(&mut self, length: usize) -> usize {
+        let length = length.min(self.len());
+        self.start += length;
+        length
+    }
+
+    /// Advances inner cursor to the end
     pub fn read_to_end(&mut self) {
         self.start = self.end;
     }
