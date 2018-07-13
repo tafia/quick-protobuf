@@ -25,6 +25,7 @@ macro_rules! write_read_primitive {
     };
 }
 
+write_read_primitive!(wr_u8, read_u8, write_u8);
 write_read_primitive!(wr_int32, read_int32, write_int32);
 write_read_primitive!(wr_int64, read_int64, write_int64);
 write_read_primitive!(wr_uint32, read_uint32, write_uint32);
