@@ -8,6 +8,12 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## 0.6.1
+- feat: make byte-specific utilities available in BytesReader
+
+## pb-rs 0.3.2
+- docs: mention usage pf pb-rs with build.rs script in readme
+
 ## pb-rs 0.3.1
 - feat: codegen, add `From<&str>` for enums
 - feat: dependable codegen
