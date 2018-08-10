@@ -312,11 +312,21 @@ impl BytesReader {
     }
 
     #[inline(always)]
-    fn read_len<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<M>
+    fn read_len<'a, M, F>(&mut self, bytes: &'a [u8], read: F) -> Result<M>
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
     {
         let len = self.read_varint32(bytes)? as usize;
+        self.read_len_size(bytes, read, len)
+    }
+
+
+    #[inline(always)]
+    fn read_len_size<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F, len: usize) -> Result<M>
+        where
+            F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
+    {
+        println!("{}", len);
         let cur_end = self.end;
         self.end = self.start + len;
         let v = read(self, bytes)?;
@@ -388,6 +398,15 @@ impl BytesReader {
         M: MessageRead<'a>,
     {
         self.read_len(bytes, M::from_reader)
+    }
+
+    /// Reads a nested message
+    #[inline]
+    pub fn read_message_size<'a, M>(&mut self, bytes: &'a [u8], len: usize) -> Result<M>
+        where
+            M: MessageRead<'a>,
+    {
+        self.read_len_size(bytes, M::from_reader, len)
     }
 
     /// Reads a map item: (key, value)
