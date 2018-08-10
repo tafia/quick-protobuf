@@ -326,7 +326,6 @@ impl BytesReader {
         where
             F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
     {
-        println!("{}", len);
         let cur_end = self.end;
         self.end = self.start + len;
         let v = read(self, bytes)?;
