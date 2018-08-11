@@ -1,0 +1,18 @@
+[package]
+name = "quick-protobuf"
+description = "A pure Rust protobuf (de)serializer. Quick."
+version = "0.6.1"
+authors = ["Johann Tuffe <tafia973@gmail.com>"]
+keywords = ["protobuf", "parser"]
+license = "MIT"
+readme = "README.md" 
+documentation = "https://docs.rs/quick-protobuf"
+repository = "https://github.com/tafia/quick-protobuf"
+
+[dependencies]
+byteorder = "1.2.3"
+failure = "0.1.1"
+failure_derive = "0.1.1"
+
+[dev-dependencies]
+lazy_static = "0.2.10"

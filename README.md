@@ -9,7 +9,7 @@ A pure Rust library to serialize/deserialize [protobuf](https://developers.googl
 This library intends to provide a simple yet fast (minimal allocations) protobuf parser implementation.
 
 It provides both:
-- [**pb-rs**](codegen), a code generation tool: 
+- [**pb-rs**](pb-rs), a code generation tool: 
   - each `.proto` file will generate a minimal rust module (one function to read, one to write, and one to compute the size of the messages)
   - each message will generate a rust struct where:
 
@@ -30,7 +30,7 @@ It provides both:
     | import file_a.proto          | `use super::file_a::*` |
 
   - no need to use google `protoc` tool to generate the modules
-- **quick-protobuf**, a protobuf file parser: 
+- [**quick-protobuf**](quick-protobuf), a protobuf file parser: 
   - this is the crate that you will typically refer to in your library. The generated modules will assume it has been imported.
   - it acts like an event parser, the logic to convert it into struct is handle by `pb-rs`
 
@@ -50,7 +50,7 @@ pb-rs /path/to/your/protobuf/file.proto
 ```toml
 # Cargo.toml
 [dependencies]
-quick-protobuf = "0.6.0"
+quick-protobuf = "0.6.1"
 ```
 
  - 3. Have fun
