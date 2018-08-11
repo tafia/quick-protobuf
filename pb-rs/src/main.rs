@@ -148,7 +148,7 @@ fn main() {
     ::std::process::exit({
         if let Err(e) = run() {
             eprintln!("pb-rs fatal error");
-            for e in e.causes() {
+            for e in e.iter_chain() {
                 eprintln!("  - {}", e);
             }
             1
