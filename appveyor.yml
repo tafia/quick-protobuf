@@ -13,9 +13,6 @@ install:
 build: false
 
 test_script:
-  - cd tests/rust_protobuf
-  - sh generate.sh
   - cargo build
   - cargo test
-  - cd ../../examples/codegen
-  - sh generate_module.sh
+  - sh run_test.sh

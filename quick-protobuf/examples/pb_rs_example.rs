@@ -1,15 +1,15 @@
 extern crate quick_protobuf;
 
-mod codegen;
+mod pb_rs;
 
 use std::borrow::Cow;
 
-use codegen::data_types::mod_FooMessage::OneOftest_oneof;
-use codegen::data_types::{self, FooMessage};
+use pb_rs::data_types::mod_FooMessage::OneOftest_oneof;
+use pb_rs::data_types::{self, FooMessage};
 
 // Imported fields contain package a.b, which is translated into
 // mod_a::mod_b rust module
-use codegen::a::b::ImportedMessage;
+use pb_rs::a::b::ImportedMessage;
 
 use quick_protobuf::{BytesReader, Writer};
 
