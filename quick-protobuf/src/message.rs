@@ -34,5 +34,8 @@ pub trait MessageWrite: Sized {
 pub trait MessageRead<'a>: Sized {
     /// Constructs an instance of `Self` by reading from the given bytes
     /// via the given reader.
+    ///
+    /// It does NOT read message length first. If you want to read a variable
+    /// length message, use `BytesReader::read_message` directly
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self>;
 }
