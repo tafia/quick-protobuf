@@ -12,48 +12,20 @@ fn t<F: FnMut(&mut TestTypes)>(_: &str, mut setter: F) {
 
 #[test]
 fn test_singular() {
-    t("int32_singular: 99", |m| {
-        m.int32_singular = Some(99)
-    });
-    t("double_singular: 99", |m| {
-        m.double_singular = Some(99.0)
-    });
-    t("float_singular: 99", |m| {
-        m.float_singular = Some(99.0)
-    });
-    t("int32_singular: 99", |m| {
-        m.int32_singular = Some(99)
-    });
-    t("int64_singular: 99", |m| {
-        m.int64_singular = Some(99)
-    });
-    t("uint32_singular: 99", |m| {
-        m.uint32_singular = Some(99)
-    });
-    t("uint64_singular: 99", |m| {
-        m.uint64_singular = Some(99)
-    });
-    t("sint32_singular: 99", |m| {
-        m.sint32_singular = Some(99)
-    });
-    t("sint64_singular: 99", |m| {
-        m.sint64_singular = Some(99)
-    });
-    t("fixed32_singular: 99", |m| {
-        m.fixed32_singular = Some(99)
-    });
-    t("fixed64_singular: 99", |m| {
-        m.fixed64_singular = Some(99)
-    });
-    t("sfixed32_singular: 99", |m| {
-        m.sfixed32_singular = Some(99)
-    });
-    t("sfixed64_singular: 99", |m| {
-        m.sfixed64_singular = Some(99)
-    });
-    t("bool_singular: false", |m| {
-        m.bool_singular = Some(false)
-    });
+    t("int32_singular: 99", |m| m.int32_singular = Some(99));
+    t("double_singular: 99", |m| m.double_singular = Some(99.0));
+    t("float_singular: 99", |m| m.float_singular = Some(99.0));
+    t("int32_singular: 99", |m| m.int32_singular = Some(99));
+    t("int64_singular: 99", |m| m.int64_singular = Some(99));
+    t("uint32_singular: 99", |m| m.uint32_singular = Some(99));
+    t("uint64_singular: 99", |m| m.uint64_singular = Some(99));
+    t("sint32_singular: 99", |m| m.sint32_singular = Some(99));
+    t("sint64_singular: 99", |m| m.sint64_singular = Some(99));
+    t("fixed32_singular: 99", |m| m.fixed32_singular = Some(99));
+    t("fixed64_singular: 99", |m| m.fixed64_singular = Some(99));
+    t("sfixed32_singular: 99", |m| m.sfixed32_singular = Some(99));
+    t("sfixed64_singular: 99", |m| m.sfixed64_singular = Some(99));
+    t("bool_singular: false", |m| m.bool_singular = Some(false));
     t("string_singular: \"abc\"", |m| {
         m.string_singular = Some(Cow::Borrowed("abc"))
     });

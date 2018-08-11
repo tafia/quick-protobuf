@@ -236,7 +236,8 @@ fn generate_map() -> Vec<TestMap<'static>> {
     let mut s = "hello world from quick-protobuf!!!".split(' ').cycle();
     (1..30)
         .map(|_| TestMap {
-            value: s.by_ref()
+            value: s
+                .by_ref()
                 .take(500)
                 .map(|s| (Cow::Owned(s.to_string()), s.len() as u32))
                 .collect(),

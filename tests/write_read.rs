@@ -120,7 +120,8 @@ impl<'a> MessageRead<'a> for TestMessage {
 impl MessageWrite for TestMessage {
     fn get_size(&self) -> usize {
         self.id.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m))
-            + self.val
+            + self
+                .val
                 .iter()
                 .map(|m| 1 + sizeof_sint64(*m))
                 .sum::<usize>()
@@ -182,7 +183,8 @@ impl<'a> MessageRead<'a> for TestMessageBorrow<'a> {
 impl<'a> MessageWrite for TestMessageBorrow<'a> {
     fn get_size(&self) -> usize {
         self.id.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m))
-            + self.val
+            + self
+                .val
                 .iter()
                 .map(|m| 1 + sizeof_len(m.len()))
                 .sum::<usize>()
@@ -332,11 +334,12 @@ fn wr_map() {
     let mut r = BytesReader::from_bytes(&buf);
     let mut read_back = HashMap::new();
     while !r.is_eof() {
-        let (key, value) = r.read_map(
-            &buf,
-            |r, bytes| r.read_string(bytes).map(Cow::Borrowed),
-            |r, bytes| r.read_int32(bytes),
-        ).unwrap();
+        let (key, value) =
+            r.read_map(
+                &buf,
+                |r, bytes| r.read_string(bytes).map(Cow::Borrowed),
+                |r, bytes| r.read_int32(bytes),
+            ).unwrap();
         read_back.insert(key, value);
     }
     assert_eq!(v, read_back);

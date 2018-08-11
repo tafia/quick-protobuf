@@ -324,8 +324,8 @@ impl BytesReader {
     /// Reads a certain number of bytes specified by len
     #[inline(always)]
     fn read_len<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F, len: usize) -> Result<M>
-        where
-            F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
+    where
+        F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
     {
         let cur_end = self.end;
         self.end = self.start + len;
@@ -408,8 +408,8 @@ impl BytesReader {
     ///  * 'len' - The length of the message to be read.
     #[inline]
     pub fn read_message_by_len<'a, M>(&mut self, bytes: &'a [u8], len: usize) -> Result<M>
-        where
-            M: MessageRead<'a>,
+    where
+        M: MessageRead<'a>,
     {
         self.read_len(bytes, M::from_reader, len)
     }

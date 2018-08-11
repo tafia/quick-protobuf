@@ -174,11 +174,14 @@ impl TestRepeatedMessages {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.messages1
+                Ok(10) => msg
+                    .messages1
                     .push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(18) => msg.messages2
+                Ok(18) => msg
+                    .messages2
                     .push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(26) => msg.messages3
+                Ok(26) => msg
+                    .messages3
                     .push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
                 Ok(t) => {
                     r.read_unknown(bytes, t)?;
@@ -196,11 +199,13 @@ impl MessageWrite for TestRepeatedMessages {
             .iter()
             .map(|s| 1 + sizeof_len((s).get_size()))
             .sum::<usize>()
-            + self.messages2
+            + self
+                .messages2
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.messages3
+            + self
+                .messages3
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
@@ -233,22 +238,19 @@ impl TestOptionalMessages {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => {
-                    msg.message1 = Some(Box::new(r.read_message(
-                        bytes,
-                        TestOptionalMessages::from_reader,
-                    )?))
+                    msg.message1 = Some(Box::new(
+                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
+                    ))
                 }
                 Ok(18) => {
-                    msg.message2 = Some(Box::new(r.read_message(
-                        bytes,
-                        TestOptionalMessages::from_reader,
-                    )?))
+                    msg.message2 = Some(Box::new(
+                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
+                    ))
                 }
                 Ok(26) => {
-                    msg.message3 = Some(Box::new(r.read_message(
-                        bytes,
-                        TestOptionalMessages::from_reader,
-                    )?))
+                    msg.message3 = Some(Box::new(
+                        r.read_message(bytes, TestOptionalMessages::from_reader)?,
+                    ))
                 }
                 Ok(t) => {
                     r.read_unknown(bytes, t)?;
@@ -265,10 +267,12 @@ impl MessageWrite for TestOptionalMessages {
         self.message1
             .as_ref()
             .map_or(0, |m| 1 + sizeof_len((m).get_size()))
-            + self.message2
+            + self
+                .message2
                 .as_ref()
                 .map_or(0, |m| 1 + sizeof_len((m).get_size()))
-            + self.message3
+            + self
+                .message3
                 .as_ref()
                 .map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
@@ -439,23 +443,32 @@ impl<'a> PerftestData<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.test1.push(r.read_message(bytes, Test1::from_reader)?),
-                Ok(18) => msg.test_repeated_bool
+                Ok(18) => msg
+                    .test_repeated_bool
                     .push(r.read_message(bytes, TestRepeatedBool::from_reader)?),
-                Ok(26) => msg.test_repeated_messages
+                Ok(26) => msg
+                    .test_repeated_messages
                     .push(r.read_message(bytes, TestRepeatedMessages::from_reader)?),
-                Ok(34) => msg.test_optional_messages
+                Ok(34) => msg
+                    .test_optional_messages
                     .push(r.read_message(bytes, TestOptionalMessages::from_reader)?),
-                Ok(42) => msg.test_strings
+                Ok(42) => msg
+                    .test_strings
                     .push(r.read_message(bytes, TestStrings::from_reader)?),
-                Ok(50) => msg.test_repeated_packed_int32
+                Ok(50) => msg
+                    .test_repeated_packed_int32
                     .push(r.read_message(bytes, TestRepeatedPackedInt32::from_reader)?),
-                Ok(58) => msg.test_repeated_packed_float
+                Ok(58) => msg
+                    .test_repeated_packed_float
                     .push(r.read_message(bytes, TestRepeatedPackedFloat::from_reader)?),
-                Ok(66) => msg.test_small_bytearrays
+                Ok(66) => msg
+                    .test_small_bytearrays
                     .push(r.read_message(bytes, TestBytes::from_reader)?),
-                Ok(74) => msg.test_large_bytearrays
+                Ok(74) => msg
+                    .test_large_bytearrays
                     .push(r.read_message(bytes, TestBytes::from_reader)?),
-                Ok(82) => msg.test_map
+                Ok(82) => msg
+                    .test_map
                     .push(r.read_message(bytes, TestMap::from_reader)?),
                 Ok(t) => {
                     r.read_unknown(bytes, t)?;
@@ -473,39 +486,48 @@ impl<'a> MessageWrite for PerftestData<'a> {
             .iter()
             .map(|s| 1 + sizeof_len((s).get_size()))
             .sum::<usize>()
-            + self.test_repeated_bool
+            + self
+                .test_repeated_bool
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.test_repeated_messages
+            + self
+                .test_repeated_messages
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.test_optional_messages
+            + self
+                .test_optional_messages
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.test_strings
+            + self
+                .test_strings
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.test_repeated_packed_int32
+            + self
+                .test_repeated_packed_int32
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.test_repeated_packed_float
+            + self
+                .test_repeated_packed_float
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.test_small_bytearrays
+            + self
+                .test_small_bytearrays
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.test_large_bytearrays
+            + self
+                .test_large_bytearrays
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
-            + self.test_map
+            + self
+                .test_map
                 .iter()
                 .map(|s| 1 + sizeof_len((s).get_size()))
                 .sum::<usize>()
