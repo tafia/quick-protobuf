@@ -4,8 +4,6 @@
 # and expecting them either to succeed or fail for some known reason.
 #
 
-cd ../../codegen
-
 # Checked in the end for non-empty value which serves as a boolean flag
 have_failures=""
 
@@ -14,11 +12,11 @@ have_failures=""
 # When adding new, remember not to add any whitespace around `=`.
 declare -A must_fail
 
-must_fail["../tests/rust_protobuf/v2/test_group_pb.proto"]="expected failure (empty read)"
-must_fail["../tests/rust_protobuf/v2/test_root_pb.proto"]="root search is not implemented yet"
-must_fail["../tests/rust_protobuf/v3/test_enum_alias_pb.proto"]="enum alias not implemented"
-must_fail["../tests/rust_protobuf/v2/test_enum_alias_pb.proto"]="enum alias not implemented"
-must_fail["../tests/rust_protobuf/v2/test_expose_oneof_pb.proto"]="missing file"
+must_fail["v2/test_group_pb.proto"]="expected failure (empty read)"
+must_fail["v2/test_root_pb.proto"]="root search is not implemented yet"
+must_fail["v3/test_enum_alias_pb.proto"]="enum alias not implemented"
+must_fail["v2/test_enum_alias_pb.proto"]="enum alias not implemented"
+must_fail["v2/test_expose_oneof_pb.proto"]="missing file"
 
 # Combined stdout and stderr for codegen of unexpectedly failed file.
 declare -A outs
@@ -39,10 +37,10 @@ success_msg() {
 	fi
 }
 
-for f in ../tests/rust_protobuf/v[23]/*.proto; do
+for f in v[23]/*.proto; do
 	ret=0
 	rm -f "${f%.proto}.rs"
-	out="$(cargo run --quiet -- "$f" 2>&1)" || ret=$?
+	out="$(cargo run -p pb-rs --quiet -- "$f" 2>&1)" || ret=$?
 
 	if expecting_failure "$f" && [ "$ret" -eq 0 ]; then
 		outs["$f"]="$out"
