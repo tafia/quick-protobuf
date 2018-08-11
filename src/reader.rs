@@ -311,12 +311,22 @@ impl BytesReader {
         self.read_int32(bytes).map(|e| e.into())
     }
 
+    /// First reads a varint and use it as size to read a generic object
     #[inline(always)]
-    fn read_len<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<M>
+    fn read_len_varint<'a, M, F>(&mut self, bytes: &'a [u8], read: F) -> Result<M>
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
     {
         let len = self.read_varint32(bytes)? as usize;
+        self.read_len(bytes, read, len)
+    }
+
+    /// Reads a certain number of bytes specified by len
+    #[inline(always)]
+    fn read_len<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F, len: usize) -> Result<M>
+        where
+            F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
+    {
         let cur_end = self.end;
         self.end = self.start + len;
         let v = read(self, bytes)?;
@@ -328,13 +338,13 @@ impl BytesReader {
     /// Reads bytes (Vec<u8>)
     #[inline]
     pub fn read_bytes<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a [u8]> {
-        self.read_len(bytes, |r, b| Ok(&b[r.start..r.end]))
+        self.read_len_varint(bytes, |r, b| Ok(&b[r.start..r.end]))
     }
 
     /// Reads string (String)
     #[inline]
     pub fn read_string<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a str> {
-        self.read_len(bytes, |r, b| {
+        self.read_len_varint(bytes, |r, b| {
             ::std::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into())
         })
     }
@@ -348,7 +358,7 @@ impl BytesReader {
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
     {
-        self.read_len(bytes, |r, b| {
+        self.read_len_varint(bytes, |r, b| {
             let mut v = Vec::new();
             while !r.is_eof() {
                 v.push(read(r, b)?);
@@ -382,12 +392,26 @@ impl BytesReader {
     }
 
     /// Reads a nested message
+    ///
+    /// First reads a varint and interprets it as the length of the message
     #[inline]
     pub fn read_message<'a, M>(&mut self, bytes: &'a [u8]) -> Result<M>
     where
         M: MessageRead<'a>,
     {
-        self.read_len(bytes, M::from_reader)
+        self.read_len_varint(bytes, M::from_reader)
+    }
+
+    /// Reads a nested message
+    ///
+    /// Reads just the message and does not try to read it's size first.
+    ///  * 'len' - The length of the message to be read.
+    #[inline]
+    pub fn read_message_by_len<'a, M>(&mut self, bytes: &'a [u8], len: usize) -> Result<M>
+        where
+            M: MessageRead<'a>,
+    {
+        self.read_len(bytes, M::from_reader, len)
     }
 
     /// Reads a map item: (key, value)
@@ -404,7 +428,7 @@ impl BytesReader {
         K: ::std::fmt::Debug + Default,
         V: ::std::fmt::Debug + Default,
     {
-        self.read_len(bytes, |r, bytes| {
+        self.read_len_varint(bytes, |r, bytes| {
             let mut k = K::default();
             let mut v = V::default();
             while !r.is_eof() {
