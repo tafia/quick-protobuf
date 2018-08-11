@@ -147,7 +147,8 @@ impl FieldType {
             FieldType::Double => Some("0f64"),
             FieldType::String_ => Some("Cow::Borrowed(\"\")"),
             FieldType::Bytes => Some("Cow::Borrowed(b\"\")"),
-            FieldType::Enum(_) => self.find_enum(&desc.messages, &desc.enums)
+            FieldType::Enum(_) => self
+                .find_enum(&desc.messages, &desc.enums)
                 .and_then(|e| e.fields.iter().find(|&&(_, i)| i == 0))
                 .map(|ref e| &*e.0),
             FieldType::Message(_) => None,
@@ -224,7 +225,8 @@ impl FieldType {
     fn has_lifetime(&self, desc: &FileDescriptor, packed: bool) -> bool {
         match *self {
             FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
-            FieldType::Message(_) => self.find_message(&desc.messages)
+            FieldType::Message(_) => self
+                .find_message(&desc.messages)
                 .map_or(false, |m| m.has_lifetime(desc)),
             FieldType::Fixed64
             | FieldType::Sfixed64
@@ -674,7 +676,8 @@ pub struct Message {
 impl Message {
     fn is_leaf(&self, leaf_messages: &[String]) -> bool {
         self.imported
-            || self.fields
+            || self
+                .fields
                 .iter()
                 .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
                 .all(|f| f.is_leaf(leaf_messages) || f.deprecated)
@@ -811,7 +814,8 @@ impl Message {
             )?;
         }
 
-        let unregular_defaults = self.fields
+        let unregular_defaults = self
+            .fields
             .iter()
             .filter(|f| !f.has_regular_default(desc))
             .collect::<Vec<_>>();
@@ -904,14 +908,17 @@ impl Message {
 
     fn sanity_checks(&self) -> Result<()> {
         // checks for reserved fields
-        for f in self.fields
+        for f in self
+            .fields
             .iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
         {
-            if self.reserved_names
+            if self
+                .reserved_names
                 .as_ref()
                 .map_or(false, |names| names.contains(&f.name))
-                || self.reserved_nums
+                || self
+                    .reserved_nums
                     .as_ref()
                     .map_or(false, |nums| nums.contains(&f.number))
             {
@@ -960,7 +967,8 @@ impl Message {
     ///
     /// If none is found, then it is an enum
     fn set_enums(&mut self, desc: &FileDescriptor) {
-        for f in self.fields
+        for f in self
+            .fields
             .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
@@ -976,7 +984,8 @@ impl Message {
     }
 
     fn set_map_required(&mut self) {
-        for f in self.fields
+        for f in self
+            .fields
             .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
@@ -990,7 +999,8 @@ impl Message {
     }
 
     fn set_repeated_as_packed(&mut self) {
-        for f in self.fields
+        for f in self
+            .fields
             .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
@@ -1003,7 +1013,8 @@ impl Message {
     }
 
     fn sanitize_defaults(&mut self, desc: &FileDescriptor) -> Result<()> {
-        for f in self.fields
+        for f in self
+            .fields
             .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
@@ -1694,7 +1705,8 @@ fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
             let k = undef_messages.pop().unwrap();
             {
                 let mut m = messages[k].clone();
-                for f in m.fields
+                for f in m
+                    .fields
                     .iter_mut()
                     .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
                 {
@@ -1779,7 +1791,8 @@ fn update_mod_file(path: &Path) -> Result<()> {
 
 /// get the proper sanitized file stem from an input file path
 fn get_file_stem(path: &Path) -> Result<String> {
-    let mut file_stem = path.file_stem()
+    let mut file_stem = path
+        .file_stem()
         .and_then(|f| f.to_str())
         .map(|s| s.to_string())
         .ok_or_else(|| Error::from(Error::OutputFile(format!("{}", path.display()))))?;
