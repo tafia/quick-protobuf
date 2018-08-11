@@ -8,6 +8,10 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## 0.6.2
+- feat: update dependencies
+- feat: have a public `read_message_by_len` to allow non varint message parsing
+
 ## 0.6.1
 - feat: make byte-specific utilities available in BytesReader
 
