@@ -99,7 +99,7 @@ impl<'a> MessageRead<'a> for TestType<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(18) => msg.struct_pb = r.read_packed(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed))?,
+                Ok(18) => msg.struct_pb.push(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(26) => msg.ref_pb = r.read_packed(bytes, |r, bytes| r.read_uint32(bytes))?,
                 Ok(10) => msg.type_pb = mod_TestType::OneOftype_pb::s(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -113,7 +113,7 @@ impl<'a> MessageRead<'a> for TestType<'a> {
 impl<'a> MessageWrite for TestType<'a> {
     fn get_size(&self) -> usize {
         0
-        + if self.struct_pb.is_empty() { 0 } else { 1 + sizeof_len(self.struct_pb.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
+        + self.struct_pb.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
         + if self.ref_pb.is_empty() { 0 } else { 1 + sizeof_len(self.ref_pb.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
         + match self.type_pb {
             mod_TestType::OneOftype_pb::s(ref m) => 1 + sizeof_len((m).len()),
@@ -121,7 +121,7 @@ impl<'a> MessageWrite for TestType<'a> {
     }    }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        w.write_packed_with_tag(18, &self.struct_pb, |w, m| w.write_string(&**m), &|m| sizeof_len((m).len()))?;
+        for s in &self.struct_pb { w.write_with_tag(18, |w| w.write_string(&**s))?; }
         w.write_packed_with_tag(26, &self.ref_pb, |w, m| w.write_uint32(*m), &|m| sizeof_varint(*(m) as u64))?;
         match self.type_pb {            mod_TestType::OneOftype_pb::s(ref m) => { w.write_with_tag(10, |w| w.write_string(&**m))? },
             mod_TestType::OneOftype_pb::None => {},
