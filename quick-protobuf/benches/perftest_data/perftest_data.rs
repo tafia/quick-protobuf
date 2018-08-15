@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'perftest_data_quick.proto' file
+//! Automatically generated rust module for 'perftest_data.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -11,6 +11,7 @@
 
 use std::io::Write;
 use std::borrow::Cow;
+use std::collections::HashMap;
 use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
@@ -109,10 +110,41 @@ impl MessageWrite for TestRepeatedPackedInt32 {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
+pub struct TestRepeatedPackedFloat<'a> {
+    pub values: Cow<'a, [f32]>,
+}
+
+impl<'a> MessageRead<'a> for TestRepeatedPackedFloat<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+        let mut msg = Self::default();
+        while !r.is_eof() {
+            match r.next_tag(bytes) {
+                Ok(10) => msg.values = Cow::Borrowed(r.read_packed_fixed(bytes)?),
+                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(msg)
+    }
+}
+
+impl<'a> MessageWrite for TestRepeatedPackedFloat<'a> {
+    fn get_size(&self) -> usize {
+        0
+        + if self.values.is_empty() { 0 } else { 1 + sizeof_len(self.values.len() * 4) }
+    }
+
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        w.write_packed_fixed_with_tag(10, &self.values)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestRepeatedMessages {
-    pub messages1: Vec<perftest_data_quick::TestRepeatedMessages>,
-    pub messages2: Vec<perftest_data_quick::TestRepeatedMessages>,
-    pub messages3: Vec<perftest_data_quick::TestRepeatedMessages>,
+    pub messages1: Vec<TestRepeatedMessages>,
+    pub messages2: Vec<TestRepeatedMessages>,
+    pub messages3: Vec<TestRepeatedMessages>,
 }
 
 impl<'a> MessageRead<'a> for TestRepeatedMessages {
@@ -120,9 +152,9 @@ impl<'a> MessageRead<'a> for TestRepeatedMessages {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.messages1.push(r.read_message::<perftest_data_quick::TestRepeatedMessages>(bytes)?),
-                Ok(18) => msg.messages2.push(r.read_message::<perftest_data_quick::TestRepeatedMessages>(bytes)?),
-                Ok(26) => msg.messages3.push(r.read_message::<perftest_data_quick::TestRepeatedMessages>(bytes)?),
+                Ok(10) => msg.messages1.push(r.read_message::<TestRepeatedMessages>(bytes)?),
+                Ok(18) => msg.messages2.push(r.read_message::<TestRepeatedMessages>(bytes)?),
+                Ok(26) => msg.messages3.push(r.read_message::<TestRepeatedMessages>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -149,9 +181,9 @@ impl MessageWrite for TestRepeatedMessages {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestOptionalMessages {
-    pub message1: Option<Box<perftest_data_quick::TestOptionalMessages>>,
-    pub message2: Option<Box<perftest_data_quick::TestOptionalMessages>>,
-    pub message3: Option<Box<perftest_data_quick::TestOptionalMessages>>,
+    pub message1: Option<Box<TestOptionalMessages>>,
+    pub message2: Option<Box<TestOptionalMessages>>,
+    pub message3: Option<Box<TestOptionalMessages>>,
 }
 
 impl<'a> MessageRead<'a> for TestOptionalMessages {
@@ -159,9 +191,9 @@ impl<'a> MessageRead<'a> for TestOptionalMessages {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.message1 = Some(Box::new(r.read_message::<perftest_data_quick::TestOptionalMessages>(bytes)?)),
-                Ok(18) => msg.message2 = Some(Box::new(r.read_message::<perftest_data_quick::TestOptionalMessages>(bytes)?)),
-                Ok(26) => msg.message3 = Some(Box::new(r.read_message::<perftest_data_quick::TestOptionalMessages>(bytes)?)),
+                Ok(10) => msg.message1 = Some(Box::new(r.read_message::<TestOptionalMessages>(bytes)?)),
+                Ok(18) => msg.message2 = Some(Box::new(r.read_message::<TestOptionalMessages>(bytes)?)),
+                Ok(26) => msg.message3 = Some(Box::new(r.read_message::<TestOptionalMessages>(bytes)?)),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -257,15 +289,51 @@ impl<'a> MessageWrite for TestBytes<'a> {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
+pub struct TestMap<'a> {
+    pub value: HashMap<Cow<'a, str>, u32>,
+}
+
+impl<'a> MessageRead<'a> for TestMap<'a> {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+        let mut msg = Self::default();
+        while !r.is_eof() {
+            match r.next_tag(bytes) {
+                Ok(10) => {
+                    let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_uint32(bytes))?;
+                    msg.value.insert(key, value);
+                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(msg)
+    }
+}
+
+impl<'a> MessageWrite for TestMap<'a> {
+    fn get_size(&self) -> usize {
+        0
+        + self.value.iter().map(|(k, v)| 1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))).sum::<usize>()
+    }
+
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        for (k, v) in self.value.iter() { w.write_with_tag(10, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_uint32(*v)))?; }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
 pub struct PerftestData<'a> {
-    pub test1: Vec<perftest_data_quick::Test1>,
-    pub test_repeated_bool: Vec<perftest_data_quick::TestRepeatedBool>,
-    pub test_repeated_messages: Vec<perftest_data_quick::TestRepeatedMessages>,
-    pub test_optional_messages: Vec<perftest_data_quick::TestOptionalMessages>,
-    pub test_strings: Vec<perftest_data_quick::TestStrings<'a>>,
-    pub test_repeated_packed_int32: Vec<perftest_data_quick::TestRepeatedPackedInt32>,
-    pub test_small_bytearrays: Vec<perftest_data_quick::TestBytes<'a>>,
-    pub test_large_bytearrays: Vec<perftest_data_quick::TestBytes<'a>>,
+    pub test1: Vec<Test1>,
+    pub test_repeated_bool: Vec<TestRepeatedBool>,
+    pub test_repeated_messages: Vec<TestRepeatedMessages>,
+    pub test_optional_messages: Vec<TestOptionalMessages>,
+    pub test_strings: Vec<TestStrings<'a>>,
+    pub test_repeated_packed_int32: Vec<TestRepeatedPackedInt32>,
+    pub test_repeated_packed_float: Vec<TestRepeatedPackedFloat<'a>>,
+    pub test_small_bytearrays: Vec<TestBytes<'a>>,
+    pub test_large_bytearrays: Vec<TestBytes<'a>>,
+    pub test_map: Vec<TestMap<'a>>,
 }
 
 impl<'a> MessageRead<'a> for PerftestData<'a> {
@@ -273,14 +341,16 @@ impl<'a> MessageRead<'a> for PerftestData<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.test1.push(r.read_message::<perftest_data_quick::Test1>(bytes)?),
-                Ok(18) => msg.test_repeated_bool.push(r.read_message::<perftest_data_quick::TestRepeatedBool>(bytes)?),
-                Ok(26) => msg.test_repeated_messages.push(r.read_message::<perftest_data_quick::TestRepeatedMessages>(bytes)?),
-                Ok(34) => msg.test_optional_messages.push(r.read_message::<perftest_data_quick::TestOptionalMessages>(bytes)?),
-                Ok(42) => msg.test_strings.push(r.read_message::<perftest_data_quick::TestStrings>(bytes)?),
-                Ok(50) => msg.test_repeated_packed_int32.push(r.read_message::<perftest_data_quick::TestRepeatedPackedInt32>(bytes)?),
-                Ok(58) => msg.test_small_bytearrays.push(r.read_message::<perftest_data_quick::TestBytes>(bytes)?),
-                Ok(66) => msg.test_large_bytearrays.push(r.read_message::<perftest_data_quick::TestBytes>(bytes)?),
+                Ok(10) => msg.test1.push(r.read_message::<Test1>(bytes)?),
+                Ok(18) => msg.test_repeated_bool.push(r.read_message::<TestRepeatedBool>(bytes)?),
+                Ok(26) => msg.test_repeated_messages.push(r.read_message::<TestRepeatedMessages>(bytes)?),
+                Ok(34) => msg.test_optional_messages.push(r.read_message::<TestOptionalMessages>(bytes)?),
+                Ok(42) => msg.test_strings.push(r.read_message::<TestStrings>(bytes)?),
+                Ok(50) => msg.test_repeated_packed_int32.push(r.read_message::<TestRepeatedPackedInt32>(bytes)?),
+                Ok(58) => msg.test_repeated_packed_float.push(r.read_message::<TestRepeatedPackedFloat>(bytes)?),
+                Ok(66) => msg.test_small_bytearrays.push(r.read_message::<TestBytes>(bytes)?),
+                Ok(74) => msg.test_large_bytearrays.push(r.read_message::<TestBytes>(bytes)?),
+                Ok(82) => msg.test_map.push(r.read_message::<TestMap>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -298,8 +368,10 @@ impl<'a> MessageWrite for PerftestData<'a> {
         + self.test_optional_messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_strings.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_repeated_packed_int32.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_repeated_packed_float.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_small_bytearrays.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
         + self.test_large_bytearrays.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + self.test_map.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -309,8 +381,10 @@ impl<'a> MessageWrite for PerftestData<'a> {
         for s in &self.test_optional_messages { w.write_with_tag(34, |w| w.write_message(s))?; }
         for s in &self.test_strings { w.write_with_tag(42, |w| w.write_message(s))?; }
         for s in &self.test_repeated_packed_int32 { w.write_with_tag(50, |w| w.write_message(s))?; }
-        for s in &self.test_small_bytearrays { w.write_with_tag(58, |w| w.write_message(s))?; }
-        for s in &self.test_large_bytearrays { w.write_with_tag(66, |w| w.write_message(s))?; }
+        for s in &self.test_repeated_packed_float { w.write_with_tag(58, |w| w.write_message(s))?; }
+        for s in &self.test_small_bytearrays { w.write_with_tag(66, |w| w.write_message(s))?; }
+        for s in &self.test_large_bytearrays { w.write_with_tag(74, |w| w.write_message(s))?; }
+        for s in &self.test_map { w.write_with_tag(82, |w| w.write_message(s))?; }
         Ok(())
     }
 }
