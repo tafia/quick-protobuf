@@ -16,3 +16,4 @@ script:
   - cargo build
   - cargo test
   - ./run_test.sh
+  - if [[ $(rustup show active-toolchain) == nightly* ]]; then cargo bench; fi;
