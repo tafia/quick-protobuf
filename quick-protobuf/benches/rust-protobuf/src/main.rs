@@ -8,10 +8,10 @@ extern crate time;
 extern crate prost_derive;
 
 use std::default::Default;
+use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::fmt::Debug;
 
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 
@@ -20,9 +20,9 @@ use bytes::{Buf, IntoBuf};
 use perftest_data::PerftestData;
 use perftest_data_quick::PerftestData as QuickPerftestData;
 
+use prost::Message as ProstMessage;
 use protobuf::Message;
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Reader, Writer};
-use prost::Message as ProstMessage;
 
 mod perftest_data;
 mod perftest_data_prost;
@@ -60,41 +60,58 @@ impl TestRunner {
         }
 
         let mut buf = Vec::new();
-        a[0] = measure(random_data.len() as u64, || {
-            for m in &random_data {
-                m.write_length_delimited_to_vec(&mut buf).unwrap();
-            }
-        }, None);
+        a[0] = measure(
+            random_data.len() as u64,
+            || {
+                for m in &random_data {
+                    m.write_length_delimited_to_vec(&mut buf).unwrap();
+                }
+            },
+            None,
+        );
 
-        a[1] = measure(random_data.len() as u64, || {
-            let mut r = Vec::new();
-            let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
-            while !coded_input_stream.eof().unwrap() {
-                r.push(
-                    protobuf::parse_length_delimited_from::<M>(&mut coded_input_stream).unwrap(),
-                );
-            }
-            r
-        }, Some(&random_data));
+        a[1] = measure(
+            random_data.len() as u64,
+            || {
+                let mut r = Vec::new();
+                let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
+                while !coded_input_stream.eof().unwrap() {
+                    r.push(
+                        protobuf::parse_length_delimited_from::<M>(&mut coded_input_stream)
+                            .unwrap(),
+                    );
+                }
+                r
+            },
+            Some(&random_data),
+        );
 
-        a[2] = measure(random_data.len() as u64, || {
-            let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
-            while !coded_input_stream.eof().unwrap() {
-                protobuf::parse_length_delimited_from::<M>(&mut coded_input_stream).unwrap();
-            }
-        }, None);
+        a[2] = measure(
+            random_data.len() as u64,
+            || {
+                let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
+                while !coded_input_stream.eof().unwrap() {
+                    protobuf::parse_length_delimited_from::<M>(&mut coded_input_stream).unwrap();
+                }
+            },
+            None,
+        );
 
-        a[3] = measure(random_data.len() as u64, || {
-            let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
-            let mut msg: M = Default::default();
-            let mut count = 0;
-            while !coded_input_stream.eof().unwrap() {
-                msg.clear();
-                coded_input_stream.merge_message(&mut msg).unwrap();
-                count += 1;
-            }
-            count
-        }, None);
+        a[3] = measure(
+            random_data.len() as u64,
+            || {
+                let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
+                let mut msg: M = Default::default();
+                let mut count = 0;
+                while !coded_input_stream.eof().unwrap() {
+                    msg.clear();
+                    coded_input_stream.merge_message(&mut msg).unwrap();
+                    count += 1;
+                }
+                count
+            },
+            None,
+        );
 
         a
     }
@@ -122,28 +139,40 @@ impl TestRunner {
         }
 
         let mut buf = Vec::new();
-        b[0] = measure(random_data.len() as u64, || {
-            let mut w = Writer::new(&mut buf);
-            for m in &random_data {
-                w.write_message(m).unwrap();
-            }
-        }, None);
+        b[0] = measure(
+            random_data.len() as u64,
+            || {
+                let mut w = Writer::new(&mut buf);
+                for m in &random_data {
+                    w.write_message(m).unwrap();
+                }
+            },
+            None,
+        );
 
-        b[1] = measure(random_data.len() as u64, || {
-            let mut r = Vec::<M>::new();
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                r.push(reader.read_message(&buf).unwrap());
-            }
-            r
-        }, Some(&random_data));
+        b[1] = measure(
+            random_data.len() as u64,
+            || {
+                let mut r = Vec::<M>::new();
+                let mut reader = BytesReader::from_bytes(&buf);
+                while !reader.is_eof() {
+                    r.push(reader.read_message(&buf).unwrap());
+                }
+                r
+            },
+            Some(&random_data),
+        );
 
-        b[2] = measure(random_data.len() as u64, || {
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                let _: M = reader.read_message(&buf).unwrap();
-            }
-        }, None);
+        b[2] = measure(
+            random_data.len() as u64,
+            || {
+                let mut reader = BytesReader::from_bytes(&buf);
+                while !reader.is_eof() {
+                    let _: M = reader.read_message(&buf).unwrap();
+                }
+            },
+            None,
+        );
 
         b
     }
@@ -171,28 +200,40 @@ impl TestRunner {
         }
 
         let mut buf = Vec::new();
-        b[0] = measure(random_data.len() as u64, || {
-            let mut w = Writer::new(&mut buf);
-            for m in &random_data {
-                w.write_message(m).unwrap();
-            }
-        }, None);
+        b[0] = measure(
+            random_data.len() as u64,
+            || {
+                let mut w = Writer::new(&mut buf);
+                for m in &random_data {
+                    w.write_message(m).unwrap();
+                }
+            },
+            None,
+        );
 
-        b[1] = measure(random_data.len() as u64, || {
-            let mut r = Vec::<perftest_data_quick::TestStrings>::new();
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                r.push(reader.read_message(&buf).unwrap());
-            }
-            r
-        }, Some(&random_data));
+        b[1] = measure(
+            random_data.len() as u64,
+            || {
+                let mut r = Vec::<perftest_data_quick::TestStrings>::new();
+                let mut reader = BytesReader::from_bytes(&buf);
+                while !reader.is_eof() {
+                    r.push(reader.read_message(&buf).unwrap());
+                }
+                r
+            },
+            Some(&random_data),
+        );
 
-        b[2] = measure(random_data.len() as u64, || {
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                let _: perftest_data_quick::TestStrings = reader.read_message(&buf).unwrap();
-            }
-        }, None);
+        b[2] = measure(
+            random_data.len() as u64,
+            || {
+                let mut reader = BytesReader::from_bytes(&buf);
+                while !reader.is_eof() {
+                    let _: perftest_data_quick::TestStrings = reader.read_message(&buf).unwrap();
+                }
+            },
+            None,
+        );
 
         b
     }
@@ -211,28 +252,40 @@ impl TestRunner {
         }
 
         let mut buf = Vec::new();
-        b[0] = measure(random_data.len() as u64, || {
-            let mut w = Writer::new(&mut buf);
-            for m in &random_data {
-                w.write_message(m).unwrap();
-            }
-        }, None);
+        b[0] = measure(
+            random_data.len() as u64,
+            || {
+                let mut w = Writer::new(&mut buf);
+                for m in &random_data {
+                    w.write_message(m).unwrap();
+                }
+            },
+            None,
+        );
 
-        b[1] = measure(random_data.len() as u64, || {
-            let mut r = Vec::<perftest_data_quick::TestBytes>::new();
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                r.push(reader.read_message(&buf).unwrap());
-            }
-            r
-        }, Some(&random_data));
+        b[1] = measure(
+            random_data.len() as u64,
+            || {
+                let mut r = Vec::<perftest_data_quick::TestBytes>::new();
+                let mut reader = BytesReader::from_bytes(&buf);
+                while !reader.is_eof() {
+                    r.push(reader.read_message(&buf).unwrap());
+                }
+                r
+            },
+            Some(&random_data),
+        );
 
-        b[2] = measure(random_data.len() as u64, || {
-            let mut reader = BytesReader::from_bytes(&buf);
-            while !reader.is_eof() {
-                let _: perftest_data_quick::TestBytes = reader.read_message(&buf).unwrap();
-            }
-        }, None);
+        b[2] = measure(
+            random_data.len() as u64,
+            || {
+                let mut reader = BytesReader::from_bytes(&buf);
+                while !reader.is_eof() {
+                    let _: perftest_data_quick::TestBytes = reader.read_message(&buf).unwrap();
+                }
+            },
+            None,
+        );
 
         b
     }
@@ -254,28 +307,40 @@ impl TestRunner {
         }
 
         let mut buf = Vec::new();
-        c[0] = measure(random_data.len() as u64, || {
-            for m in &random_data {
-                m.encode_length_delimited(&mut buf).unwrap();
-            }
-        }, None);
+        c[0] = measure(
+            random_data.len() as u64,
+            || {
+                for m in &random_data {
+                    m.encode_length_delimited(&mut buf).unwrap();
+                }
+            },
+            None,
+        );
 
         let mut tmp_buf = buf.clone().into_buf();
-        c[1] = measure(random_data.len() as u64, move || {
-            let mut r = Vec::new();
-            while tmp_buf.has_remaining() {
-                let m = M::decode_length_delimited(&mut tmp_buf).unwrap();
-                r.push(m);
-            }
-            r
-        }, Some(&random_data));
+        c[1] = measure(
+            random_data.len() as u64,
+            move || {
+                let mut r = Vec::new();
+                while tmp_buf.has_remaining() {
+                    let m = M::decode_length_delimited(&mut tmp_buf).unwrap();
+                    r.push(m);
+                }
+                r
+            },
+            Some(&random_data),
+        );
 
         let mut tmp_buf = buf.clone().into_buf();
-        c[2] = measure(random_data.len() as u64, move || {
-            while tmp_buf.has_remaining() {
-                M::decode_length_delimited(&mut tmp_buf).unwrap();
-            }
-        }, None);
+        c[2] = measure(
+            random_data.len() as u64,
+            move || {
+                while tmp_buf.has_remaining() {
+                    M::decode_length_delimited(&mut tmp_buf).unwrap();
+                }
+            },
+            None,
+        );
 
         c
     }
