@@ -3,18 +3,18 @@ name = "perftest"
 version = "0.0.0"
 authors = ["Stepan Koltsov <stepan.koltsov@gmail.com>",
            "Johann Tuffe <tafia973@gmail.com>"]
+build = "build.rs"
 
 [dependencies]
-protobuf = "1.4"
+protobuf = "2.0.4"
 quick-protobuf = { path = "../../" }
-time = { git = "https://github.com/rust-lang/time" }
-rand = "0.3.15"
-prost = { git = "https://github.com/danburkert/prost.git" }
-prost-derive = { git = "https://github.com/danburkert/prost.git" }
-bytes = "0.4"
+time = "0.1.40"
+rand = "0.5.5"
+prost = "0.4.0"
+prost-derive = "0.4.0"
+bytes = "0.4.9"
 
-[[bin]]
-
-name = "rust-protobuf-perftest"
-path = "perftest.rs"
-test = false
+[build-dependencies]
+protobuf-codegen-pure = "2.0.4"
+pb-rs = { path = "../../../pb-rs" }
+prost-build = "0.4.0"

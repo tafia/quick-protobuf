@@ -11,6 +11,7 @@ use std::cmp::min;
 use perftest_data::*;
 
 use quick_protobuf::message::MessageWrite;
+use quick_protobuf::MessageRead;
 use quick_protobuf::{BytesReader, Reader, Writer};
 use test::{black_box, Bencher};
 

@@ -13,6 +13,6 @@ install:
 build: false
 
 test_script:
-  - cargo build
-  - cargo test
+  - cargo build -p pb-rs -p quick-protobuf
   - sh run_test.sh
+  - cargo test -p pb-rs -p quick-protobuf
