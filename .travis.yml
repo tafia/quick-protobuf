@@ -12,8 +12,8 @@ before_script:
   - rustup component add rustfmt-preview
 
 script:
-  - if [[ $(rustup show active-toolchain) == stable* ]]; then cargo fmt --all -- --check; fi;
   - cargo build -p pb-rs -p quick-protobuf
   - ./run_test.sh
+  - if [[ $(rustup show active-toolchain) == stable* ]]; then cargo fmt -ppb-rs -pquick-protobuf -- --check; fi;
   - cargo test -p pb-rs -p quick-protobuf
   - if [[ $(rustup show active-toolchain) == nightly* ]]; then cargo bench -p quick-protobuf; fi;
