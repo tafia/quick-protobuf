@@ -213,16 +213,6 @@ This library is an alternative to the widely used [rust-protobuf](https://github
   - Not a drop-in replacement of rust-protobuf
     - everything being explicit you have to handle more things yourself (e.g. `Option` unwrapping, `Cow` management)
 
-#### Codegen
-
-Have a look at the different generated modules for the same .proto file:
-- [rust-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data.rs): 2371 loc
-- [quick-protobuf](https://github.com/tafia/quick-protobuf/blob/master/benches/rust-protobuf/perftest_data_quick.rs): 302 loc
-
-#### Benchmarks
-
-An [adaptation of rust-protobuf perftest](benches/rust-protobuf) is available and show, on these particular examples, that quick-protobuf is much faster than rust-protobuf.
-
 ## Contribution
 
 Any help is welcomed! (Pull requests of course, bug report, missing functionality etc...)

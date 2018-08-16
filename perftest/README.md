@@ -1,64 +1,68 @@
 # perftest
 
+The purpose of this package is to compare the performances of
+- protobuf
+- quick-protobuf
+- prost
+
 These tests are copied and adapted from [rust-protobuf](https://github.com/stepancheg/rust-protobuf/tree/master/src/perftest)
 
 ## Setup
 
-You can either run the tests as-is or manually regenerate the rust files following rust-protobuf guidelines or using pb-rs for quick-protobuf.
+Prost requires google `protoc` to be installed and available in your PATH.
+For the 3 projects, all files are generated at build time.
 
 ## Results
-
-quick-protobuf is generally faster than rust-protobuf.
 
 ```
          labels   rust-protobuf  quick-protobuf           prost      quick/rust      prost/rust
                         ns/iter         ns/iter         ns/iter               %               %
 
 test1
-          write              70              21              21            70.0            70.0
-           read              75              30              57            60.0            24.0
-    read no vec              43              20              46            53.5            -7.0
-     read reuse              38                              NA              NA
+          write              72              20              21            72.2            70.8
+           read              71              31              53            56.3            25.4
+    read no vec              44              20              46            54.5            -4.5
+     read reuse              42                              NA              NA
 
 test_repeated_bool
-          write              75              33              29            56.0            61.3
-           read             169             113             149            33.1            11.8
-    read no vec             118              79             131            33.1           -11.0
-     read reuse              60                              NA              NA
+          write              80              33              28            58.8            65.0
+           read             167             114             147            31.7            12.0
+    read no vec             124              79             123            36.3             0.8
+     read reuse              62                              NA              NA
 
 test_repeated_packed_int32
-          write             132              79              44            40.2            66.7
-           read             210             184             217            12.4            -3.3
-    read no vec             189             160             212            15.3           -12.2
-     read reuse              70                              NA              NA
+          write             135              69              46            48.9            65.9
+           read             241             186             216            22.8            10.4
+    read no vec             182             152             180            16.5             1.1
+     read reuse              71                              NA              NA
 
 test_repeated_messages
-          write             214             175             237            18.2           -10.7
-           read             669             560             529            16.3            20.9
-    read no vec             395             385             354             2.5            10.4
-     read reuse             178                              NA              NA
+          write             213             178             227            16.4            -6.6
+           read             665             550             519            17.3            22.0
+    read no vec             384             380             353             1.0             8.1
+     read reuse             169                              NA              NA
 
 test_optional_messages
-          write             212             153             104            27.8            50.9
-           read             476             329             318            30.9            33.2
-    read no vec             305             243             266            20.3            12.8
-     read reuse             158                              NA              NA
+          write             223             157             104            29.6            53.4
+           read             515             316             313            38.6            39.2
+    read no vec             354             241             249            31.9            29.7
+     read reuse             191                              NA              NA
 
 test_strings
-          write             177              60              61            66.1            65.5
-           read             314             184             319            41.4            -1.6
-    read no vec             227              86             179            62.1            21.1
-     read reuse             137                              NA              NA
+          write             146              63              59            56.8            59.6
+           read             345             185             247            46.4            28.4
+    read no vec             234              87             178            62.8            23.9
+     read reuse             124                              NA              NA
 
 test_small_bytearrays
-          write             503             455             321             9.5            36.2
-           read             684             103             617            84.9             9.8
-    read no vec             190              33             158            82.6            16.8
-     read reuse             100                              NA              NA
+          write             479             463             318             3.3            33.6
+           read             747              99             729            86.7             2.4
+    read no vec             182              31             259            83.0           -42.3
+     read reuse             113                              NA              NA
 
 test_large_bytearrays
-          write           83282           95547           63232           -14.7            24.1
-           read           36913            8503           67487            77.0           -82.8
-    read no vec            9047              51           18109            99.4          -100.2
-     read reuse            6694                              NA              NA
+          write          109299           96753           89523            11.5            18.1
+           read           47513            8598           66959            81.9           -40.9
+    read no vec           11245              56            9641            99.5            14.3
+     read reuse            8834                              NA              NA
 ```
