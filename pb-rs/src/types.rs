@@ -61,9 +61,10 @@ pub enum FieldType {
 impl FieldType {
     pub fn is_primitive(&self) -> bool {
         match *self {
-            FieldType::Message(_) | FieldType::Map(_, _) | FieldType::String_ | FieldType::Bytes => {
-                false
-            }
+            FieldType::Message(_)
+            | FieldType::Map(_, _)
+            | FieldType::String_
+            | FieldType::Bytes => false,
             _ => true,
         }
     }
@@ -71,9 +72,7 @@ impl FieldType {
     fn has_cow(&self) -> bool {
         match *self {
             FieldType::Bytes | FieldType::String_ => true,
-            FieldType::Map(ref k, ref v) => {
-                k.has_cow() || v.has_cow()
-            }
+            FieldType::Map(ref k, ref v) => k.has_cow() || v.has_cow(),
             _ => false,
         }
     }
@@ -104,7 +103,10 @@ impl FieldType {
             | FieldType::Bool
             | FieldType::Enum(_) => 0,
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => 1,
-            FieldType::String_ | FieldType::Bytes | FieldType::Message(_) | FieldType::Map(_, _) => 2,
+            FieldType::String_
+            | FieldType::Bytes
+            | FieldType::Message(_)
+            | FieldType::Map(_, _) => 2,
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         }
@@ -275,13 +277,11 @@ impl FieldType {
                 }
                 None => return Err(Error::MessageNotFound(msg.to_string())),
             },
-            FieldType::Map(ref key, ref value) => {
-                format!(
-                    "HashMap<{}, {}>",
-                    key.rust_type(desc)?,
-                    value.rust_type(desc)?
-                )
-            }
+            FieldType::Map(ref key, ref value) => format!(
+                "HashMap<{}, {}>",
+                key.rust_type(desc)?,
+                value.rust_type(desc)?
+            ),
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         })
     }
@@ -359,16 +359,14 @@ impl FieldType {
             FieldType::Message(_) if boxed => format!("write_message(&**{})", s),
             FieldType::Message(_) => format!("write_message({})", s),
 
-            FieldType::Map(ref k, ref v) => {
-                format!(
-                    "write_map({}, {}, |w| w.{}, {}, |w| w.{})",
-                    self.get_size(""),
-                    tag(1, k, false),
-                    k.get_write("k", false),
-                    tag(2, v, false),
-                    v.get_write("v", false)
-                )
-            }
+            FieldType::Map(ref k, ref v) => format!(
+                "write_map({}, {}, |w| w.{}, {}, |w| w.{})",
+                self.get_size(""),
+                tag(1, k, false),
+                k.get_write("k", false),
+                tag(2, v, false),
+                v.get_write("v", false)
+            ),
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         }
     }
@@ -983,10 +981,11 @@ impl Message {
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
             .map(|f| &mut f.typ)
             .flat_map(|typ| match *typ {
-                FieldType::Map(ref mut key, ref mut value) => vec![&mut **key, &mut **value].into_iter(),
+                FieldType::Map(ref mut key, ref mut value) => {
+                    vec![&mut **key, &mut **value].into_iter()
+                }
                 _ => vec![typ].into_iter(),
-            })
-        {
+            }) {
             if let FieldType::MessageOrEnum(m) = typ.clone() {
                 *typ = if typ.find_message(&desc.messages).is_none() {
                     FieldType::Enum(m)
