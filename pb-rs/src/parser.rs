@@ -158,8 +158,8 @@ named!(
             tag!("bytes") => { |_| FieldType::Bytes } |
             tag!("float") => { |_| FieldType::Float } |
             tag!("double") => { |_| FieldType::Double } |
-            map_field => { |(k, v)| FieldType::Map(Box::new((k, v))) } |
-            word => { |w| FieldType::Message(w) })
+            map_field => { |(k, v)| FieldType::Map(Box::new(k), Box::new(v)) } |
+            word => { |w| FieldType::MessageOrEnum(w) })
 );
 
 named!(

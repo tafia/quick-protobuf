@@ -51,16 +51,17 @@ pub enum FieldType {
     String_,
     Bytes,
     Message(String),
+    MessageOrEnum(String),
     Fixed32,
     Sfixed32,
     Float,
-    Map(Box<(FieldType, FieldType)>),
+    Map(Box<FieldType>, Box<FieldType>),
 }
 
 impl FieldType {
     pub fn is_primitive(&self) -> bool {
         match *self {
-            FieldType::Message(_) | FieldType::Map(_) | FieldType::String_ | FieldType::Bytes => {
+            FieldType::Message(_) | FieldType::Map(_, _) | FieldType::String_ | FieldType::Bytes => {
                 false
             }
             _ => true,
@@ -70,8 +71,7 @@ impl FieldType {
     fn has_cow(&self) -> bool {
         match *self {
             FieldType::Bytes | FieldType::String_ => true,
-            FieldType::Map(ref m) => {
-                let &(ref k, ref v) = &**m;
+            FieldType::Map(ref k, ref v) => {
                 k.has_cow() || v.has_cow()
             }
             _ => false,
@@ -80,7 +80,7 @@ impl FieldType {
 
     fn is_map(&self) -> bool {
         match *self {
-            FieldType::Map(_) => true,
+            FieldType::Map(_, _) => true,
             _ => false,
         }
     }
@@ -104,8 +104,9 @@ impl FieldType {
             | FieldType::Bool
             | FieldType::Enum(_) => 0,
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => 1,
-            FieldType::String_ | FieldType::Bytes | FieldType::Message(_) | FieldType::Map(_) => 2,
+            FieldType::String_ | FieldType::Bytes | FieldType::Message(_) | FieldType::Map(_, _) => 2,
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
+            FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         }
     }
 
@@ -128,7 +129,8 @@ impl FieldType {
             FieldType::String_ => "string",
             FieldType::Bytes => "bytes",
             FieldType::Message(_) => "message",
-            FieldType::Map(_) => "map",
+            FieldType::Map(_, _) => "map",
+            FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         }
     }
 
@@ -161,7 +163,8 @@ impl FieldType {
                 .and_then(|e| e.fields.iter().find(|&&(_, i)| i == 0))
                 .map(|ref e| &*e.0),
             FieldType::Message(_) => None,
-            FieldType::Map(_) => None,
+            FieldType::Map(_, _) => None,
+            FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         }
     }
 
@@ -170,7 +173,7 @@ impl FieldType {
     /// Searches first basic name then within nested messages
     fn find_message<'a, 'b>(&'a self, msgs: &'b [Message]) -> Option<&'b Message> {
         match *self {
-            FieldType::Message(ref m) => {
+            FieldType::Message(ref m) | FieldType::MessageOrEnum(ref m) => {
                 let mut found = match m.rfind('.') {
                     Some(p) => {
                         let package = &m[..p];
@@ -243,8 +246,7 @@ impl FieldType {
             | FieldType::Fixed32
             | FieldType::Sfixed32
             | FieldType::Float => packed, // Cow<[M]>
-            FieldType::Map(ref m) => {
-                let &(ref key, ref value) = &**m;
+            FieldType::Map(ref key, ref value) => {
                 key.has_lifetime(desc, false) || value.has_lifetime(desc, false)
             }
             _ => false,
@@ -273,14 +275,14 @@ impl FieldType {
                 }
                 None => return Err(Error::MessageNotFound(msg.to_string())),
             },
-            FieldType::Map(ref t) => {
-                let &(ref key, ref value) = &**t;
+            FieldType::Map(ref key, ref value) => {
                 format!(
                     "HashMap<{}, {}>",
                     key.rust_type(desc)?,
                     value.rust_type(desc)?
                 )
             }
+            FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         })
     }
 
@@ -294,12 +296,13 @@ impl FieldType {
                 }
                 None => return Err(Error::MessageNotFound(msg.to_string())),
             },
-            FieldType::Map(_) => return Err(Error::ReadFnMap),
+            FieldType::Map(_, _) => return Err(Error::ReadFnMap),
             FieldType::String_ | FieldType::Bytes => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let cow = format!("{}.map(Cow::Borrowed)", m);
                 (m, cow)
             }
+            FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
             _ => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 (m.clone(), m)
@@ -325,10 +328,10 @@ impl FieldType {
 
             FieldType::Message(_) => format!("sizeof_len(({}).get_size())", s),
 
-            FieldType::Map(ref m) => {
-                let &(ref k, ref v) = &**m;
+            FieldType::Map(ref k, ref v) => {
                 format!("2 + {} + {}", k.get_size("k"), v.get_size("v"))
             }
+            FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         }
     }
 
@@ -356,8 +359,7 @@ impl FieldType {
             FieldType::Message(_) if boxed => format!("write_message(&**{})", s),
             FieldType::Message(_) => format!("write_message({})", s),
 
-            FieldType::Map(ref m) => {
-                let &(ref k, ref v) = &**m;
+            FieldType::Map(ref k, ref v) => {
                 format!(
                     "write_map({}, {}, |w| w.{}, {}, |w| w.{})",
                     self.get_size(""),
@@ -367,6 +369,7 @@ impl FieldType {
                     v.get_write("v", false)
                 )
             }
+            FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         }
     }
 }
@@ -460,9 +463,7 @@ impl Field {
 
     fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         // special case for FieldType::Map: destructure tuple before inserting in HashMap
-        if let FieldType::Map(ref m) = self.typ {
-            let &(ref key, ref value) = &**m;
-
+        if let FieldType::Map(ref key, ref value) = self.typ {
             writeln!(w, "                Ok({}) => {{", self.tag())?;
             writeln!(
                 w,
@@ -976,15 +977,22 @@ impl Message {
     ///
     /// If none is found, then it is an enum
     fn set_enums(&mut self, desc: &FileDescriptor) {
-        for f in self
+        for typ in self
             .fields
             .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+            .map(|f| &mut f.typ)
+            .flat_map(|typ| match *typ {
+                FieldType::Map(ref mut key, ref mut value) => vec![&mut **key, &mut **value].into_iter(),
+                _ => vec![typ].into_iter(),
+            })
         {
-            if f.typ.find_message(&desc.messages).is_none() {
-                if let FieldType::Message(m) = f.typ.clone() {
-                    f.typ = FieldType::Enum(m);
-                }
+            if let FieldType::MessageOrEnum(m) = typ.clone() {
+                *typ = if typ.find_message(&desc.messages).is_none() {
+                    FieldType::Enum(m)
+                } else {
+                    FieldType::Message(m)
+                };
             }
         }
         for m in &mut self.messages {
@@ -998,7 +1006,7 @@ impl Message {
             .iter_mut()
             .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
         {
-            if let FieldType::Map(_) = f.typ {
+            if let FieldType::Map(_, _) = f.typ {
                 f.frequency = Frequency::Required;
             }
         }
