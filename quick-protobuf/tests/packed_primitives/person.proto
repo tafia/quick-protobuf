@@ -9,4 +9,10 @@ message Address {
 
 message Person {
     Address address = 2;
+    repeated string names = 3;
+}
+
+message PersonPacked {
+    Address address = 2;
+    repeated string names = 3 [packed=true];
 }

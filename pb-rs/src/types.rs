@@ -58,6 +58,15 @@ pub enum FieldType {
 }
 
 impl FieldType {
+    pub fn is_primitive(&self) -> bool {
+        match *self {
+            FieldType::Message(_) | FieldType::Map(_) | FieldType::String_ | FieldType::Bytes => {
+                false
+            }
+            _ => true,
+        }
+    }
+
     fn has_cow(&self) -> bool {
         match *self {
             FieldType::Bytes | FieldType::String_ => true,
@@ -1012,6 +1021,18 @@ impl Message {
         }
     }
 
+    fn unset_packed_non_primitives(&mut self) {
+        for f in self
+            .fields
+            .iter_mut()
+            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+        {
+            if !f.typ.is_primitive() && f.packed.is_some() {
+                f.packed = None;
+            }
+        }
+    }
+
     fn sanitize_defaults(&mut self, desc: &FileDescriptor) -> Result<()> {
         for f in self
             .fields
@@ -1536,6 +1557,10 @@ impl FileDescriptor {
         let copy = self.clone();
         for m in &mut self.messages {
             m.sanitize_defaults(&copy)?; //&msgs, &self.enums)?; ???
+        }
+        // force packed only on primitives
+        for m in &mut self.messages {
+            m.unset_packed_non_primitives();
         }
         Ok(())
     }

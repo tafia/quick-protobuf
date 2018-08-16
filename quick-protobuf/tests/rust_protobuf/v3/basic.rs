@@ -562,8 +562,8 @@ impl<'a> MessageRead<'a> for TestTypesRepeated<'a> {
                 Ok(93) => msg.sfixed32_field.push(r.read_sfixed32(bytes)?),
                 Ok(97) => msg.sfixed64_field.push(r.read_sfixed64(bytes)?),
                 Ok(104) => msg.bool_field.push(r.read_bool(bytes)?),
-                Ok(114) => msg.string_field = r.read_packed(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed))?,
-                Ok(122) => msg.bytes_field = r.read_packed(bytes, |r, bytes| r.read_bytes(bytes).map(Cow::Borrowed))?,
+                Ok(114) => msg.string_field.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(122) => msg.bytes_field.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(128) => msg.enum_field.push(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -589,8 +589,8 @@ impl<'a> MessageWrite for TestTypesRepeated<'a> {
         + (1 + 4) * self.sfixed32_field.len()
         + (1 + 8) * self.sfixed64_field.len()
         + self.bool_field.iter().map(|s| 1 + sizeof_varint(*(s) as u64)).sum::<usize>()
-        + if self.string_field.is_empty() { 0 } else { 1 + sizeof_len(self.string_field.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
-        + if self.bytes_field.is_empty() { 0 } else { 1 + sizeof_len(self.bytes_field.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
+        + self.string_field.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
+        + self.bytes_field.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
         + self.enum_field.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
     }
 
@@ -608,8 +608,8 @@ impl<'a> MessageWrite for TestTypesRepeated<'a> {
         for s in &self.sfixed32_field { w.write_with_tag(93, |w| w.write_sfixed32(*s))?; }
         for s in &self.sfixed64_field { w.write_with_tag(97, |w| w.write_sfixed64(*s))?; }
         for s in &self.bool_field { w.write_with_tag(104, |w| w.write_bool(*s))?; }
-        w.write_packed_with_tag(114, &self.string_field, |w, m| w.write_string(&**m), &|m| sizeof_len((m).len()))?;
-        w.write_packed_with_tag(122, &self.bytes_field, |w, m| w.write_bytes(&**m), &|m| sizeof_len((m).len()))?;
+        for s in &self.string_field { w.write_with_tag(114, |w| w.write_string(&**s))?; }
+        for s in &self.bytes_field { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
         for s in &self.enum_field { w.write_with_tag(128, |w| w.write_enum(*s as i32))?; }
         Ok(())
     }
@@ -653,8 +653,8 @@ impl<'a> MessageRead<'a> for TestTypesRepeatedPacked<'a> {
                 Ok(90) => msg.sfixed32_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
                 Ok(98) => msg.sfixed64_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
                 Ok(106) => msg.bool_field = r.read_packed(bytes, |r, bytes| r.read_bool(bytes))?,
-                Ok(114) => msg.string_field = r.read_packed(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed))?,
-                Ok(122) => msg.bytes_field = r.read_packed(bytes, |r, bytes| r.read_bytes(bytes).map(Cow::Borrowed))?,
+                Ok(114) => msg.string_field.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(122) => msg.bytes_field.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(130) => msg.enum_field = r.read_packed(bytes, |r, bytes| r.read_enum(bytes))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -680,8 +680,8 @@ impl<'a> MessageWrite for TestTypesRepeatedPacked<'a> {
         + if self.sfixed32_field.is_empty() { 0 } else { 1 + sizeof_len(self.sfixed32_field.len() * 4) }
         + if self.sfixed64_field.is_empty() { 0 } else { 1 + sizeof_len(self.sfixed64_field.len() * 8) }
         + if self.bool_field.is_empty() { 0 } else { 1 + sizeof_len(self.bool_field.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
-        + if self.string_field.is_empty() { 0 } else { 1 + sizeof_len(self.string_field.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
-        + if self.bytes_field.is_empty() { 0 } else { 1 + sizeof_len(self.bytes_field.iter().map(|s| sizeof_len((s).len())).sum::<usize>()) }
+        + self.string_field.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
+        + self.bytes_field.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
         + if self.enum_field.is_empty() { 0 } else { 2 + sizeof_len(self.enum_field.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
@@ -699,8 +699,8 @@ impl<'a> MessageWrite for TestTypesRepeatedPacked<'a> {
         w.write_packed_fixed_with_tag(90, &self.sfixed32_field)?;
         w.write_packed_fixed_with_tag(98, &self.sfixed64_field)?;
         w.write_packed_with_tag(106, &self.bool_field, |w, m| w.write_bool(*m), &|m| sizeof_varint(*(m) as u64))?;
-        w.write_packed_with_tag(114, &self.string_field, |w, m| w.write_string(&**m), &|m| sizeof_len((m).len()))?;
-        w.write_packed_with_tag(122, &self.bytes_field, |w, m| w.write_bytes(&**m), &|m| sizeof_len((m).len()))?;
+        for s in &self.string_field { w.write_with_tag(114, |w| w.write_string(&**s))?; }
+        for s in &self.bytes_field { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
         w.write_packed_with_tag(130, &self.enum_field, |w, m| w.write_enum(*m as i32), &|m| sizeof_varint(*(m) as u64))?;
         Ok(())
     }
