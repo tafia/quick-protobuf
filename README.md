@@ -250,7 +250,8 @@ Have a look at the different generated modules for the same .proto file:
 
 #### Benchmarks
 
-An [adaptation of rust-protobuf perftest](quick-protobuf/benches/rust-protobuf) is available and show, on these particular examples, that quick-protobuf is much faster than rust-protobuf.
+See [perftest](perftest), an adaptation of rust protobuf's perftest. Depending on your scenario each crate has its merit.
+quick-protobuf is particularly good at reading large bytes.
 
 ## Contribution
 

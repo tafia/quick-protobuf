@@ -7,13 +7,11 @@ extern crate time;
 #[macro_use]
 extern crate prost_derive;
 
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::default::Default;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
-
-use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 use bytes::{Buf, IntoBuf};
 
@@ -413,15 +411,21 @@ fn main() {
         data_size: data_size,
     };
 
-    let mut is = File::open(&Path::new("perftest_data.pbbin")).unwrap();
-    let test_data = protobuf::parse_from_reader::<PerftestData>(&mut is).unwrap();
+    let data = {
+        let mut is = File::open(&format!(
+            "{}/{}",
+            env!("CARGO_MANIFEST_DIR"),
+            "perftest_data.pbbin"
+        )).unwrap();
+        let mut data = Vec::new();
+        is.read_to_end(&mut data).unwrap();
+        data
+    };
 
-    let mut reader = Reader::from_file("perftest_data.pbbin").unwrap();
+    let test_data = protobuf::parse_from_reader::<PerftestData>(&mut &*data).unwrap();
+    let mut reader = Reader::from_reader(&mut &*data, data.len()).unwrap();
     let test_data_quick = reader.read(QuickPerftestData::from_reader).unwrap();
 
-    let mut is = File::open(&Path::new("perftest_data.pbbin")).unwrap();
-    let mut data = Vec::new();
-    is.read_to_end(&mut data).unwrap();
     let test_data_prost = perftest_data_prost::PerftestData::decode(&data).unwrap();
 
     let a = runner.test(test_data.get_test1());
