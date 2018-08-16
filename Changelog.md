@@ -8,6 +8,11 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.4.0
+- fix: ignore packed for non primitive fields
+- fix: force message with default values to be enum
+- feat: check if enum variant exists in default fields
+
 ## 0.6.2
 - feat: update dependencies
 - feat: have a public `read_message_by_len` to allow non varint message parsing
