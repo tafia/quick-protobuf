@@ -508,9 +508,12 @@ mod test {
         if let ::nom::IResult::Done(_, mess) = mess {
             assert_eq!(1, mess.fields.len());
             match mess.fields[0].typ {
-                FieldType::Map(ref f) => match &**f {
-                    &(FieldType::String_, FieldType::Int32) => (),
-                    ref f => panic!("Expecting Map<String, Int32> found {:?}", f),
+                FieldType::Map(ref key, ref value) => match (&**key, &**value) {
+                    (&FieldType::String_, &FieldType::Int32) => (),
+                    _ => panic!(
+                        "Expecting Map<String, Int32> found Map<{:?}, {:?}>",
+                        key, value
+                    ),
                 },
                 ref f => panic!("Expecting map, got {:?}", f),
             }
