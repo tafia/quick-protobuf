@@ -17,6 +17,8 @@ must_fail["v2/test_root_pb.proto"]="root search is not implemented yet"
 must_fail["v3/test_enum_alias_pb.proto"]="enum alias not implemented"
 must_fail["v2/test_enum_alias_pb.proto"]="enum alias not implemented"
 must_fail["v2/test_expose_oneof_pb.proto"]="missing file"
+must_fail["v2/test_enum_invalid_default.proto"]="enum variant does not exist"
+must_fail["v3/test_enum_invalid_default.proto"]="enum variant does not exist"
 
 # Combined stdout and stderr for codegen of unexpectedly failed file.
 declare -A outs

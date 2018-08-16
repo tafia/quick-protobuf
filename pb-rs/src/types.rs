@@ -914,13 +914,14 @@ impl Message {
         Ok(())
     }
 
-    fn sanity_checks(&self) -> Result<()> {
+    fn sanity_checks(&self, desc: &FileDescriptor) -> Result<()> {
         // checks for reserved fields
         for f in self
             .fields
             .iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
         {
+            // check reserved
             if self
                 .reserved_names
                 .as_ref()
@@ -935,6 +936,18 @@ impl Message {
                      Field {:?} conflict with reserved fields",
                     self.name, f
                 )));
+            }
+
+            // check default enums
+            if let Some(var) = f.default.as_ref() {
+                if let FieldType::Enum(ref name) = f.typ {
+                    f.typ.find_enum(&desc.messages, &desc.enums)
+                        .and_then(|e| e.fields.iter().find(|&(ref name, _)| name == var))
+                        .ok_or(Error::InvalidMessage(format!(
+                                    "Error in message {}\n\
+                                    Enum field {:?} has a default value '{}' which is not valid for enum {}",
+                                    self.name, f, var, name)))?;
+                }
             }
         }
         Ok(())
@@ -1488,7 +1501,7 @@ impl FileDescriptor {
 
     fn sanity_checks(&self) -> Result<()> {
         for m in &self.messages {
-            m.sanity_checks()?;
+            m.sanity_checks(&self)?;
         }
         Ok(())
     }
