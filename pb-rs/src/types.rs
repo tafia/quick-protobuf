@@ -975,6 +975,20 @@ impl Message {
     ///
     /// If none is found, then it is an enum
     fn set_enums(&mut self, desc: &FileDescriptor) {
+        // if there is a default value, then it is an enum
+        for f in self
+            .fields
+            .iter_mut()
+            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+        {
+            if f.default.is_some() {
+                if let FieldType::MessageOrEnum(m) = f.typ.clone() {
+                    f.typ = FieldType::Enum(m);
+                }
+            }
+        }
+
+        // else if we find a message, then it is a message, else an enum
         for typ in self
             .fields
             .iter_mut()
