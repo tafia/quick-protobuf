@@ -17,7 +17,10 @@ use test::{black_box, Bencher};
 
 #[bench]
 fn read_file(b: &mut Bencher) {
-    let path = format!("{}/benches/perftest_data/perftest_data.pbbin", env!("CARGO_MANIFEST_DIR"));
+    let path = format!(
+        "{}/benches/perftest_data/perftest_data.pbbin",
+        env!("CARGO_MANIFEST_DIR")
+    );
     b.iter(|| {
         let mut reader = Reader::from_file(&path).unwrap();
         reader.read(PerftestData::from_reader).unwrap().test1.len()
