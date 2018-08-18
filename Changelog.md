@@ -8,6 +8,11 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.4.1
+- fix: fix some nested messages not recognised (#90)
+- test: add new mesos.proto test
+- refactor: stop using find_enum and find_message, have MessageIndex and EnumIndex instead
+
 ## pb-rs 0.4.0
 - fix: ignore packed for non primitive fields
 - fix: force message with default values to be enum
