@@ -57,6 +57,24 @@ for f in v[23]/*.proto; do
 	fi
 done
 
+for f in common/*.proto; do
+	ret=0
+	rm -f "${f%.proto}.rs"
+	out="$(cargo run -p pb-rs --quiet -- "$f" 2>&1)" || ret=$?
+
+	if expecting_failure "$f" && [ "$ret" -eq 0 ]; then
+		outs["$f"]="$out"
+		have_failures="true"
+		echo "$f: unexpected success"
+	elif expecting_success "$f" && [ "$ret" -ne 0 ]; then
+		have_failures="true"
+		outs["$f"]="$out"
+		echo "$f: unexpected failure $ret"
+	else
+		echo "$f: $(success_msg "$f")"
+	fi
+done
+
 echo
 
 if [ "$have_failures" ]; then
