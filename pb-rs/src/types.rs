@@ -1635,7 +1635,6 @@ impl FileDescriptor {
                             continue 'types;
                         }
                     }
-                    println!("tested: {:?}", test_names);
                     return Err(Error::MessageOrEnumNotFound(name));
                 }
             }
