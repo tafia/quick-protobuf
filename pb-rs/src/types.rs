@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -36,6 +37,45 @@ pub enum Frequency {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct MessageIndex {
+    indexes: Vec<usize>,
+}
+
+impl MessageIndex {
+    fn get_message<'a>(&self, desc: &'a FileDescriptor) -> Option<&'a Message> {
+        let first_message = self.indexes.first().and_then(|i| desc.messages.get(*i));
+        self.indexes
+            .iter()
+            .skip(1)
+            .fold(first_message, |cur, next| {
+                cur.and_then(|msg| msg.messages.get(*next))
+            })
+    }
+    fn push(&mut self, i: usize) {
+        self.indexes.push(i);
+    }
+    fn pop(&mut self) {
+        self.indexes.pop();
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct EnumIndex {
+    msg_index: MessageIndex,
+    index: usize,
+}
+
+impl EnumIndex {
+    fn get_enum<'a>(&self, desc: &'a FileDescriptor) -> Option<&'a Enumerator> {
+        self.msg_index
+            .get_message(desc)
+            .map(|m| &m.enums)
+            .or(Some(&desc.enums))
+            .and_then(|enums| enums.get(self.index))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FieldType {
     Int32,
     Int64,
@@ -44,13 +84,13 @@ pub enum FieldType {
     Sint32,
     Sint64,
     Bool,
-    Enum(String),
+    Enum(EnumIndex),
     Fixed64,
     Sfixed64,
     Double,
     String_,
     Bytes,
-    Message(String),
+    Message(MessageIndex),
     MessageOrEnum(String),
     Fixed32,
     Sfixed32,
@@ -160,8 +200,8 @@ impl FieldType {
             FieldType::Double => Some("0f64"),
             FieldType::String_ => Some("Cow::Borrowed(\"\")"),
             FieldType::Bytes => Some("Cow::Borrowed(b\"\")"),
-            FieldType::Enum(_) => self
-                .find_enum(&desc.messages, &desc.enums)
+            FieldType::Enum(ref e) => e
+                .get_enum(desc)
                 .and_then(|e| e.fields.iter().find(|&&(_, i)| i == 0))
                 .map(|ref e| &*e.0),
             FieldType::Message(_) => None,
@@ -170,78 +210,12 @@ impl FieldType {
         }
     }
 
-    /// Searches for message corresponding to the current type
-    ///
-    /// Searches first basic name then within nested messages
-    fn find_message<'a, 'b>(&'a self, msgs: &'b [Message]) -> Option<&'b Message> {
-        match *self {
-            FieldType::Message(ref m) | FieldType::MessageOrEnum(ref m) => {
-                let mut found = match m.rfind('.') {
-                    Some(p) => {
-                        let package = &m[..p];
-                        let name = &m[(p + 1)..];
-                        msgs.iter().find(|m| m.package == package && m.name == name)
-                    }
-                    None => msgs.iter().find(|m2| m2.name == &m[..]),
-                };
-
-                if found.is_none() {
-                    // recursively search into nested messages
-                    for m in msgs {
-                        found = self.find_message(&m.messages);
-                        if found.is_some() {
-                            break;
-                        }
-                    }
-                }
-
-                found
-            }
-            _ => None,
-        }
-    }
-
-    /// Searches for enum corresponding to the current type
-    pub fn find_enum<'a, 'b>(
-        &'a self,
-        msgs: &'b [Message],
-        enums: &'b [Enumerator],
-    ) -> Option<&'b Enumerator> {
-        match *self {
-            FieldType::Enum(ref m) => {
-                let mut found = match m.rfind('.') {
-                    Some(p) => {
-                        let package = &m[..p];
-                        let name = &m[(p + 1)..];
-                        enums
-                            .iter()
-                            .find(|m| m.package == package && m.name == name)
-                    }
-                    None => enums.iter().find(|m2| m2.name == &m[..]),
-                };
-
-                if found.is_none() {
-                    // recursively search into nested messages
-                    for m in msgs.iter() {
-                        found = self.find_enum(&m.messages, &m.enums);
-                        if found.is_some() {
-                            break;
-                        }
-                    }
-                }
-
-                found
-            }
-            _ => None,
-        }
-    }
-
     fn has_lifetime(&self, desc: &FileDescriptor, packed: bool) -> bool {
         match *self {
             FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
-            FieldType::Message(_) => self
-                .find_message(&desc.messages)
-                .map_or(false, |m| m.has_lifetime(desc)),
+            FieldType::Message(ref m) => {
+                m.get_message(desc).map_or(false, |m| m.has_lifetime(desc))
+            }
             FieldType::Fixed64
             | FieldType::Sfixed64
             | FieldType::Double
@@ -266,16 +240,16 @@ impl FieldType {
             FieldType::String_ => "Cow<'a, str>".to_string(),
             FieldType::Bytes => "Cow<'a, [u8]>".to_string(),
             FieldType::Bool => "bool".to_string(),
-            FieldType::Enum(ref e) => match self.find_enum(&desc.messages, &desc.enums) {
+            FieldType::Enum(ref e) => match e.get_enum(desc) {
                 Some(e) => format!("{}{}", e.get_modules(desc), e.name),
-                None => return Err(Error::EnumNotFound(e.to_string())),
+                None => return Err(Error::EnumNotFound(e.clone())),
             },
-            FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
+            FieldType::Message(ref msg) => match msg.get_message(desc) {
                 Some(m) => {
                     let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
                     format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
                 }
-                None => return Err(Error::MessageNotFound(msg.to_string())),
+                None => return Err(Error::MessageNotFound(msg.clone())),
             },
             FieldType::Map(ref key, ref value) => format!(
                 "HashMap<{}, {}>",
@@ -289,12 +263,12 @@ impl FieldType {
     /// Returns the relevant function to read the data, both for regular and Cow wrapped
     fn read_fn(&self, desc: &FileDescriptor) -> Result<(String, String)> {
         Ok(match *self {
-            FieldType::Message(ref msg) => match self.find_message(&desc.messages) {
+            FieldType::Message(ref msg) => match msg.get_message(desc) {
                 Some(m) => {
                     let m = format!("r.read_message::<{}{}>(bytes)", m.get_modules(desc), m.name);
                     (m.clone(), m)
                 }
-                None => return Err(Error::MessageNotFound(msg.to_string())),
+                None => return Err(Error::MessageNotFound(msg.clone())),
             },
             FieldType::Map(_, _) => return Err(Error::ReadFnMap),
             FieldType::String_ | FieldType::Bytes => {
@@ -390,17 +364,11 @@ impl Field {
     }
 
     /// searches if the message must be boxed
-    fn is_leaf(&self, leaf_messages: &[String]) -> bool {
+    fn is_leaf(&self, leaf_messages: &[MessageIndex]) -> bool {
         match self.typ {
-            FieldType::Message(ref s) => match self.frequency {
+            FieldType::Message(ref m) => match self.frequency {
                 Frequency::Repeated => true,
-                _ => {
-                    let typ = match s.rfind('.') {
-                        Some(p) => &s[p + 1..],
-                        None => &s[..],
-                    };
-                    leaf_messages.iter().any(|m| &*m == &typ)
-                }
+                _ => leaf_messages.contains(m),
             },
             _ => true,
         }
@@ -682,7 +650,7 @@ pub struct Message {
 }
 
 impl Message {
-    fn is_leaf(&self, leaf_messages: &[String]) -> bool {
+    fn is_leaf(&self, leaf_messages: &[MessageIndex]) -> bool {
         self.imported
             || self
                 .fields
@@ -696,7 +664,11 @@ impl Message {
             .iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
             .any(|f| match f.typ {
-                FieldType::Message(ref m) if &m[..] == self.name => false,
+                FieldType::Message(ref m)
+                    if m.get_message(desc).map_or(false, |m| m.name == self.name) =>
+                {
+                    false
+                }
                 ref t => t.has_lifetime(desc, f.packed()),
             })
     }
@@ -940,13 +912,13 @@ impl Message {
 
             // check default enums
             if let Some(var) = f.default.as_ref() {
-                if let FieldType::Enum(ref name) = f.typ {
-                    f.typ.find_enum(&desc.messages, &desc.enums)
+                if let FieldType::Enum(ref e) = f.typ {
+                    e.get_enum(desc)
                         .and_then(|e| e.fields.iter().find(|&(ref name, _)| name == var))
                         .ok_or(Error::InvalidMessage(format!(
                                     "Error in message {}\n\
-                                    Enum field {:?} has a default value '{}' which is not valid for enum {}",
-                                    self.name, f, var, name)))?;
+                                    Enum field {:?} has a default value '{}' which is not valid for enum index {:?}",
+                                    self.name, f, var, e)))?;
                 }
             }
         }
@@ -981,48 +953,6 @@ impl Message {
         }
         for m in &mut self.oneofs {
             m.set_package(&child_package, &child_module);
-        }
-    }
-
-    /// Searches for a matching message in all message
-    ///
-    /// If none is found, then it is an enum
-    fn set_enums(&mut self, desc: &FileDescriptor) {
-        // if there is a default value, then it is an enum
-        for f in self
-            .fields
-            .iter_mut()
-            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-        {
-            if f.default.is_some() {
-                if let FieldType::MessageOrEnum(m) = f.typ.clone() {
-                    f.typ = FieldType::Enum(m);
-                }
-            }
-        }
-
-        // else if we find a message, then it is a message, else an enum
-        for typ in self
-            .fields
-            .iter_mut()
-            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-            .map(|f| &mut f.typ)
-            .flat_map(|typ| match *typ {
-                FieldType::Map(ref mut key, ref mut value) => {
-                    vec![&mut **key, &mut **value].into_iter()
-                }
-                _ => vec![typ].into_iter(),
-            }) {
-            if let FieldType::MessageOrEnum(m) = typ.clone() {
-                *typ = if typ.find_message(&desc.messages).is_none() {
-                    FieldType::Enum(m)
-                } else {
-                    FieldType::Message(m)
-                };
-            }
-        }
-        for m in &mut self.messages {
-            m.set_enums(desc);
         }
     }
 
@@ -1400,10 +1330,11 @@ impl FileDescriptor {
             return Err(Error::EmptyRead);
         }
 
-        desc.set_enums();
+        desc.resolve_types()?;
 
         let mut leaf_messages = Vec::new();
-        break_cycles(&mut desc.messages, &mut leaf_messages);
+        let index = MessageIndex { indexes: vec![] };
+        break_cycles(&index, &mut desc.messages, &mut leaf_messages);
 
         desc.sanity_checks()?;
         desc.set_defaults()?;
@@ -1608,12 +1539,116 @@ impl FileDescriptor {
         }
     }
 
-    fn set_enums(&mut self) {
-        let copy = self.clone();
-
-        for m in &mut self.messages {
-            m.set_enums(&copy);
+    fn get_full_names(&self) -> (HashMap<String, MessageIndex>, HashMap<String, EnumIndex>) {
+        fn rec_full_names(
+            m: &Message,
+            index: &mut MessageIndex,
+            full_msgs: &mut HashMap<String, MessageIndex>,
+            full_enums: &mut HashMap<String, EnumIndex>,
+        ) {
+            if m.package.is_empty() {
+                full_msgs.insert(m.name.clone(), index.clone());
+            } else {
+                full_msgs.insert(format!("{}.{}", m.package, m.name), index.clone());
+            }
+            for (i, e) in m.enums.iter().enumerate() {
+                full_enums.insert(
+                    format!("{}.{}", e.package, e.name),
+                    EnumIndex {
+                        msg_index: index.clone(),
+                        index: i,
+                    },
+                );
+            }
+            for (i, m) in m.messages.iter().enumerate() {
+                index.push(i);
+                rec_full_names(m, index, full_msgs, full_enums);
+                index.pop();
+            }
         }
+
+        let mut full_msgs = HashMap::new();
+        let mut full_enums = HashMap::new();
+        let mut index = MessageIndex { indexes: vec![] };
+        for (i, m) in self.messages.iter().enumerate() {
+            index.push(i);
+            rec_full_names(m, &mut index, &mut full_msgs, &mut full_enums);
+            index.pop();
+        }
+        for (i, e) in self.enums.iter().enumerate() {
+            if e.package.is_empty() {
+                full_enums.insert(
+                    e.name.clone(),
+                    EnumIndex {
+                        msg_index: index.clone(),
+                        index: i,
+                    },
+                );
+            } else {
+                full_enums.insert(
+                    format!("{}.{}", e.package, e.name),
+                    EnumIndex {
+                        msg_index: index.clone(),
+                        index: i,
+                    },
+                );
+            }
+        }
+        (full_msgs, full_enums)
+    }
+
+    fn resolve_types(&mut self) -> Result<()> {
+        let (full_msgs, full_enums) = self.get_full_names();
+
+        fn rec_resolve_types(
+            m: &mut Message,
+            full_msgs: &HashMap<String, MessageIndex>,
+            full_enums: &HashMap<String, EnumIndex>,
+        ) -> Result<()> {
+            'types: for typ in m
+                .fields
+                .iter_mut()
+                .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+                .map(|f| &mut f.typ)
+                .flat_map(|typ| match *typ {
+                    FieldType::Map(ref mut key, ref mut value) => {
+                        vec![&mut **key, &mut **value].into_iter()
+                    }
+                    _ => vec![typ].into_iter(),
+                }) {
+                if let FieldType::MessageOrEnum(name) = typ.clone() {
+                    let test_names: Vec<String> = if m.package.is_empty() {
+                        vec![name.clone(), format!("{}.{}", m.name, name)]
+                    } else {
+                        vec![
+                            name.clone(),
+                            format!("{}.{}", m.package, name),
+                            format!("{}.{}.{}", m.package, m.name, name),
+                        ]
+                    };
+                    for name in &test_names {
+                        if let Some(msg) = full_msgs.get(&*name) {
+                            *typ = FieldType::Message(msg.clone());
+                            continue 'types;
+                        } else if let Some(e) = full_enums.get(&*name) {
+                            *typ = FieldType::Enum(e.clone());
+                            continue 'types;
+                        }
+                    }
+                    println!("tested: {:?}", test_names);
+                    return Err(Error::MessageOrEnumNotFound(name));
+                }
+            }
+            for m in m.messages.iter_mut() {
+                rec_resolve_types(m, full_msgs, full_enums)?;
+            }
+            Ok(())
+        }
+
+        for m in self.messages.iter_mut() {
+            rec_resolve_types(m, &full_msgs, &full_enums)?;
+        }
+        Ok(())
     }
 
     fn write<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
@@ -1737,23 +1772,26 @@ impl FileDescriptor {
 /// Breaks cycles by adding boxes when necessary
 ///
 /// Cycles means one Message calls itself at some point
-fn break_cycles(messages: &mut [Message], leaf_messages: &mut Vec<String>) {
-    for m in messages.iter_mut() {
-        break_cycles(&mut m.messages, leaf_messages);
+fn break_cycles(
+    index: &MessageIndex,
+    messages: &mut [Message],
+    leaf_messages: &mut Vec<MessageIndex>,
+) {
+    for (i, m) in messages.iter_mut().enumerate() {
+        let mut index = index.clone();
+        index.push(i);
+        break_cycles(&index, &mut m.messages, leaf_messages);
     }
-
-    let message_names = messages
-        .iter()
-        .map(|m| m.name.to_string())
-        .collect::<Vec<_>>();
 
     let mut undef_messages = (0..messages.len()).collect::<Vec<_>>();
     while !undef_messages.is_empty() {
         let len = undef_messages.len();
         let mut new_undefs = Vec::new();
         for i in undef_messages {
-            if messages[i].is_leaf(&leaf_messages) {
-                leaf_messages.push(message_names[i].clone())
+            if messages[i].is_leaf(&**leaf_messages) {
+                let mut index = index.clone();
+                index.push(i);
+                leaf_messages.push(index)
             } else {
                 new_undefs.push(i);
             }
