@@ -80,6 +80,11 @@ named!(
 );
 
 named!(
+    extensions<()>,
+    do_parse!(tag!("extensions") >> take_until_and_consume!(";") >> ())
+);
+
+named!(
     num_range<Vec<i32>>,
     do_parse!(
         from_: integer
@@ -256,6 +261,7 @@ named!(
                                          message => { |m| MessageEvent::Message(m) } |
                                          enumerator => { |e| MessageEvent::Enumerator(e) } |
                                          one_of => { |o| MessageEvent::OneOf(o) } |
+                                         extensions => { |_| MessageEvent::Ignore } |
                                          br => { |_| MessageEvent::Ignore })
 );
 
