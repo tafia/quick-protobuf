@@ -1,7 +1,6 @@
 //! A module to handle all errors via error-chain crate
 
 use std::io;
-use types::{EnumIndex, MessageIndex};
 
 /// An error enum which derives `Fail`
 #[derive(Debug, Fail)]
@@ -48,16 +47,11 @@ pub enum Error {
                    either definition might be invalid or there were only unsupported structures"
     )]
     EmptyRead,
-    /// enum not found
-
-    /// Enum not found
-    #[fail(display = "Could not find enum {:?}", _0)]
-    EnumNotFound(EnumIndex),
-    /// Enum not found
-    #[fail(display = "Could not find message index {:?}", _0)]
-    MessageNotFound(MessageIndex),
+    /// enum or message not found
     #[fail(display = "Could not find message or enum {}", _0)]
     MessageOrEnumNotFound(String),
+    #[fail(display = "Enum field cannot be set to '{}', this variant does not exist", _0)]
+    InvalidDefaultEnum(String),
     /// read_fn implementation for Maps
     #[fail(display = "There should be a special case for maps")]
     ReadFnMap,

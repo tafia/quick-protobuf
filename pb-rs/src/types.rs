@@ -42,7 +42,7 @@ pub struct MessageIndex {
 }
 
 impl MessageIndex {
-    fn get_message<'a>(&self, desc: &'a FileDescriptor) -> Option<&'a Message> {
+    fn get_message<'a>(&self, desc: &'a FileDescriptor) -> &'a Message {
         let first_message = self.indexes.first().and_then(|i| desc.messages.get(*i));
         self.indexes
             .iter()
@@ -50,6 +50,7 @@ impl MessageIndex {
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get(*next))
             })
+            .expect("Message index not found")
     }
     fn push(&mut self, i: usize) {
         self.indexes.push(i);
@@ -66,12 +67,13 @@ pub struct EnumIndex {
 }
 
 impl EnumIndex {
-    fn get_enum<'a>(&self, desc: &'a FileDescriptor) -> Option<&'a Enumerator> {
-        self.msg_index
-            .get_message(desc)
-            .map(|m| &m.enums)
-            .or(Some(&desc.enums))
-            .and_then(|enums| enums.get(self.index))
+    fn get_enum<'a>(&self, desc: &'a FileDescriptor) -> &'a Enumerator {
+        let enums = if self.msg_index.indexes.is_empty() {
+            &desc.enums
+        } else {
+            &self.msg_index.get_message(desc).enums
+        };
+        enums.get(self.index).expect("Enum index not found")
     }
 }
 
@@ -200,10 +202,10 @@ impl FieldType {
             FieldType::Double => Some("0f64"),
             FieldType::String_ => Some("Cow::Borrowed(\"\")"),
             FieldType::Bytes => Some("Cow::Borrowed(b\"\")"),
-            FieldType::Enum(ref e) => e
-                .get_enum(desc)
-                .and_then(|e| e.fields.iter().find(|&&(_, i)| i == 0))
-                .map(|ref e| &*e.0),
+            FieldType::Enum(ref e) => {
+                let e = e.get_enum(desc);
+                e.fields.iter().find(|&&(_, i)| i == 0).map(|ref e| &*e.0)
+            }
             FieldType::Message(_) => None,
             FieldType::Map(_, _) => None,
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
@@ -213,9 +215,7 @@ impl FieldType {
     fn has_lifetime(&self, desc: &FileDescriptor, packed: bool) -> bool {
         match *self {
             FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
-            FieldType::Message(ref m) => {
-                m.get_message(desc).map_or(false, |m| m.has_lifetime(desc))
-            }
+            FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc),
             FieldType::Fixed64
             | FieldType::Sfixed64
             | FieldType::Double
@@ -240,17 +240,15 @@ impl FieldType {
             FieldType::String_ => "Cow<'a, str>".to_string(),
             FieldType::Bytes => "Cow<'a, [u8]>".to_string(),
             FieldType::Bool => "bool".to_string(),
-            FieldType::Enum(ref e) => match e.get_enum(desc) {
-                Some(e) => format!("{}{}", e.get_modules(desc), e.name),
-                None => return Err(Error::EnumNotFound(e.clone())),
-            },
-            FieldType::Message(ref msg) => match msg.get_message(desc) {
-                Some(m) => {
-                    let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
-                    format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
-                }
-                None => return Err(Error::MessageNotFound(msg.clone())),
-            },
+            FieldType::Enum(ref e) => {
+                let e = e.get_enum(desc);
+                format!("{}{}", e.get_modules(desc), e.name)
+            }
+            FieldType::Message(ref msg) => {
+                let m = msg.get_message(desc);
+                let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
+                format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
+            }
             FieldType::Map(ref key, ref value) => format!(
                 "HashMap<{}, {}>",
                 key.rust_type(desc)?,
@@ -263,13 +261,11 @@ impl FieldType {
     /// Returns the relevant function to read the data, both for regular and Cow wrapped
     fn read_fn(&self, desc: &FileDescriptor) -> Result<(String, String)> {
         Ok(match *self {
-            FieldType::Message(ref msg) => match msg.get_message(desc) {
-                Some(m) => {
-                    let m = format!("r.read_message::<{}{}>(bytes)", m.get_modules(desc), m.name);
-                    (m.clone(), m)
-                }
-                None => return Err(Error::MessageNotFound(msg.clone())),
-            },
+            FieldType::Message(ref msg) => {
+                let m = msg.get_message(desc);
+                let m = format!("r.read_message::<{}{}>(bytes)", m.get_modules(desc), m.name);
+                (m.clone(), m)
+            }
             FieldType::Map(_, _) => return Err(Error::ReadFnMap),
             FieldType::String_ | FieldType::Bytes => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
@@ -664,11 +660,7 @@ impl Message {
             .iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
             .any(|f| match f.typ {
-                FieldType::Message(ref m)
-                    if m.get_message(desc).map_or(false, |m| m.name == self.name) =>
-                {
-                    false
-                }
+                FieldType::Message(ref m) if m.get_message(desc).name == self.name => false,
                 ref t => t.has_lifetime(desc, f.packed()),
             })
     }
@@ -887,7 +879,6 @@ impl Message {
     }
 
     fn sanity_checks(&self, desc: &FileDescriptor) -> Result<()> {
-        // checks for reserved fields
         for f in self
             .fields
             .iter()
@@ -913,12 +904,12 @@ impl Message {
             // check default enums
             if let Some(var) = f.default.as_ref() {
                 if let FieldType::Enum(ref e) = f.typ {
-                    e.get_enum(desc)
-                        .and_then(|e| e.fields.iter().find(|&(ref name, _)| name == var))
-                        .ok_or(Error::InvalidMessage(format!(
-                                    "Error in message {}\n\
-                                    Enum field {:?} has a default value '{}' which is not valid for enum index {:?}",
-                                    self.name, f, var, e)))?;
+                    let e = e.get_enum(desc);
+                    e.fields.iter().find(|&(ref name, _)| name == var)
+                    .ok_or(Error::InvalidDefaultEnum(format!(
+                                "Error in message {}\n\
+                                Enum field {:?} has a default value '{}' which is not valid for enum index {:?}",
+                                self.name, f, var, e)))?;
                 }
             }
         }
