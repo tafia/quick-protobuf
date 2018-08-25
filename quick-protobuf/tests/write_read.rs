@@ -1,6 +1,7 @@
 extern crate quick_protobuf;
 
 use quick_protobuf::sizeofs::*;
+use quick_protobuf::{deserialize_from_slice, serialize_into_vec};
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Reader, Result, Writer};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -144,13 +145,8 @@ fn wr_message() {
         id: Some(63),
         val: vec![53, 5, 76, 743, 23, 753],
     };
-    let mut buf = Vec::new();
-    {
-        let mut w = Writer::new(&mut buf);
-        w.write_message(&v).unwrap();
-    }
-    let mut r = BytesReader::from_bytes(&buf);
-    assert_eq!(v, r.read_message::<TestMessage>(&buf).unwrap());
+    let buf = serialize_into_vec(&v).unwrap();
+    assert_eq!(v, deserialize_from_slice(&buf).unwrap());
 
     // test get_size!
     assert_eq!(buf.len(), sizeof_varint(8) + v.get_size());
@@ -209,13 +205,8 @@ fn wr_message_length_prefixed() {
         id: Some(63),
         val: vec![&test[0..2], &test[3..7], &test[7..10]],
     };
-    let mut buf = Vec::new();
-    {
-        let mut writer = Writer::new(&mut buf);
-        writer.write_message(&v).unwrap();
-    }
-    let mut r = BytesReader::from_bytes(&buf);
-    assert_eq!(v, r.read_message::<TestMessageBorrow>(&buf).unwrap());
+    let buf = serialize_into_vec(&v).unwrap();
+    assert_eq!(v, deserialize_from_slice(&buf).unwrap());
 
     // test get_size!
     assert_eq!(buf.len(), sizeof_varint(8) + v.get_size());

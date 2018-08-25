@@ -11,7 +11,7 @@ use pb_rs::data_types::{self, FooMessage};
 // mod_a::mod_b rust module
 use pb_rs::a::b::ImportedMessage;
 
-use quick_protobuf::{BytesReader, Writer};
+use quick_protobuf::{deserialize_from_slice, serialize_into_vec, BytesReader, Writer};
 
 fn main() {
     // Generate a message, somehow
@@ -60,6 +60,10 @@ fn main() {
     }
     println!("Message written successfully!");
 
+    // alternatively, a one-liner if we want to work with vec directly
+    let out_vec = serialize_into_vec(&message).expect("Cannot write message!");
+    assert_eq!(out, out_vec);
+
     // Try to read it back and confirm that we still have the exact same message
     //
     // In general, if we had written the data to say, a file, or if someone else
@@ -73,6 +77,10 @@ fn main() {
             .expect("Cannot read message")
     };
     assert_eq!(message, read_message);
+
+    // alternatively, a one-liner if we want to work with slices directly
+    let read_vec = deserialize_from_slice(&out).expect("Cannot write message!");
+    assert_eq!(message, read_vec);
 
     println!("Message read back and everything matches!");
     println!("{:#?}", read_message);

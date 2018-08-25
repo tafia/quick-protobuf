@@ -52,13 +52,20 @@ use foo_bar::FooBar;
 use quick_protobuf::{MessageRead, BytesReader};
 
 fn main() {
+
     // bytes is a buffer on the data we want to deserialize
     // typically bytes is read from a `Read`:
     // r.read_to_end(&mut bytes).expect("cannot read bytes");
-    let mut bytes: Vec<u8>;
-    # bytes = vec![];
+    let bytes: Vec<u8> = ...;
 
-    // we can build a bytes reader directly out of the bytes
+    // In the most simple form, we want to deserialize from a `&[u8]`
+    let foobar = deserialize_from_slice(&bytes).expect("Cannot convert into a `FooBar`");
+
+    // ...
+    // ...
+
+    // Alternatively, we can go lower level and work with a `BytesReader`
+    // It gives more control of the bytes we are reading
     let mut reader = BytesReader::from_bytes(&bytes);
 
     // now using the generated module decoding is as easy as:
@@ -70,6 +77,15 @@ fn main() {
     //     ...
     // }
     println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
+
+    // Similarly, if we want to serialize the message you can use a `Writer` or use
+    // `serialize_into_vec`
+    let vec = serialize_into_vec(&foobar).expect("Cannot serialize `foobar`");
+
+    // ... or for more control (more than one message)
+    let mut buf = Vec::new();
+    let mut writer = Writer::new(&mut buf);
+    writer.write_message(&foobar).expect("Cannot write `foobar`);
 }
 ```
 

@@ -18,5 +18,5 @@ pub mod writer;
 
 pub use errors::{Error, Result};
 pub use message::{MessageRead, MessageWrite};
-pub use reader::{BytesReader, Reader};
-pub use writer::Writer;
+pub use reader::{deserialize_from_slice, BytesReader, Reader};
+pub use writer::{serialize_into_vec, Writer};
