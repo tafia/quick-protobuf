@@ -8,6 +8,9 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## quick-protobuf 0.6.3
+- feat: add serialize_into_vec and deserialize_from_slice helper functions
+
 ## pb-rs 0.4.1
 - fix: fix some nested messages not recognised (#90)
 - test: add new mesos.proto test
