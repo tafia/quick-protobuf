@@ -654,7 +654,9 @@ impl Message {
     }
 
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
-        self.all_fields().any(|f| match f.typ {
+        self.all_fields()
+            .filter(|f| !f.boxed) // removed boxed fields
+            .any(|f| match f.typ {
             FieldType::Message(ref m) if m.get_message(desc).name == self.name => false,
             ref t => t.has_lifetime(desc, f.packed()),
         })
@@ -1647,7 +1649,6 @@ impl FileDescriptor {
         self.write_enums(w)?;
         self.write_messages(w)?;
         self.write_package_end(w)?;
-        println!("Done processing {}", filename);
         Ok(())
     }
 
