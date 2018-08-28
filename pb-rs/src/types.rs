@@ -36,7 +36,7 @@ pub enum Frequency {
     Required,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct MessageIndex {
     indexes: Vec<usize>,
 }
@@ -60,7 +60,7 @@ impl MessageIndex {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct EnumIndex {
     msg_index: MessageIndex,
     index: usize,
@@ -212,10 +212,15 @@ impl FieldType {
         }
     }
 
-    fn has_lifetime(&self, desc: &FileDescriptor, packed: bool) -> bool {
+    fn has_lifetime(
+        &self,
+        desc: &FileDescriptor,
+        packed: bool,
+        ignore: &mut Vec<MessageIndex>,
+    ) -> bool {
         match *self {
             FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
-            FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc),
+            FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc, ignore),
             FieldType::Fixed64
             | FieldType::Sfixed64
             | FieldType::Double
@@ -223,7 +228,7 @@ impl FieldType {
             | FieldType::Sfixed32
             | FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref key, ref value) => {
-                key.has_lifetime(desc, false) || value.has_lifetime(desc, false)
+                key.has_lifetime(desc, false, ignore) || value.has_lifetime(desc, false, ignore)
             }
             _ => false,
         }
@@ -246,7 +251,11 @@ impl FieldType {
             }
             FieldType::Message(ref msg) => {
                 let m = msg.get_message(desc);
-                let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
+                let lifetime = if m.has_lifetime(desc, &mut Vec::new()) {
+                    "<'a>"
+                } else {
+                    ""
+                };
                 format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
             }
             FieldType::Map(ref key, ref value) => format!(
@@ -643,6 +652,7 @@ pub struct Message {
     pub module: String,         // 'package' corresponding to actual generated Rust module
     pub path: PathBuf,
     pub import: PathBuf,
+    pub index: MessageIndex,
 }
 
 impl Message {
@@ -653,13 +663,16 @@ impl Message {
                 .all(|f| f.is_leaf(leaf_messages) || f.deprecated)
     }
 
-    fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
-        self.all_fields()
-            .filter(|f| !f.boxed) // removed boxed fields
-            .any(|f| match f.typ {
-            FieldType::Message(ref m) if m.get_message(desc).name == self.name => false,
-            ref t => t.has_lifetime(desc, f.packed()),
-        })
+    fn has_lifetime(&self, desc: &FileDescriptor, ignore: &mut Vec<MessageIndex>) -> bool {
+        if ignore.contains(&&self.index) {
+            return false;
+        }
+        ignore.push(self.index.clone());
+        let res = self
+            .all_fields()
+            .any(|f| f.typ.has_lifetime(desc, f.packed(), ignore));
+        ignore.pop();
+        res
     }
 
     fn set_imported(&mut self) {
@@ -738,7 +751,7 @@ impl Message {
             return Ok(());
         }
 
-        if self.has_lifetime(desc) {
+        if self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w, "pub struct {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "pub struct {} {{", self.name)?;
@@ -767,7 +780,7 @@ impl Message {
             return Ok(());
         }
 
-        if self.has_lifetime(desc) {
+        if self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w, "impl<'a> MessageRead<'a> for {}<'a> {{", self.name)?;
             writeln!(
                 w,
@@ -832,7 +845,7 @@ impl Message {
             return Ok(());
         }
 
-        if self.has_lifetime(desc) {
+        if self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
@@ -1011,7 +1024,7 @@ impl Message {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Enumerator {
     pub name: String,
     pub fields: Vec<(String, i32)>,
@@ -1020,6 +1033,7 @@ pub struct Enumerator {
     pub module: String,
     pub path: PathBuf,
     pub import: PathBuf,
+    pub index: EnumIndex,
 }
 
 impl Enumerator {
@@ -1118,7 +1132,7 @@ impl OneOf {
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
         self.fields
             .iter()
-            .any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed()))
+            .any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed(), &mut Vec::new()))
     }
 
     fn set_package(&mut self, package: &str, module: &str) {
@@ -1521,28 +1535,28 @@ impl FileDescriptor {
         }
     }
 
-    fn get_full_names(&self) -> (HashMap<String, MessageIndex>, HashMap<String, EnumIndex>) {
+    fn get_full_names(&mut self) -> (HashMap<String, MessageIndex>, HashMap<String, EnumIndex>) {
         fn rec_full_names(
-            m: &Message,
+            m: &mut Message,
             index: &mut MessageIndex,
             full_msgs: &mut HashMap<String, MessageIndex>,
             full_enums: &mut HashMap<String, EnumIndex>,
         ) {
+            m.index = index.clone();
             if m.package.is_empty() {
                 full_msgs.insert(m.name.clone(), index.clone());
             } else {
                 full_msgs.insert(format!("{}.{}", m.package, m.name), index.clone());
             }
-            for (i, e) in m.enums.iter().enumerate() {
-                full_enums.insert(
-                    format!("{}.{}", e.package, e.name),
-                    EnumIndex {
-                        msg_index: index.clone(),
-                        index: i,
-                    },
-                );
+            for (i, e) in m.enums.iter_mut().enumerate() {
+                let index = EnumIndex {
+                    msg_index: index.clone(),
+                    index: i,
+                };
+                e.index = index.clone();
+                full_enums.insert(format!("{}.{}", e.package, e.name), index);
             }
-            for (i, m) in m.messages.iter().enumerate() {
+            for (i, m) in m.messages.iter_mut().enumerate() {
                 index.push(i);
                 rec_full_names(m, index, full_msgs, full_enums);
                 index.pop();
@@ -1552,28 +1566,21 @@ impl FileDescriptor {
         let mut full_msgs = HashMap::new();
         let mut full_enums = HashMap::new();
         let mut index = MessageIndex { indexes: vec![] };
-        for (i, m) in self.messages.iter().enumerate() {
+        for (i, m) in self.messages.iter_mut().enumerate() {
             index.push(i);
             rec_full_names(m, &mut index, &mut full_msgs, &mut full_enums);
             index.pop();
         }
-        for (i, e) in self.enums.iter().enumerate() {
+        for (i, e) in self.enums.iter_mut().enumerate() {
+            let index = EnumIndex {
+                msg_index: index.clone(),
+                index: i,
+            };
+            e.index = index.clone();
             if e.package.is_empty() {
-                full_enums.insert(
-                    e.name.clone(),
-                    EnumIndex {
-                        msg_index: index.clone(),
-                        index: i,
-                    },
-                );
+                full_enums.insert(e.name.clone(), index.clone());
             } else {
-                full_enums.insert(
-                    format!("{}.{}", e.package, e.name),
-                    EnumIndex {
-                        msg_index: index.clone(),
-                        index: i,
-                    },
-                );
+                full_enums.insert(format!("{}.{}", e.package, e.name), index.clone());
             }
         }
         (full_msgs, full_enums)

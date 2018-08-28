@@ -339,11 +339,7 @@ named!(
             >> many0!(tag!(";")) >> (Enumerator {
             name: name,
             fields: fields,
-            imported: false,
-            package: "".to_string(),
-            module: "".to_string(),
-            import: PathBuf::new(),
-            path: PathBuf::new(),
+            ..Enumerator::default()
         })
     )
 );
