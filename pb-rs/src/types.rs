@@ -649,20 +649,15 @@ impl Message {
     fn is_leaf(&self, leaf_messages: &[MessageIndex]) -> bool {
         self.imported
             || self
-                .fields
-                .iter()
-                .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
+                .all_fields()
                 .all(|f| f.is_leaf(leaf_messages) || f.deprecated)
     }
 
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
-        self.fields
-            .iter()
-            .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
-            .any(|f| match f.typ {
-                FieldType::Message(ref m) if m.get_message(desc).name == self.name => false,
-                ref t => t.has_lifetime(desc, f.packed()),
-            })
+        self.all_fields().any(|f| match f.typ {
+            FieldType::Message(ref m) if m.get_message(desc).name == self.name => false,
+            ref t => t.has_lifetime(desc, f.packed()),
+        })
     }
 
     fn set_imported(&mut self) {
@@ -700,20 +695,18 @@ impl Message {
             writeln!(w, "")?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w, "")?;
-            if self.messages.iter().any(|m| {
-                m.fields
-                    .iter()
-                    .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                    .any(|f| f.typ.has_cow())
-            }) {
+            if self
+                .messages
+                .iter()
+                .any(|m| m.all_fields().any(|f| f.typ.has_cow()))
+            {
                 writeln!(w, "use std::borrow::Cow;")?;
             }
-            if self.messages.iter().any(|m| {
-                m.fields
-                    .iter()
-                    .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                    .any(|f| f.typ.is_map())
-            }) {
+            if self
+                .messages
+                .iter()
+                .any(|m| m.all_fields().any(|f| f.typ.is_map()))
+            {
                 writeln!(w, "use std::collections::HashMap;")?;
             }
             if !self.messages.is_empty() || !self.oneofs.is_empty() {
@@ -879,11 +872,7 @@ impl Message {
     }
 
     fn sanity_checks(&self, desc: &FileDescriptor) -> Result<()> {
-        for f in self
-            .fields
-            .iter()
-            .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
-        {
+        for f in self.all_fields() {
             // check reserved
             if self
                 .reserved_names
@@ -948,11 +937,7 @@ impl Message {
     }
 
     fn set_map_required(&mut self) {
-        for f in self
-            .fields
-            .iter_mut()
-            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-        {
+        for f in self.all_fields_mut() {
             if let FieldType::Map(_, _) = f.typ {
                 f.frequency = Frequency::Required;
             }
@@ -963,11 +948,7 @@ impl Message {
     }
 
     fn set_repeated_as_packed(&mut self) {
-        for f in self
-            .fields
-            .iter_mut()
-            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-        {
+        for f in self.all_fields_mut() {
             if f.packed.is_none() {
                 if let Frequency::Repeated = f.frequency {
                     f.packed = Some(true);
@@ -977,11 +958,7 @@ impl Message {
     }
 
     fn unset_packed_non_primitives(&mut self) {
-        for f in self
-            .fields
-            .iter_mut()
-            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-        {
+        for f in self.all_fields_mut() {
             if !f.typ.is_primitive() && f.packed.is_some() {
                 f.packed = None;
             }
@@ -989,11 +966,7 @@ impl Message {
     }
 
     fn sanitize_defaults(&mut self, desc: &FileDescriptor) -> Result<()> {
-        for f in self
-            .fields
-            .iter_mut()
-            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-        {
+        for f in self.all_fields_mut() {
             f.sanitize_default(desc)?;
         }
         for m in &mut self.messages {
@@ -1017,6 +990,22 @@ impl Message {
         for o in &mut self.oneofs {
             o.sanitize_names();
         }
+    }
+
+    /// Return an iterator producing references to all the `Field`s of `self`,
+    /// including both direct and `oneof` fields.
+    fn all_fields(&self) -> impl Iterator<Item = &Field> {
+        self.fields
+            .iter()
+            .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
+    }
+
+    /// Return an iterator producing mutable references to all the `Field`s of
+    /// `self`, including both direct and `oneof` fields.
+    fn all_fields_mut(&mut self) -> impl Iterator<Item = &mut Field> {
+        self.fields
+            .iter_mut()
+            .chain(self.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
     }
 }
 
@@ -1596,6 +1585,10 @@ impl FileDescriptor {
             full_msgs: &HashMap<String, MessageIndex>,
             full_enums: &HashMap<String, EnumIndex>,
         ) -> Result<()> {
+            // Interestingly, we can't call all_fields_mut to iterate over the
+            // fields here: writing out the field traversal as below lets Rust
+            // split m's mutable borrow, permitting the loop body to use fields
+            // of `m` other than `fields` and `oneofs`.
             'types: for typ in m
                 .fields
                 .iter_mut()
@@ -1691,20 +1684,18 @@ impl FileDescriptor {
             return Ok(());
         }
         writeln!(w, "use std::io::Write;")?;
-        if self.messages.iter().any(|m| {
-            m.fields
-                .iter()
-                .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                .any(|f| f.typ.has_cow())
-        }) {
+        if self
+            .messages
+            .iter()
+            .any(|m| m.all_fields().any(|f| f.typ.has_cow()))
+        {
             writeln!(w, "use std::borrow::Cow;")?;
         }
-        if self.messages.iter().any(|m| {
-            m.fields
-                .iter()
-                .chain(m.oneofs.iter().flat_map(|o| o.fields.iter()))
-                .any(|f| f.typ.is_map())
-        }) {
+        if self
+            .messages
+            .iter()
+            .any(|m| m.all_fields().any(|f| f.typ.is_map()))
+        {
             writeln!(w, "use std::collections::HashMap;")?;
         }
         writeln!(
@@ -1792,11 +1783,7 @@ fn break_cycles(
             let k = undef_messages.pop().unwrap();
             {
                 let mut m = messages[k].clone();
-                for f in m
-                    .fields
-                    .iter_mut()
-                    .chain(m.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
-                {
+                for f in m.all_fields_mut() {
                     if !f.is_leaf(&leaf_messages) {
                         f.frequency = Frequency::Optional;
                         f.boxed = true;
