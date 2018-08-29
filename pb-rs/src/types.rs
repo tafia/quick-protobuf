@@ -1,4 +1,5 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::fmt;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -36,9 +37,15 @@ pub enum Frequency {
     Required,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
 pub struct MessageIndex {
     indexes: Vec<usize>,
+}
+
+impl fmt::Debug for MessageIndex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> ::std::result::Result<(), fmt::Error> {
+        f.debug_set().entries(self.indexes.iter()).finish()
+    }
 }
 
 impl MessageIndex {
@@ -1540,7 +1547,7 @@ impl FileDescriptor {
     ///
     /// Cycles means one Message calls itself at some point
     fn break_cycles(&mut self) {
-        let mut processing = Vec::with_capacity(self.messages.len());
+        let mut processing = VecDeque::with_capacity(self.messages.len());
         let mut messages = self
             .messages
             .iter()
@@ -1548,15 +1555,18 @@ impl FileDescriptor {
             .collect::<Vec<_>>();
         while let Some(m) = messages.pop() {
             messages.extend(m.get_message(self).messages.iter().map(|m| m.index.clone()));
-            processing.push((m.clone(), vec![m]));
+            processing.push_front((m.clone(), vec![m]));
         }
 
-        while let Some((i, ancestors)) = processing.pop() {
+        while let Some((i, ancestors)) = processing.pop_front() {
             let msg = i.get_message_mut(self);
+            let mut idx_first = 0;
+            debug!(
+                "break cycle:\nmessage: {:?}\nprocessing: {:?}",
+                i, processing
+            );
             for f in msg
-                .fields
-                .iter_mut()
-                .chain(msg.oneofs.iter_mut().flat_map(|o| o.fields.iter_mut()))
+                .all_fields_mut()
                 .filter(|f| !f.boxed && f.frequency != Frequency::Repeated)
             {
                 if let FieldType::Message(ref m) = &f.typ {
@@ -1564,10 +1574,14 @@ impl FileDescriptor {
                         f.frequency = Frequency::Optional;
                         f.boxed = true;
                     } else {
-                        if let Some(&mut (_, ref mut m_ancestors)) =
-                            processing.iter_mut().find(|(i, _)| i == m)
-                        {
-                            m_ancestors.push(i.clone());
+                        if let Some(p) = processing.iter().position(|(i, _)| i == m) {
+                            // extend its ancestors
+                            processing[p].1.extend(ancestors.clone());
+                            // put this message at the top of the loop
+                            if idx_first < p {
+                                processing.swap(idx_first, p);
+                                idx_first += 1;
+                            }
                         }
                     }
                 }
@@ -1798,54 +1812,6 @@ impl FileDescriptor {
     }
 }
 
-<<<<<<< HEAD
-/// Breaks cycles by adding boxes when necessary
-///
-/// Cycles means one Message calls itself at some point
-fn break_cycles(
-    index: &MessageIndex,
-    messages: &mut [Message],
-    leaf_messages: &mut Vec<MessageIndex>,
-) {
-    for (i, m) in messages.iter_mut().enumerate() {
-        let mut index = index.clone();
-        index.push(i);
-        break_cycles(&index, &mut m.messages, leaf_messages);
-    }
-
-    let mut undef_messages = (0..messages.len()).collect::<Vec<_>>();
-    while !undef_messages.is_empty() {
-        let len = undef_messages.len();
-        let mut new_undefs = Vec::new();
-        for i in undef_messages {
-            if messages[i].is_leaf(&**leaf_messages) {
-                let mut index = index.clone();
-                index.push(i);
-                leaf_messages.push(index)
-            } else {
-                new_undefs.push(i);
-            }
-        }
-        undef_messages = new_undefs;
-        if len == undef_messages.len() {
-            // try boxing messages, one by one ...
-            let k = undef_messages.pop().unwrap();
-            {
-                let mut m = messages[k].clone();
-                for f in m.all_fields_mut() {
-                    if !f.is_leaf(&leaf_messages) {
-                        f.frequency = Frequency::Optional;
-                        f.boxed = true;
-                    }
-                }
-                messages[k] = m;
-            }
-        }
-    }
-}
-
-=======
->>>>>>> refactor break_cycles and add box to oneof variants
 /// Calculates the tag value
 fn tag(number: u32, typ: &FieldType, packed: bool) -> u32 {
     number << 3 | typ.wire_type_num(packed)

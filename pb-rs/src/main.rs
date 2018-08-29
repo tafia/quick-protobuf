@@ -5,6 +5,9 @@ extern crate failure;
 extern crate failure_derive;
 #[macro_use]
 extern crate nom;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 mod errors;
 mod keywords;
@@ -145,6 +148,7 @@ fn path_vec(maybe_vec: std::result::Result<Vec<String>, clap::Error>) -> Vec<Pat
 }
 
 fn main() {
+    env_logger::init();
     ::std::process::exit({
         if let Err(e) = run() {
             eprintln!("pb-rs fatal error");
