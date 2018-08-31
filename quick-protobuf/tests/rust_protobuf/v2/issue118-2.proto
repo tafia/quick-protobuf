@@ -16,7 +16,7 @@ message Third {
 }
 
 message Fourth {
-  required Third fourth_field = 1;
+  optional Third fourth_field = 1;
   required Fifth fourth_field_2 = 2;
 }
 

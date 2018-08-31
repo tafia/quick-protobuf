@@ -1323,6 +1323,7 @@ pub struct Config {
     pub single_module: bool,
     pub import_search_path: Vec<PathBuf>,
     pub no_output: bool,
+    pub error_cycle: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1345,7 +1346,7 @@ impl FileDescriptor {
         }
 
         desc.resolve_types()?;
-        desc.break_cycles()?;
+        desc.break_cycles(config.error_cycle)?;
         desc.sanity_checks()?;
         desc.set_defaults()?;
         desc.sanitize_names();
@@ -1550,9 +1551,18 @@ impl FileDescriptor {
     }
 
     /// Breaks cycles by adding boxes when necessary
-    fn break_cycles(&mut self) -> Result<()> {
+    fn break_cycles(&mut self, error_cycle: bool) -> Result<()> {
         // get strongly connected components
         let sccs = self.sccs();
+
+        fn is_cycle(scc: &[MessageIndex], desc: &FileDescriptor) -> bool {
+            scc.iter()
+                .map(|m| m.get_message(desc))
+                .flat_map(|m| m.all_fields())
+                .filter(|f| !f.boxed)
+                .filter_map(|f| f.typ.message())
+                .any(|m| scc.contains(m))
+        }
 
         // sccs are sub DFS trees so if there is a edge connecting a node to
         // another node higher in the scc list, then this is a cycle. (Note that
@@ -1566,32 +1576,49 @@ impl FileDescriptor {
         // within a scc. We favor generated code stability over performance.
         for scc in &sccs {
             debug!("scc: {:?}", scc);
-
-            // filter on scc higer than one node or one node but with self fields
-            if scc.len() > 1
-                || scc[0]
-                    .get_message_mut(self)
-                    .all_fields_mut()
-                    .any(|f| f.typ.message().map_or(false, |m| scc.contains(m)))
-            {
-                let mut found_optional = false;
-                for v in scc.iter() {
-                    for f in v
-                        .get_message_mut(self)
-                        .all_fields_mut()
-                        .filter(|f| f.frequency == Frequency::Optional)
-                        .filter(|f| f.typ.message().map_or(false, |m| scc.contains(m)))
-                    {
-                        f.boxed = true;
-                        found_optional = true;
+            for (i, v) in scc.iter().enumerate() {
+                // cycles with v as root
+                let cycles = v
+                    .get_message(self)
+                    .all_fields()
+                    .filter_map(|f| f.typ.message())
+                    .filter_map(|m| scc[i..].iter().position(|n| n == m))
+                    .collect::<Vec<_>>();
+                for cycle in cycles {
+                    let cycle = &scc[i..i + cycle + 1];
+                    debug!("cycle: {:?}", &cycle);
+                    for v in cycle {
+                        for f in v
+                            .get_message_mut(self)
+                            .all_fields_mut()
+                            .filter(|f| f.frequency == Frequency::Optional)
+                            .filter(|f| f.typ.message().map_or(false, |m| cycle.contains(m)))
+                        {
+                            f.boxed = true;
+                        }
                     }
-                }
-                if !found_optional {
-                    return Err(Error::Cycle(
-                        scc.iter()
-                            .map(|m| m.get_message(self).name.clone())
-                            .collect(),
-                    ));
+                    if is_cycle(cycle, self) {
+                        if error_cycle {
+                            return Err(Error::Cycle(
+                                cycle
+                                    .iter()
+                                    .map(|m| m.get_message(self).name.clone())
+                                    .collect(),
+                            ));
+                        } else {
+                            for v in cycle {
+                                for f in v
+                                    .get_message_mut(self)
+                                    .all_fields_mut()
+                                    .filter(|f| f.frequency == Frequency::Required)
+                                    .filter(|f| f.typ.message().map_or(false, |m| cycle.contains(m)))
+                                {
+                                    f.boxed = true;
+                                    f.frequency = Frequency::Optional;
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -74,6 +74,13 @@ fn run() -> Result<(), ::failure::Error> {
                 .help("The .proto files used to generate quick-protobuf code")
                 .validator(|x| extension_matches(x, "proto")),
         )
+        .arg(
+            Arg::with_name("CYCLE")
+                .long("error-cycle")
+                .short("e")
+                .required(false)
+                .help("Error out if recursive messages do not have optional fields"),
+        )
         .get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -117,6 +124,7 @@ fn run() -> Result<(), ::failure::Error> {
             single_module: matches.is_present("SINGLE_MOD"),
             import_search_path: include_path.clone(),
             no_output: matches.is_present("NO_OUTPUT"),
+            error_cycle: matches.is_present("CYCLE"),
         };
 
         FileDescriptor::write_proto(&config).context(format!(
