@@ -3,6 +3,8 @@
 //! For most generated files, the 'test' is just making sure it compiles!
 
 pub mod basic;
+pub mod issue118;
+pub mod issue118_2;
 pub mod nonunique_1;
 pub mod nonunique_2;
 pub mod special;
@@ -28,5 +30,3 @@ pub mod test_sanitize_file_name_pb;
 pub mod test_sync;
 pub mod test_text_format;
 pub mod test_text_format_pb;
-pub mod issue118;
-pub mod issue118_2;

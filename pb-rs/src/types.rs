@@ -1611,8 +1611,9 @@ impl FileDescriptor {
                                     .get_message_mut(self)
                                     .all_fields_mut()
                                     .filter(|f| f.frequency == Frequency::Required)
-                                    .filter(|f| f.typ.message().map_or(false, |m| cycle.contains(m)))
-                                {
+                                    .filter(|f| {
+                                        f.typ.message().map_or(false, |m| cycle.contains(m))
+                                    }) {
                                     f.boxed = true;
                                     f.frequency = Frequency::Optional;
                                 }
