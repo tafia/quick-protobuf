@@ -273,7 +273,7 @@ impl MessageWrite for TestUnknownFields {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestSelfReference {
-    pub r1: Option<Box<basic::TestSelfReference>>,
+    pub r1: basic::TestSelfReference,
     pub r2: Option<Box<basic::TestSelfReference>>,
 }
 
@@ -282,7 +282,7 @@ impl<'a> MessageRead<'a> for TestSelfReference {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.r1 = Some(Box::new(r.read_message::<basic::TestSelfReference>(bytes)?)),
+                Ok(10) => msg.r1 = r.read_message::<basic::TestSelfReference>(bytes)?,
                 Ok(18) => msg.r2 = Some(Box::new(r.read_message::<basic::TestSelfReference>(bytes)?)),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -295,12 +295,12 @@ impl<'a> MessageRead<'a> for TestSelfReference {
 impl MessageWrite for TestSelfReference {
     fn get_size(&self) -> usize {
         0
-        + self.r1.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        + 1 + sizeof_len((&self.r1).get_size())
         + self.r2.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.r1 { w.write_with_tag(10, |w| w.write_message(&**s))?; }
+        w.write_with_tag(10, |w| w.write_message(&self.r1))?;
         if let Some(ref s) = self.r2 { w.write_with_tag(18, |w| w.write_message(&**s))?; }
         Ok(())
     }

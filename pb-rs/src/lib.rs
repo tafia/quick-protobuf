@@ -8,4 +8,5 @@ extern crate log;
 pub mod errors;
 pub mod keywords;
 pub mod parser;
+pub mod scc;
 pub mod types;

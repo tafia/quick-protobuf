@@ -12,6 +12,7 @@ extern crate env_logger;
 mod errors;
 mod keywords;
 mod parser;
+mod scc;
 mod types;
 
 use clap::{App, Arg};

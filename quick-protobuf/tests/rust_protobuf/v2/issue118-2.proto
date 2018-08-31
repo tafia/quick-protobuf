@@ -23,3 +23,15 @@ message Fourth {
 message Fifth {
   required Second fifth_field = 1;
 }
+
+message Sixth {
+  optional Sixth sixth_field = 1;
+}
+
+message Seventh {
+  required Eighth seventh_field = 1;
+}
+
+message Eighth {
+  optional Seventh eighth_field = 1;
+}

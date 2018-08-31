@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
@@ -49,7 +49,7 @@ impl fmt::Debug for MessageIndex {
 }
 
 impl MessageIndex {
-    fn get_message<'a>(&self, desc: &'a FileDescriptor) -> &'a Message {
+    pub fn get_message<'a>(&self, desc: &'a FileDescriptor) -> &'a Message {
         let first_message = self.indexes.first().and_then(|i| desc.messages.get(*i));
         self.indexes
             .iter()
@@ -232,6 +232,14 @@ impl FieldType {
             FieldType::Message(_) => None,
             FieldType::Map(_, _) => None,
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
+        }
+    }
+
+    pub fn message(&self) -> Option<&MessageIndex> {
+        if let FieldType::Message(ref m) = self {
+            Some(m)
+        } else {
+            None
         }
     }
 
@@ -1014,7 +1022,7 @@ impl Message {
 
     /// Return an iterator producing references to all the `Field`s of `self`,
     /// including both direct and `oneof` fields.
-    fn all_fields(&self) -> impl Iterator<Item = &Field> {
+    pub fn all_fields(&self) -> impl Iterator<Item = &Field> {
         self.fields
             .iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
@@ -1337,9 +1345,7 @@ impl FileDescriptor {
         }
 
         desc.resolve_types()?;
-
-        desc.break_cycles();
-
+        desc.break_cycles()?;
         desc.sanity_checks()?;
         desc.set_defaults()?;
         desc.sanitize_names();
@@ -1544,49 +1550,52 @@ impl FileDescriptor {
     }
 
     /// Breaks cycles by adding boxes when necessary
-    ///
-    /// Cycles means one Message calls itself at some point
-    fn break_cycles(&mut self) {
-        let mut processing = VecDeque::with_capacity(self.messages.len());
-        let mut messages = self
-            .messages
-            .iter()
-            .map(|m| m.index.clone())
-            .collect::<Vec<_>>();
-        while let Some(m) = messages.pop() {
-            messages.extend(m.get_message(self).messages.iter().map(|m| m.index.clone()));
-            processing.push_front((m.clone(), vec![m]));
-        }
+    fn break_cycles(&mut self) -> Result<()> {
+        // get strongly connected components
+        let sccs = self.sccs();
 
-        while let Some((i, ancestors)) = processing.pop_front() {
-            let msg = i.get_message_mut(self);
-            let mut idx_first = 0;
-            debug!(
-                "break cycle:\nmessage: {:?}\nprocessing: {:?}",
-                i, processing
-            );
-            for f in msg
-                .all_fields_mut()
-                .filter(|f| !f.boxed && f.frequency != Frequency::Repeated)
+        // sccs are sub DFS trees so if there is a edge connecting a node to
+        // another node higher in the scc list, then this is a cycle. (Note that
+        // we may have several cycles per scc).
+        //
+        // Technically we only need to box one edge (optional field) per cycle to
+        // have Sized structs. Unfortunately, scc root depend on the order we
+        // traverse the graph so such a field is not guaranteed to always be the same.
+        //
+        // For now, we decide (see discussion in #121) to box all optional fields
+        // within a scc. We favor generated code stability over performance.
+        for scc in &sccs {
+            debug!("scc: {:?}", scc);
+
+            // filter on scc higer than one node or one node but with self fields
+            if scc.len() > 1
+                || scc[0]
+                    .get_message_mut(self)
+                    .all_fields_mut()
+                    .any(|f| f.typ.message().map_or(false, |m| scc.contains(m)))
             {
-                if let FieldType::Message(ref m) = &f.typ {
-                    if ancestors.contains(m) {
-                        f.frequency = Frequency::Optional;
+                let mut found_optional = false;
+                for v in scc.iter() {
+                    for f in v
+                        .get_message_mut(self)
+                        .all_fields_mut()
+                        .filter(|f| f.frequency == Frequency::Optional)
+                        .filter(|f| f.typ.message().map_or(false, |m| scc.contains(m)))
+                    {
                         f.boxed = true;
-                    } else {
-                        if let Some(p) = processing.iter().position(|(i, _)| i == m) {
-                            // extend its ancestors
-                            processing[p].1.extend(ancestors.clone());
-                            // put this message at the top of the loop
-                            if idx_first < p {
-                                processing.swap(idx_first, p);
-                                idx_first += 1;
-                            }
-                        }
+                        found_optional = true;
                     }
+                }
+                if !found_optional {
+                    return Err(Error::Cycle(
+                        scc.iter()
+                            .map(|m| m.get_message(self).name.clone())
+                            .collect(),
+                    ));
                 }
             }
         }
+        Ok(())
     }
 
     fn get_full_names(&mut self) -> (HashMap<String, MessageIndex>, HashMap<String, EnumIndex>) {
