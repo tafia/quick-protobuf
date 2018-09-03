@@ -1607,6 +1607,15 @@ impl FileDescriptor {
                             ));
                         } else {
                             for v in cycle {
+                                warn!(
+                                    "Unsound proto file would result in infinite size Messages.\n\
+                                     Cycle detected in messages {:?}.\n\
+                                     Modifying required fields into optional fields",
+                                    cycle
+                                        .iter()
+                                        .map(|m| &m.get_message(self).name)
+                                        .collect::<Vec<_>>()
+                                );
                                 for f in v
                                     .get_message_mut(self)
                                     .all_fields_mut()
