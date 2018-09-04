@@ -5,10 +5,14 @@ extern crate failure;
 extern crate failure_derive;
 #[macro_use]
 extern crate nom;
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 mod errors;
 mod keywords;
 mod parser;
+mod scc;
 mod types;
 
 use clap::{App, Arg};
@@ -70,6 +74,13 @@ fn run() -> Result<(), ::failure::Error> {
                 .help("The .proto files used to generate quick-protobuf code")
                 .validator(|x| extension_matches(x, "proto")),
         )
+        .arg(
+            Arg::with_name("CYCLE")
+                .long("error-cycle")
+                .short("e")
+                .required(false)
+                .help("Error out if recursive messages do not have optional fields"),
+        )
         .get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -113,6 +124,7 @@ fn run() -> Result<(), ::failure::Error> {
             single_module: matches.is_present("SINGLE_MOD"),
             import_search_path: include_path.clone(),
             no_output: matches.is_present("NO_OUTPUT"),
+            error_cycle: matches.is_present("CYCLE"),
         };
 
         FileDescriptor::write_proto(&config).context(format!(
@@ -145,6 +157,7 @@ fn path_vec(maybe_vec: std::result::Result<Vec<String>, clap::Error>) -> Vec<Pat
 }
 
 fn main() {
+    env_logger::init();
     ::std::process::exit({
         if let Err(e) = run() {
             eprintln!("pb-rs fatal error");

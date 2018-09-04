@@ -55,6 +55,8 @@ pub enum Error {
     /// read_fn implementation for Maps
     #[fail(display = "There should be a special case for maps")]
     ReadFnMap,
+    #[fail(display = "Messages {:?} are cyclic (missing an optional field)", _0)]
+    Cycle(Vec<String>),
 }
 
 /// A wrapper for `Result<T, Error>`

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
@@ -29,20 +30,26 @@ impl Default for Syntax {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Frequency {
     Optional,
     Repeated,
     Required,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash, Default)]
 pub struct MessageIndex {
     indexes: Vec<usize>,
 }
 
+impl fmt::Debug for MessageIndex {
+    fn fmt(&self, f: &mut fmt::Formatter) -> ::std::result::Result<(), fmt::Error> {
+        f.debug_set().entries(self.indexes.iter()).finish()
+    }
+}
+
 impl MessageIndex {
-    fn get_message<'a>(&self, desc: &'a FileDescriptor) -> &'a Message {
+    pub fn get_message<'a>(&self, desc: &'a FileDescriptor) -> &'a Message {
         let first_message = self.indexes.first().and_then(|i| desc.messages.get(*i));
         self.indexes
             .iter()
@@ -52,15 +59,31 @@ impl MessageIndex {
             })
             .expect("Message index not found")
     }
+
+    fn get_message_mut<'a>(&self, desc: &'a mut FileDescriptor) -> &'a mut Message {
+        let first_message = self
+            .indexes
+            .first()
+            .and_then(move |i| desc.messages.get_mut(*i));
+        self.indexes
+            .iter()
+            .skip(1)
+            .fold(first_message, |cur, next| {
+                cur.and_then(|msg| msg.messages.get_mut(*next))
+            })
+            .expect("Message index not found")
+    }
+
     fn push(&mut self, i: usize) {
         self.indexes.push(i);
     }
+
     fn pop(&mut self) {
         self.indexes.pop();
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct EnumIndex {
     msg_index: MessageIndex,
     index: usize,
@@ -212,10 +235,23 @@ impl FieldType {
         }
     }
 
-    fn has_lifetime(&self, desc: &FileDescriptor, packed: bool) -> bool {
+    pub fn message(&self) -> Option<&MessageIndex> {
+        if let FieldType::Message(ref m) = self {
+            Some(m)
+        } else {
+            None
+        }
+    }
+
+    fn has_lifetime(
+        &self,
+        desc: &FileDescriptor,
+        packed: bool,
+        ignore: &mut Vec<MessageIndex>,
+    ) -> bool {
         match *self {
             FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
-            FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc),
+            FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc, ignore),
             FieldType::Fixed64
             | FieldType::Sfixed64
             | FieldType::Double
@@ -223,7 +259,7 @@ impl FieldType {
             | FieldType::Sfixed32
             | FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref key, ref value) => {
-                key.has_lifetime(desc, false) || value.has_lifetime(desc, false)
+                key.has_lifetime(desc, false, ignore) || value.has_lifetime(desc, false, ignore)
             }
             _ => false,
         }
@@ -246,7 +282,11 @@ impl FieldType {
             }
             FieldType::Message(ref msg) => {
                 let m = msg.get_message(desc);
-                let lifetime = if m.has_lifetime(desc) { "<'a>" } else { "" };
+                let lifetime = if m.has_lifetime(desc, &mut Vec::new()) {
+                    "<'a>"
+                } else {
+                    ""
+                };
                 format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
             }
             FieldType::Map(ref key, ref value) => format!(
@@ -357,17 +397,6 @@ pub struct Field {
 impl Field {
     fn packed(&self) -> bool {
         self.packed.unwrap_or(false)
-    }
-
-    /// searches if the message must be boxed
-    fn is_leaf(&self, leaf_messages: &[MessageIndex]) -> bool {
-        match self.typ {
-            FieldType::Message(ref m) => match self.frequency {
-                Frequency::Repeated => true,
-                _ => leaf_messages.contains(m),
-            },
-            _ => true,
-        }
     }
 
     fn sanitize_default(&mut self, desc: &FileDescriptor) -> Result<()> {
@@ -643,21 +672,20 @@ pub struct Message {
     pub module: String,         // 'package' corresponding to actual generated Rust module
     pub path: PathBuf,
     pub import: PathBuf,
+    pub index: MessageIndex,
 }
 
 impl Message {
-    fn is_leaf(&self, leaf_messages: &[MessageIndex]) -> bool {
-        self.imported
-            || self
-                .all_fields()
-                .all(|f| f.is_leaf(leaf_messages) || f.deprecated)
-    }
-
-    fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
-        self.all_fields().any(|f| match f.typ {
-            FieldType::Message(ref m) if m.get_message(desc).name == self.name => false,
-            ref t => t.has_lifetime(desc, f.packed()),
-        })
+    fn has_lifetime(&self, desc: &FileDescriptor, ignore: &mut Vec<MessageIndex>) -> bool {
+        if ignore.contains(&&self.index) {
+            return false;
+        }
+        ignore.push(self.index.clone());
+        let res = self
+            .all_fields()
+            .any(|f| f.typ.has_lifetime(desc, f.packed(), ignore));
+        ignore.pop();
+        res
     }
 
     fn set_imported(&mut self) {
@@ -736,7 +764,7 @@ impl Message {
             return Ok(());
         }
 
-        if self.has_lifetime(desc) {
+        if self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w, "pub struct {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "pub struct {} {{", self.name)?;
@@ -765,7 +793,7 @@ impl Message {
             return Ok(());
         }
 
-        if self.has_lifetime(desc) {
+        if self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w, "impl<'a> MessageRead<'a> for {}<'a> {{", self.name)?;
             writeln!(
                 w,
@@ -830,7 +858,7 @@ impl Message {
             return Ok(());
         }
 
-        if self.has_lifetime(desc) {
+        if self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
@@ -994,7 +1022,7 @@ impl Message {
 
     /// Return an iterator producing references to all the `Field`s of `self`,
     /// including both direct and `oneof` fields.
-    fn all_fields(&self) -> impl Iterator<Item = &Field> {
+    pub fn all_fields(&self) -> impl Iterator<Item = &Field> {
         self.fields
             .iter()
             .chain(self.oneofs.iter().flat_map(|o| o.fields.iter()))
@@ -1009,7 +1037,7 @@ impl Message {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Enumerator {
     pub name: String,
     pub fields: Vec<(String, i32)>,
@@ -1018,6 +1046,7 @@ pub struct Enumerator {
     pub module: String,
     pub path: PathBuf,
     pub import: PathBuf,
+    pub index: EnumIndex,
 }
 
 impl Enumerator {
@@ -1116,7 +1145,7 @@ impl OneOf {
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
         self.fields
             .iter()
-            .any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed()))
+            .any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed(), &mut Vec::new()))
     }
 
     fn set_package(&mut self, package: &str, module: &str) {
@@ -1152,7 +1181,12 @@ impl OneOf {
             writeln!(w, "pub enum OneOf{} {{", self.name)?;
         }
         for f in &self.fields {
-            writeln!(w, "    {}({}),", f.name, f.typ.rust_type(desc)?)?;
+            let rust_type = f.typ.rust_type(desc)?;
+            if f.boxed {
+                writeln!(w, "    {}(Box<{}>),", f.name, rust_type)?;
+            } else {
+                writeln!(w, "    {}({}),", f.name, rust_type)?;
+            }
         }
         writeln!(w, "    None,")?;
         writeln!(w, "}}")?;
@@ -1289,6 +1323,7 @@ pub struct Config {
     pub single_module: bool,
     pub import_search_path: Vec<PathBuf>,
     pub no_output: bool,
+    pub error_cycle: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1311,11 +1346,7 @@ impl FileDescriptor {
         }
 
         desc.resolve_types()?;
-
-        let mut leaf_messages = Vec::new();
-        let index = MessageIndex { indexes: vec![] };
-        break_cycles(&index, &mut desc.messages, &mut leaf_messages);
-
+        desc.break_cycles(config.error_cycle)?;
         desc.sanity_checks()?;
         desc.set_defaults()?;
         desc.sanitize_names();
@@ -1519,28 +1550,113 @@ impl FileDescriptor {
         }
     }
 
-    fn get_full_names(&self) -> (HashMap<String, MessageIndex>, HashMap<String, EnumIndex>) {
+    /// Breaks cycles by adding boxes when necessary
+    fn break_cycles(&mut self, error_cycle: bool) -> Result<()> {
+        // get strongly connected components
+        let sccs = self.sccs();
+
+        fn is_cycle(scc: &[MessageIndex], desc: &FileDescriptor) -> bool {
+            scc.iter()
+                .map(|m| m.get_message(desc))
+                .flat_map(|m| m.all_fields())
+                .filter(|f| !f.boxed)
+                .filter_map(|f| f.typ.message())
+                .any(|m| scc.contains(m))
+        }
+
+        // sccs are sub DFS trees so if there is a edge connecting a node to
+        // another node higher in the scc list, then this is a cycle. (Note that
+        // we may have several cycles per scc).
+        //
+        // Technically we only need to box one edge (optional field) per cycle to
+        // have Sized structs. Unfortunately, scc root depend on the order we
+        // traverse the graph so such a field is not guaranteed to always be the same.
+        //
+        // For now, we decide (see discussion in #121) to box all optional fields
+        // within a scc. We favor generated code stability over performance.
+        for scc in &sccs {
+            debug!("scc: {:?}", scc);
+            for (i, v) in scc.iter().enumerate() {
+                // cycles with v as root
+                let cycles = v
+                    .get_message(self)
+                    .all_fields()
+                    .filter_map(|f| f.typ.message())
+                    .filter_map(|m| scc[i..].iter().position(|n| n == m))
+                    .collect::<Vec<_>>();
+                for cycle in cycles {
+                    let cycle = &scc[i..i + cycle + 1];
+                    debug!("cycle: {:?}", &cycle);
+                    for v in cycle {
+                        for f in v
+                            .get_message_mut(self)
+                            .all_fields_mut()
+                            .filter(|f| f.frequency == Frequency::Optional)
+                            .filter(|f| f.typ.message().map_or(false, |m| cycle.contains(m)))
+                        {
+                            f.boxed = true;
+                        }
+                    }
+                    if is_cycle(cycle, self) {
+                        if error_cycle {
+                            return Err(Error::Cycle(
+                                cycle
+                                    .iter()
+                                    .map(|m| m.get_message(self).name.clone())
+                                    .collect(),
+                            ));
+                        } else {
+                            for v in cycle {
+                                warn!(
+                                    "Unsound proto file would result in infinite size Messages.\n\
+                                     Cycle detected in messages {:?}.\n\
+                                     Modifying required fields into optional fields",
+                                    cycle
+                                        .iter()
+                                        .map(|m| &m.get_message(self).name)
+                                        .collect::<Vec<_>>()
+                                );
+                                for f in v
+                                    .get_message_mut(self)
+                                    .all_fields_mut()
+                                    .filter(|f| f.frequency == Frequency::Required)
+                                    .filter(|f| {
+                                        f.typ.message().map_or(false, |m| cycle.contains(m))
+                                    }) {
+                                    f.boxed = true;
+                                    f.frequency = Frequency::Optional;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn get_full_names(&mut self) -> (HashMap<String, MessageIndex>, HashMap<String, EnumIndex>) {
         fn rec_full_names(
-            m: &Message,
+            m: &mut Message,
             index: &mut MessageIndex,
             full_msgs: &mut HashMap<String, MessageIndex>,
             full_enums: &mut HashMap<String, EnumIndex>,
         ) {
+            m.index = index.clone();
             if m.package.is_empty() {
                 full_msgs.insert(m.name.clone(), index.clone());
             } else {
                 full_msgs.insert(format!("{}.{}", m.package, m.name), index.clone());
             }
-            for (i, e) in m.enums.iter().enumerate() {
-                full_enums.insert(
-                    format!("{}.{}", e.package, e.name),
-                    EnumIndex {
-                        msg_index: index.clone(),
-                        index: i,
-                    },
-                );
+            for (i, e) in m.enums.iter_mut().enumerate() {
+                let index = EnumIndex {
+                    msg_index: index.clone(),
+                    index: i,
+                };
+                e.index = index.clone();
+                full_enums.insert(format!("{}.{}", e.package, e.name), index);
             }
-            for (i, m) in m.messages.iter().enumerate() {
+            for (i, m) in m.messages.iter_mut().enumerate() {
                 index.push(i);
                 rec_full_names(m, index, full_msgs, full_enums);
                 index.pop();
@@ -1550,28 +1666,21 @@ impl FileDescriptor {
         let mut full_msgs = HashMap::new();
         let mut full_enums = HashMap::new();
         let mut index = MessageIndex { indexes: vec![] };
-        for (i, m) in self.messages.iter().enumerate() {
+        for (i, m) in self.messages.iter_mut().enumerate() {
             index.push(i);
             rec_full_names(m, &mut index, &mut full_msgs, &mut full_enums);
             index.pop();
         }
-        for (i, e) in self.enums.iter().enumerate() {
+        for (i, e) in self.enums.iter_mut().enumerate() {
+            let index = EnumIndex {
+                msg_index: index.clone(),
+                index: i,
+            };
+            e.index = index.clone();
             if e.package.is_empty() {
-                full_enums.insert(
-                    e.name.clone(),
-                    EnumIndex {
-                        msg_index: index.clone(),
-                        index: i,
-                    },
-                );
+                full_enums.insert(e.name.clone(), index.clone());
             } else {
-                full_enums.insert(
-                    format!("{}.{}", e.package, e.name),
-                    EnumIndex {
-                        msg_index: index.clone(),
-                        index: i,
-                    },
-                );
+                full_enums.insert(format!("{}.{}", e.package, e.name), index.clone());
             }
         }
         (full_msgs, full_enums)
@@ -1647,7 +1756,6 @@ impl FileDescriptor {
         self.write_enums(w)?;
         self.write_messages(w)?;
         self.write_package_end(w)?;
-        println!("Done processing {}", filename);
         Ok(())
     }
 
@@ -1747,51 +1855,6 @@ impl FileDescriptor {
             m.write(w, &self)?;
         }
         Ok(())
-    }
-}
-
-/// Breaks cycles by adding boxes when necessary
-///
-/// Cycles means one Message calls itself at some point
-fn break_cycles(
-    index: &MessageIndex,
-    messages: &mut [Message],
-    leaf_messages: &mut Vec<MessageIndex>,
-) {
-    for (i, m) in messages.iter_mut().enumerate() {
-        let mut index = index.clone();
-        index.push(i);
-        break_cycles(&index, &mut m.messages, leaf_messages);
-    }
-
-    let mut undef_messages = (0..messages.len()).collect::<Vec<_>>();
-    while !undef_messages.is_empty() {
-        let len = undef_messages.len();
-        let mut new_undefs = Vec::new();
-        for i in undef_messages {
-            if messages[i].is_leaf(&**leaf_messages) {
-                let mut index = index.clone();
-                index.push(i);
-                leaf_messages.push(index)
-            } else {
-                new_undefs.push(i);
-            }
-        }
-        undef_messages = new_undefs;
-        if len == undef_messages.len() {
-            // try boxing messages, one by one ...
-            let k = undef_messages.pop().unwrap();
-            {
-                let mut m = messages[k].clone();
-                for f in m.all_fields_mut() {
-                    if !f.is_leaf(&leaf_messages) {
-                        f.frequency = Frequency::Optional;
-                        f.boxed = true;
-                    }
-                }
-                messages[k] = m;
-            }
-        }
     }
 }
 
