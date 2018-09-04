@@ -8,6 +8,10 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.5.0
+- fix: nested messages issue (missing OneOf, lifetime)
+- feat: break cycles on optional messages only, and required one if user chooses to
+
 ## quick-protobuf 0.6.3
 - feat: add serialize_into_vec and deserialize_from_slice helper functions
 
