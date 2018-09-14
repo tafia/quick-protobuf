@@ -3,10 +3,12 @@ extern crate prost_build;
 extern crate protobuf_codegen_pure;
 
 use pb_rs::types::{Config, FileDescriptor};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 fn main() {
+    let out_dir = env::var("OUT_DIR").unwrap();
+
     // protobuf
     protobuf_codegen_pure::run(protobuf_codegen_pure::Args {
         out_dir: "src",
@@ -18,12 +20,15 @@ fn main() {
     }).expect("protoc");
 
     // quick-protobuf
+    let quick_dest = Path::new(&out_dir).join("perftest_data_quick.rs");
     let config = Config {
         in_file: PathBuf::from("src/perftest_data.proto"),
-        out_file: PathBuf::from("src/perftest_data_quick.rs"),
+        out_file: quick_dest,
         single_module: true,
         import_search_path: vec![PathBuf::from("src")],
         no_output: false,
+        error_cycle: false,
+        headers: false,
     };
     FileDescriptor::write_proto(&config).unwrap();
 

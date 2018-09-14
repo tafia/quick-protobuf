@@ -81,6 +81,13 @@ fn run() -> Result<(), ::failure::Error> {
                 .required(false)
                 .help("Error out if recursive messages do not have optional fields"),
         )
+        .arg(
+            Arg::with_name("HEADERS")
+                .long("no-headers")
+                .short("H")
+                .required(false)
+                .help("Do not add module comments and module attributes in generated file"),
+        )
         .get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -125,6 +132,7 @@ fn run() -> Result<(), ::failure::Error> {
             import_search_path: include_path.clone(),
             no_output: matches.is_present("NO_OUTPUT"),
             error_cycle: matches.is_present("CYCLE"),
+            headers: !matches.is_present("HEADERS"),
         };
 
         FileDescriptor::write_proto(&config).context(format!(
