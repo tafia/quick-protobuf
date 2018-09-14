@@ -50,12 +50,18 @@ pub enum Error {
     /// enum or message not found
     #[fail(display = "Could not find message or enum {}", _0)]
     MessageOrEnumNotFound(String),
-    #[fail(display = "Enum field cannot be set to '{}', this variant does not exist", _0)]
+    #[fail(
+        display = "Enum field cannot be set to '{}', this variant does not exist",
+        _0
+    )]
     InvalidDefaultEnum(String),
     /// read_fn implementation for Maps
     #[fail(display = "There should be a special case for maps")]
     ReadFnMap,
-    #[fail(display = "Messages {:?} are cyclic (missing an optional field)", _0)]
+    #[fail(
+        display = "Messages {:?} are cyclic (missing an optional field)",
+        _0
+    )]
     Cycle(Vec<String>),
 }
 

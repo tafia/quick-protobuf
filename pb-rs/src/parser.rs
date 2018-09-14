@@ -13,9 +13,9 @@ fn is_word(b: u8) -> bool {
 
 named!(
     word<String>,
-    map_res!(take_while!(is_word), |b: &[u8]| {
-        String::from_utf8(b.to_vec())
-    })
+    map_res!(take_while!(is_word), |b: &[u8]| String::from_utf8(
+        b.to_vec()
+    ))
 );
 named!(
     word_ref<&str>,
@@ -25,9 +25,12 @@ named!(
 named!(
     hex_integer<i32>,
     do_parse!(
-        tag!("0x") >> num: map_res!(map_res!(hex_digit, str::from_utf8), |s| {
-            i32::from_str_radix(s, 16)
-        }) >> (num)
+        tag!("0x")
+            >> num: map_res!(
+                map_res!(hex_digit, str::from_utf8),
+                |s| i32::from_str_radix(s, 16)
+            )
+            >> (num)
     )
 );
 
@@ -54,21 +57,32 @@ named!(
 named!(
     syntax<Syntax>,
     do_parse!(
-        tag!("syntax") >> many0!(br) >> tag!("=") >> many0!(br)
+        tag!("syntax")
+            >> many0!(br)
+            >> tag!("=")
+            >> many0!(br)
             >> proto:
                 alt!(tag!("\"proto2\"") => { |_| Syntax::Proto2 } |
-                             tag!("\"proto3\"") => { |_| Syntax::Proto3 }) >> many0!(br)
-            >> tag!(";") >> (proto)
+                             tag!("\"proto3\"") => { |_| Syntax::Proto3 })
+            >> many0!(br)
+            >> tag!(";")
+            >> (proto)
     )
 );
 
 named!(
     import<PathBuf>,
     do_parse!(
-        tag!("import") >> many1!(br) >> tag!("\"")
-            >> path: map!(map_res!(take_until!("\""), str::from_utf8), |s| {
-                Path::new(s).into()
-            }) >> tag!("\"") >> many0!(br) >> tag!(";") >> (path)
+        tag!("import")
+            >> many1!(br)
+            >> tag!("\"")
+            >> path: map!(map_res!(take_until!("\""), str::from_utf8), |s| Path::new(
+                s
+            ).into())
+            >> tag!("\"")
+            >> many0!(br)
+            >> tag!(";")
+            >> (path)
     )
 );
 
@@ -99,11 +113,14 @@ named!(
 named!(
     reserved_nums<Vec<i32>>,
     do_parse!(
-        tag!("reserved") >> many1!(br)
+        tag!("reserved")
+            >> many1!(br)
             >> nums: separated_list!(
                 do_parse!(many0!(br) >> tag!(",") >> many0!(br) >> (())),
                 alt!(num_range | integer => { |i| vec![i] })
-            ) >> many0!(br) >> tag!(";")
+            )
+            >> many0!(br)
+            >> tag!(";")
             >> (nums.into_iter().flat_map(|v| v.into_iter()).collect())
     )
 );
@@ -111,7 +128,8 @@ named!(
 named!(
     reserved_names<Vec<String>>,
     do_parse!(
-        tag!("reserved") >> many1!(br)
+        tag!("reserved")
+            >> many1!(br)
             >> names:
                 many1!(do_parse!(
                     tag!("\"")
@@ -119,7 +137,10 @@ named!(
                         >> tag!("\"")
                         >> many0!(alt!(br | tag!(",") => { |_| () }))
                         >> (name)
-                )) >> many0!(br) >> tag!(";") >> (names)
+                ))
+            >> many0!(br)
+            >> tag!(";")
+            >> (names)
     )
 );
 
@@ -195,13 +216,14 @@ named!(
             >> fields: many1!(message_field)
             >> many0!(br)
             >> tag!("}")
-            >> many0!(br) >> (OneOf {
-            name: name,
-            fields: fields,
-            package: "".to_string(),
-            module: "".to_string(),
-            imported: false,
-        })
+            >> many0!(br)
+            >> (OneOf {
+                name: name,
+                fields: fields,
+                package: "".to_string(),
+                module: "".to_string(),
+                imported: false,
+            })
     )
 );
 
@@ -219,27 +241,27 @@ named!(
             >> number: integer
             >> many0!(br)
             >> key_vals: many0!(key_val)
-            >> tag!(";") >> (Field {
-            name: name,
-            frequency: frequency.unwrap_or(Frequency::Optional),
-            number: number,
-            default: key_vals
-                .iter()
-                .find(|&&(k, _)| k == "default")
-                .map(|&(_, v)| v.to_string()),
-            packed: key_vals
-                .iter()
-                .find(|&&(k, _)| k == "packed")
-                .map(|&(_, v)| str::FromStr::from_str(v).expect("Cannot parse Packed value")),
-            boxed: false,
-            typ: typ,
-            deprecated: key_vals
-                .iter()
-                .find(|&&(k, _)| k == "deprecated")
-                .map_or(false, |&(_, v)| {
-                    str::FromStr::from_str(v).expect("Cannot parse Deprecated value")
-                }),
-        })
+            >> tag!(";")
+            >> (Field {
+                name: name,
+                frequency: frequency.unwrap_or(Frequency::Optional),
+                number: number,
+                default: key_vals
+                    .iter()
+                    .find(|&&(k, _)| k == "default")
+                    .map(|&(_, v)| v.to_string()),
+                packed: key_vals
+                    .iter()
+                    .find(|&&(k, _)| k == "packed")
+                    .map(|&(_, v)| str::FromStr::from_str(v).expect("Cannot parse Packed value")),
+                boxed: false,
+                typ: typ,
+                deprecated: key_vals
+                    .iter()
+                    .find(|&&(k, _)| k == "deprecated")
+                    .map_or(false, |&(_, v)| str::FromStr::from_str(v)
+                        .expect("Cannot parse Deprecated value")),
+            })
     )
 );
 
@@ -336,11 +358,12 @@ named!(
             >> many0!(br)
             >> tag!("}")
             >> many0!(br)
-            >> many0!(tag!(";")) >> (Enumerator {
-            name: name,
-            fields: fields,
-            ..Enumerator::default()
-        })
+            >> many0!(tag!(";"))
+            >> (Enumerator {
+                name: name,
+                fields: fields,
+                ..Enumerator::default()
+            })
     )
 );
 

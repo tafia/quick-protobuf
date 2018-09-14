@@ -120,12 +120,11 @@ impl<'a> MessageRead<'a> for TestMessage {
 
 impl MessageWrite for TestMessage {
     fn get_size(&self) -> usize {
-        self.id.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m))
-            + self
-                .val
-                .iter()
-                .map(|m| 1 + sizeof_sint64(*m))
-                .sum::<usize>()
+        self.id.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m)) + self
+            .val
+            .iter()
+            .map(|m| 1 + sizeof_sint64(*m))
+            .sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
@@ -178,12 +177,11 @@ impl<'a> MessageRead<'a> for TestMessageBorrow<'a> {
 
 impl<'a> MessageWrite for TestMessageBorrow<'a> {
     fn get_size(&self) -> usize {
-        self.id.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m))
-            + self
-                .val
-                .iter()
-                .map(|m| 1 + sizeof_len(m.len()))
-                .sum::<usize>()
+        self.id.as_ref().map_or(0, |m| 1 + sizeof_uint32(*m)) + self
+            .val
+            .iter()
+            .map(|m| 1 + sizeof_len(m.len()))
+            .sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
@@ -325,8 +323,8 @@ fn wr_map() {
     let mut r = BytesReader::from_bytes(&buf);
     let mut read_back = HashMap::new();
     while !r.is_eof() {
-        let (key, value) =
-            r.read_map(
+        let (key, value) = r
+            .read_map(
                 &buf,
                 |r, bytes| r.read_string(bytes).map(Cow::Borrowed),
                 |r, bytes| r.read_int32(bytes),
