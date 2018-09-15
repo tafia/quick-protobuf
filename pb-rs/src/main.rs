@@ -34,31 +34,27 @@ fn run() -> Result<(), ::failure::Error> {
                 .takes_value(true)
                 .help("Generated file name, defaults to INPUT with 'rs' extension")
                 .validator(|x| extension_matches(x, "rs")),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("OUTPUT_DIR")
                 .required(false)
                 .long("output_directory")
                 .short("d")
                 .takes_value(true)
                 .help("Output directory of generated code"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("INCLUDE_PATH")
                 .required(false)
                 .long("include")
                 .short("I")
                 .takes_value(true)
                 .help("Path to search for imported protobufs"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("SINGLE_MOD")
                 .required(false)
                 .long("single-mod")
                 .short("s")
                 .help("Omit generation of modules for each package when there is only one package"),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("NO_OUTPUT")
                 .required(false)
                 .long("no-output")
@@ -67,21 +63,24 @@ fn run() -> Result<(), ::failure::Error> {
                     "Show enums and messages in this .proto file, including those imported. \
                      No code generated",
                 ),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("INPUT")
                 .multiple(true)
                 .help("The .proto files used to generate quick-protobuf code")
                 .validator(|x| extension_matches(x, "proto")),
-        )
-        .arg(
+        ).arg(
             Arg::with_name("CYCLE")
                 .long("error-cycle")
                 .short("e")
                 .required(false)
                 .help("Error out if recursive messages do not have optional fields"),
-        )
-        .get_matches();
+        ).arg(
+            Arg::with_name("HEADERS")
+                .long("no-headers")
+                .short("H")
+                .required(false)
+                .help("Do not add module comments and module attributes in generated file"),
+        ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
     if in_files.is_empty() {
@@ -125,6 +124,7 @@ fn run() -> Result<(), ::failure::Error> {
             import_search_path: include_path.clone(),
             no_output: matches.is_present("NO_OUTPUT"),
             error_cycle: matches.is_present("CYCLE"),
+            headers: !matches.is_present("HEADERS"),
         };
 
         FileDescriptor::write_proto(&config).context(format!(

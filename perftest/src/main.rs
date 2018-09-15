@@ -24,7 +24,9 @@ use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Reader, Writer};
 
 mod perftest_data;
 mod perftest_data_prost;
-mod perftest_data_quick;
+mod perftest_data_quick {
+    include!(concat!(env!("OUT_DIR"), "/perftest_data_quick.rs"));
+}
 
 const SEED: [u8; 16] = [
     10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160,

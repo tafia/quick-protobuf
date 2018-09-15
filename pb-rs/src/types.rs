@@ -56,8 +56,7 @@ impl MessageIndex {
             .skip(1)
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get(*next))
-            })
-            .expect("Message index not found")
+            }).expect("Message index not found")
     }
 
     fn get_message_mut<'a>(&self, desc: &'a mut FileDescriptor) -> &'a mut Message {
@@ -70,8 +69,7 @@ impl MessageIndex {
             .skip(1)
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get_mut(*next))
-            })
-            .expect("Message index not found")
+            }).expect("Message index not found")
     }
 
     fn push(&mut self, i: usize) {
@@ -1324,6 +1322,7 @@ pub struct Config {
     pub import_search_path: Vec<PathBuf>,
     pub no_output: bool,
     pub error_cycle: bool,
+    pub headers: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1406,7 +1405,7 @@ impl FileDescriptor {
 
         let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
         let mut w = BufWriter::new(File::create(&out_file)?);
-        desc.write(&mut w, name)?;
+        desc.write(&mut w, name, config.headers)?;
         update_mod_file(&out_file)
     }
 
@@ -1743,13 +1742,15 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn write<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
+    fn write<W: Write>(&self, w: &mut W, filename: &str, headers: bool) -> Result<()> {
         println!(
             "Found {} messages, and {} enums",
             self.messages.len(),
             self.enums.len()
         );
-        self.write_headers(w, filename)?;
+        if headers {
+            self.write_headers(w, filename)?;
+        }
         self.write_package_start(w)?;
         self.write_uses(w)?;
         self.write_imports(w)?;
@@ -1762,7 +1763,7 @@ impl FileDescriptor {
     fn write_headers<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
         writeln!(
             w,
-            "//! Automatically generated rust module for '{}' file",
+            "// Automatically generated rust module for '{}' file",
             filename
         )?;
         writeln!(w, "")?;
