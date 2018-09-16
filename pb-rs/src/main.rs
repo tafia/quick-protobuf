@@ -1,25 +1,13 @@
 #[macro_use]
 extern crate clap;
-extern crate failure;
-#[macro_use]
-extern crate failure_derive;
-#[macro_use]
-extern crate nom;
-#[macro_use]
-extern crate log;
 extern crate env_logger;
-
-mod errors;
-mod keywords;
-mod parser;
-mod scc;
-mod types;
+extern crate failure;
+extern crate log;
+extern crate pb_rs;
 
 use clap::{App, Arg};
-use errors::Error;
-use failure::ResultExt;
+use pb_rs::CompileBuilder;
 use std::path::{Path, PathBuf};
-use types::{Config, FileDescriptor};
 
 fn run() -> Result<(), ::failure::Error> {
     let matches = App::new(crate_name!())
@@ -32,7 +20,7 @@ fn run() -> Result<(), ::failure::Error> {
                 .long("output")
                 .short("o")
                 .takes_value(true)
-                .help("Generated file name, defaults to INPUT with 'rs' extension")
+                .help("Generated file name, defaults to INPUT with 'rs' extension, cannot be used with --output_directory")
                 .validator(|x| extension_matches(x, "rs")),
         ).arg(
             Arg::with_name("OUTPUT_DIR")
@@ -40,7 +28,7 @@ fn run() -> Result<(), ::failure::Error> {
                 .long("output_directory")
                 .short("d")
                 .takes_value(true)
-                .help("Output directory of generated code"),
+                .help("Output directory of generated code, cannot be used with --output"),
         ).arg(
             Arg::with_name("INCLUDE_PATH")
                 .required(false)
@@ -83,57 +71,20 @@ fn run() -> Result<(), ::failure::Error> {
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
-    if in_files.is_empty() {
-        return Err(Error::NoProto.into());
-    }
+    let include_paths = path_vec(values_t!(matches, "INCLUDE_PATH", String));
+    let out_file = matches.value_of("OUTPUT").map(|o| PathBuf::from(o));
+    let out_dir = matches.value_of("OUTPUT_DIR").map(|o| PathBuf::from(o));
 
-    for f in &in_files {
-        if !f.exists() {
-            return Err(Error::InputFile(format!("{}", f.display())).into());
-        }
-    }
-
-    let mut include_path = path_vec(values_t!(matches, "INCLUDE_PATH", String));
-    let default = PathBuf::from(".");
-    if include_path.is_empty() || !include_path.contains(&default) {
-        include_path.push(default);
-    }
-
-    if in_files.len() > 1 && matches.value_of("OUTPUT").is_some() {
-        return Err(Error::OutputMultipleInputs.into());
-    }
-
-    for in_file in in_files {
-        let mut out_file = in_file.with_extension("rs");
-
-        if let Some(ofile) = matches.value_of("OUTPUT") {
-            out_file = PathBuf::from(ofile);
-        } else if let Some(dir) = matches.value_of("OUTPUT_DIR") {
-            let mut directory = PathBuf::from(dir);
-            if !directory.is_dir() {
-                return Err(Error::OutputDirectory(format!("{}", directory.display())).into());
-            }
-            directory.push(out_file.file_name().unwrap());
-            out_file = directory;
-        }
-
-        let config = Config {
-            in_file: in_file,
-            out_file: out_file,
-            single_module: matches.is_present("SINGLE_MOD"),
-            import_search_path: include_path.clone(),
-            no_output: matches.is_present("NO_OUTPUT"),
-            error_cycle: matches.is_present("CYCLE"),
-            headers: !matches.is_present("HEADERS"),
-        };
-
-        FileDescriptor::write_proto(&config).context(format!(
-            "Could not convert {} into {}",
-            config.in_file.display(),
-            config.out_file.display()
-        ))?;
-    }
-    Ok(())
+    let compiler = CompileBuilder::new(
+        &in_files,
+        out_file.as_ref(),
+        out_dir.as_ref(),
+        &include_paths,
+    )?.single_module(matches.is_present("SINGLE_MOD"))
+    .no_output(matches.is_present("NO_OUTPUT"))
+    .error_cycle(matches.is_present("CYCLE"))
+    .headers(matches.is_present("HEADERS"));
+    compiler.compile()
 }
 
 fn extension_matches<P: AsRef<Path>>(path: P, expected: &str) -> std::result::Result<(), String> {

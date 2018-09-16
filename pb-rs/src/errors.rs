@@ -63,6 +63,9 @@ pub enum Error {
         _0
     )]
     Cycle(Vec<String>),
+    /// --output and --output_directory both used
+    #[fail(display = "only one of --output or --output_directory allowed")]
+    OutputAndOutputDir,
 }
 
 /// A wrapper for `Result<T, Error>`
