@@ -1709,7 +1709,9 @@ impl FileDescriptor {
                     _ => vec![typ].into_iter(),
                 }) {
                 if let FieldType::MessageOrEnum(name) = typ.clone() {
-                    let test_names: Vec<String> = if m.package.is_empty() {
+                    let test_names: Vec<String> = if name.starts_with(".") {
+                        vec![name.clone().split_off(1)]
+                    } else if m.package.is_empty() {
                         vec![name.clone(), format!("{}.{}", m.name, name)]
                     } else {
                         vec![

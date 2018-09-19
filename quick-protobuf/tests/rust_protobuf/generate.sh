@@ -13,7 +13,6 @@ have_failures=""
 declare -A must_fail
 
 must_fail["v2/test_group_pb.proto"]="expected failure (empty read)"
-must_fail["v2/test_root_pb.proto"]="root search is not implemented yet"
 must_fail["v3/test_enum_alias_pb.proto"]="enum alias not implemented"
 must_fail["v2/test_enum_alias_pb.proto"]="enum alias not implemented"
 must_fail["v2/test_expose_oneof_pb.proto"]="missing file"
