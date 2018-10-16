@@ -6,7 +6,8 @@ extern crate log;
 extern crate pb_rs;
 
 use clap::{App, Arg};
-use pb_rs::CompileBuilder;
+use pb_rs::types::FileDescriptor;
+use pb_rs::ConfigBuilder;
 use std::path::{Path, PathBuf};
 
 fn run() -> Result<(), ::failure::Error> {
@@ -75,16 +76,18 @@ fn run() -> Result<(), ::failure::Error> {
     let out_file = matches.value_of("OUTPUT").map(|o| PathBuf::from(o));
     let out_dir = matches.value_of("OUTPUT_DIR").map(|o| PathBuf::from(o));
 
-    let compiler = CompileBuilder::new(
+    let compiler = ConfigBuilder::new(
         &in_files,
         out_file.as_ref(),
         out_dir.as_ref(),
         &include_paths,
-    )?.single_module(matches.is_present("SINGLE_MOD"))
+    )?
+    .single_module(matches.is_present("SINGLE_MOD"))
     .no_output(matches.is_present("NO_OUTPUT"))
     .error_cycle(matches.is_present("CYCLE"))
     .headers(matches.is_present("HEADERS"));
-    compiler.compile()
+
+    FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
 }
 
 fn extension_matches<P: AsRef<Path>>(path: P, expected: &str) -> std::result::Result<(), String> {
