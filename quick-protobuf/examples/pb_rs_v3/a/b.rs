@@ -1,4 +1,4 @@
-// Automatically generated rust module for 'test_import_pkg_nested_pb.proto' file
+// Automatically generated rust module for 'data_types_import.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -15,18 +15,16 @@ use quick_protobuf::sizeofs::*;
 use super::super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct ContainsImportedNested {
-    pub m: Option<foo::baz::mod_ContainerForNested::NestedMessage>,
-    pub e: Option<foo::baz::mod_ContainerForNested::NestedEnum>,
+pub struct ImportedMessage {
+    pub i: bool,
 }
 
-impl<'a> MessageRead<'a> for ContainsImportedNested {
+impl<'a> MessageRead<'a> for ImportedMessage {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.m = Some(r.read_message::<foo::baz::mod_ContainerForNested::NestedMessage>(bytes)?),
-                Ok(16) => msg.e = Some(r.read_enum(bytes)?),
+                Ok(8) => msg.i = r.read_bool(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -35,16 +33,14 @@ impl<'a> MessageRead<'a> for ContainsImportedNested {
     }
 }
 
-impl MessageWrite for ContainsImportedNested {
+impl MessageWrite for ImportedMessage {
     fn get_size(&self) -> usize {
         0
-        + self.m.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
-        + self.e.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + if self.i == false { 0 } else { 1 + sizeof_varint(*(&self.i) as u64) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.m { w.write_with_tag(10, |w| w.write_message(s))?; }
-        if let Some(ref s) = self.e { w.write_with_tag(16, |w| w.write_enum(*s as i32))?; }
+        if self.i != false { w.write_with_tag(8, |w| w.write_bool(*&self.i))?; }
         Ok(())
     }
 }

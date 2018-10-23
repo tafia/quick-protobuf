@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'test_oneof_pb.proto' file
+// Automatically generated rust module for 'test_oneof_pb.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -49,7 +49,7 @@ impl<'a> From<&'a str> for EnumForOneof {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct MessageForOneof {
-    pub f: Option<i32>,
+    pub f: i32,
 }
 
 impl<'a> MessageRead<'a> for MessageForOneof {
@@ -57,7 +57,7 @@ impl<'a> MessageRead<'a> for MessageForOneof {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(8) => msg.f = Some(r.read_int32(bytes)?),
+                Ok(8) => msg.f = r.read_int32(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -69,18 +69,18 @@ impl<'a> MessageRead<'a> for MessageForOneof {
 impl MessageWrite for MessageForOneof {
     fn get_size(&self) -> usize {
         0
-        + self.f.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + if self.f == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.f) as u64) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.f { w.write_with_tag(8, |w| w.write_int32(*s))?; }
+        if self.f != 0i32 { w.write_with_tag(8, |w| w.write_int32(*&self.f))?; }
         Ok(())
     }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestOneof<'a> {
-    pub s: Option<Cow<'a, str>>,
+    pub s: Cow<'a, str>,
     pub one: mod_TestOneof::OneOfone<'a>,
 }
 
@@ -89,7 +89,7 @@ impl<'a> MessageRead<'a> for TestOneof<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(234) => msg.s = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(234) => msg.s = r.read_string(bytes).map(Cow::Borrowed)?,
                 Ok(9) => msg.one = mod_TestOneof::OneOfone::double_field(r.read_double(bytes)?),
                 Ok(21) => msg.one = mod_TestOneof::OneOfone::float_field(r.read_float(bytes)?),
                 Ok(24) => msg.one = mod_TestOneof::OneOfone::int32_field(r.read_int32(bytes)?),
@@ -118,7 +118,7 @@ impl<'a> MessageRead<'a> for TestOneof<'a> {
 impl<'a> MessageWrite for TestOneof<'a> {
     fn get_size(&self) -> usize {
         0
-        + self.s.as_ref().map_or(0, |m| 2 + sizeof_len((m).len()))
+        + if self.s == Cow::Borrowed("") { 0 } else { 2 + sizeof_len((&self.s).len()) }
         + match self.one {
             mod_TestOneof::OneOfone::double_field(_) => 1 + 8,
             mod_TestOneof::OneOfone::float_field(_) => 1 + 4,
@@ -141,7 +141,7 @@ impl<'a> MessageWrite for TestOneof<'a> {
     }    }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.s { w.write_with_tag(234, |w| w.write_string(&**s))?; }
+        if self.s != Cow::Borrowed("") { w.write_with_tag(234, |w| w.write_string(&**&self.s))?; }
         match self.one {            mod_TestOneof::OneOfone::double_field(ref m) => { w.write_with_tag(9, |w| w.write_double(*m))? },
             mod_TestOneof::OneOfone::float_field(ref m) => { w.write_with_tag(21, |w| w.write_float(*m))? },
             mod_TestOneof::OneOfone::int32_field(ref m) => { w.write_with_tag(24, |w| w.write_int32(*m))? },

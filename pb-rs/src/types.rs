@@ -18,7 +18,7 @@ fn sizeof_varint(v: u32) -> usize {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Syntax {
     Proto2,
     Proto3,
@@ -225,7 +225,7 @@ impl FieldType {
             FieldType::Bytes => Some("Cow::Borrowed(b\"\")"),
             FieldType::Enum(ref e) => {
                 let e = e.get_enum(desc);
-                e.fields.iter().find(|&&(_, i)| i == 0).map(|ref e| &*e.0)
+                Some(&*e.fully_qualified_fields[0].0)
             }
             FieldType::Message(_) => None,
             FieldType::Map(_, _) => None,
@@ -439,13 +439,17 @@ impl Field {
         let rust_type = self.typ.rust_type(desc)?;
         match self.frequency {
             _ if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
-            Frequency::Optional if self.default.is_some() => writeln!(w, "{},", rust_type)?,
-            Frequency::Optional => writeln!(w, "Option<{}>,", rust_type)?,
+            Frequency::Optional
+                if desc.syntax == Syntax::Proto2 && self.default.is_none()
+                    || self.typ.message().is_some() =>
+            {
+                writeln!(w, "Option<{}>,", rust_type)?
+            }
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
                 writeln!(w, "Cow<'a, [{}]>,", rust_type)?;
             }
             Frequency::Repeated => writeln!(w, "Vec<{}>,", rust_type)?,
-            Frequency::Required => writeln!(w, "{},", rust_type)?,
+            Frequency::Required | Frequency::Optional => writeln!(w, "{},", rust_type)?,
         }
         Ok(())
     }
@@ -475,11 +479,15 @@ impl Field {
         write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
             _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
-            Frequency::Required => writeln!(w, "msg.{} = {}?,", name, val_cow)?,
-            Frequency::Optional if self.default.is_some() => {
+            Frequency::Optional
+                if desc.syntax == Syntax::Proto2 && self.default.is_none()
+                    || self.typ.message().is_some() =>
+            {
+                writeln!(w, "msg.{} = Some({}?),", name, val_cow)?
+            }
+            Frequency::Required | Frequency::Optional => {
                 writeln!(w, "msg.{} = {}?,", name, val_cow)?
             }
-            Frequency::Optional => writeln!(w, "msg.{} = Some({}?),", name, val_cow)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
                 writeln!(
                     w,
@@ -499,10 +507,35 @@ impl Field {
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         write!(w, "        + ")?;
         let tag_size = sizeof_varint(self.tag());
         match self.frequency {
+            Frequency::Optional
+                if desc.syntax == Syntax::Proto2 || self.typ.message().is_some() =>
+            {
+                // TODO this might be incorrect behavior for proto2
+                match self.default.as_ref() {
+                    None => {
+                        write!(w, "self.{}.as_ref().map_or(0, ", self.name)?;
+                        if self.typ.is_fixed_size() {
+                            writeln!(w, "|_| {} + {})", tag_size, self.typ.get_size(""))?;
+                        } else {
+                            writeln!(w, "|m| {} + {})", tag_size, self.typ.get_size("m"))?;
+                        }
+                    }
+                    Some(d) => {
+                        writeln!(
+                            w,
+                            "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
+                            self.name,
+                            d,
+                            tag_size,
+                            self.typ.get_size(&format!("&self.{}", self.name))
+                        )?;
+                    }
+                }
+            }
             Frequency::Required if self.typ.is_map() => {
                 writeln!(
                     w,
@@ -512,32 +545,24 @@ impl Field {
                     self.typ.get_size("")
                 )?;
             }
+            Frequency::Optional => writeln!(
+                w,
+                "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
+                self.name,
+                self.default
+                    .iter()
+                    .next()
+                    .map(|s| s.as_str())
+                    .unwrap_or(self.typ.regular_default(desc).unwrap_or("None")),
+                tag_size,
+                self.typ.get_size(&format!("&self.{}", self.name))
+            )?,
             Frequency::Required => writeln!(
                 w,
                 "{} + {}",
                 tag_size,
                 self.typ.get_size(&format!("&self.{}", self.name))
             )?,
-            Frequency::Optional => match self.default.as_ref() {
-                None => {
-                    write!(w, "self.{}.as_ref().map_or(0, ", self.name)?;
-                    if self.typ.is_fixed_size() {
-                        writeln!(w, "|_| {} + {})", tag_size, self.typ.get_size(""))?;
-                    } else {
-                        writeln!(w, "|m| {} + {})", tag_size, self.typ.get_size("m"))?;
-                    }
-                }
-                Some(d) => {
-                    writeln!(
-                        w,
-                        "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
-                        self.name,
-                        d,
-                        tag_size,
-                        self.typ.get_size(&format!("&self.{}", self.name))
-                    )?;
-                }
-            },
             Frequency::Repeated => {
                 if self.packed() {
                     write!(
@@ -573,8 +598,50 @@ impl Field {
         Ok(())
     }
 
-    fn write_write<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         match self.frequency {
+            Frequency::Optional
+                if desc.syntax == Syntax::Proto2 || self.typ.message().is_some() =>
+            {
+                match self.default.as_ref() {
+                    None => {
+                        writeln!(
+                            w,
+                            "        if let Some(ref s) = \
+                             self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                            self.name,
+                            self.tag(),
+                            self.typ.get_write("s", self.boxed)
+                        )?;
+                    }
+                    Some(d) => {
+                        writeln!(
+                            w,
+                            "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                            self.name,
+                            d,
+                            self.tag(),
+                            self.typ
+                                .get_write(&format!("&self.{}", self.name), self.boxed)
+                        )?;
+                    }
+                }
+            }
+            Frequency::Optional => {
+                writeln!(
+                    w,
+                    "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                    self.name,
+                    self.default
+                        .iter()
+                        .next()
+                        .map(|s| s.as_str())
+                        .unwrap_or(self.typ.regular_default(desc).unwrap_or("None")),
+                    self.tag(),
+                    self.typ
+                        .get_write(&format!("&self.{}", self.name), self.boxed)
+                )?;
+            }
             Frequency::Required if self.typ.is_map() => {
                 writeln!(
                     w,
@@ -593,29 +660,6 @@ impl Field {
                         .get_write(&format!("&self.{}", self.name), self.boxed)
                 )?;
             }
-            Frequency::Optional => match self.default.as_ref() {
-                None => {
-                    writeln!(
-                        w,
-                        "        if let Some(ref s) = \
-                         self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                        self.name,
-                        self.tag(),
-                        self.typ.get_write("s", self.boxed)
-                    )?;
-                }
-                Some(d) => {
-                    writeln!(
-                        w,
-                        "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                        self.name,
-                        d,
-                        self.tag(),
-                        self.typ
-                            .get_write(&format!("&self.{}", self.name), self.boxed)
-                    )?;
-                }
-            },
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => writeln!(
                 w,
                 "        w.write_packed_fixed_with_tag({}, &self.{})?;",
@@ -874,7 +918,7 @@ impl Message {
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
         writeln!(w, "        0")?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_get_size(w)?;
+            f.write_get_size(w, desc)?;
         }
         for o in self.oneofs.iter() {
             o.write_get_size(w, desc)?;
@@ -889,7 +933,7 @@ impl Message {
             "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{"
         )?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_write(w)?;
+            f.write_write(w, desc)?;
         }
         for o in &self.oneofs {
             o.write_write(w, desc)?;
@@ -1041,6 +1085,8 @@ impl Message {
 pub struct Enumerator {
     pub name: String,
     pub fields: Vec<(String, i32)>,
+    pub fully_qualified_fields: Vec<(String, i32)>,
+    pub partially_qualified_fields: Vec<(String, i32)>,
     pub imported: bool,
     pub package: String,
     pub module: String,
@@ -1053,6 +1099,22 @@ impl Enumerator {
     fn set_package(&mut self, package: &str, module: &str) {
         self.package = package.to_string();
         self.module = module.to_string();
+        self.partially_qualified_fields = self
+            .fields
+            .iter()
+            .map(|f| (format!("{}::{}", &self.name, f.0), f.1))
+            .collect();
+        self.fully_qualified_fields = self
+            .partially_qualified_fields
+            .iter()
+            .map(|pqf| {
+                let mut fqf = pqf.0.clone();
+                if self.module != "" {
+                    fqf.insert_str(0, format!("{}::", &self.module.replace(".", "::")).as_str());
+                }
+                (fqf, pqf.1)
+            })
+            .collect();
     }
 
     fn sanitize_names(&mut self) {
@@ -1097,7 +1159,7 @@ impl Enumerator {
         writeln!(w, "impl Default for {} {{", self.name)?;
         writeln!(w, "    fn default() -> Self {{")?;
         // TODO: check with default field and return error if there is no field
-        writeln!(w, "        {}::{}", self.name, self.fields[0].0)?;
+        writeln!(w, "        {}", self.partially_qualified_fields[0].0)?;
         writeln!(w, "    }}")?;
         writeln!(w, "}}")?;
         Ok(())

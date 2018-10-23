@@ -1,4 +1,4 @@
-// Automatically generated rust module for 'test_import_root_imported_pb.proto' file
+//! Automatically generated rust module for 'data_types_unit.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -13,43 +13,43 @@ use quick_protobuf::{BytesReader, Result, MessageRead, MessageWrite};
 use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum ImportedEnum {
-    SOMETHING = 1,
+pub enum test {
+    a = 10,
 }
 
-impl Default for ImportedEnum {
+impl Default for test {
     fn default() -> Self {
-        ImportedEnum::SOMETHING
+        test::a
     }
 }
 
-impl From<i32> for ImportedEnum {
+impl From<i32> for test {
     fn from(i: i32) -> Self {
         match i {
-            1 => ImportedEnum::SOMETHING,
+            10 => test::a,
             _ => Self::default(),
         }
     }
 }
 
-impl<'a> From<&'a str> for ImportedEnum {
+impl<'a> From<&'a str> for test {
     fn from(s: &'a str) -> Self {
         match s {
-            "SOMETHING" => ImportedEnum::SOMETHING,
+            "a" => test::a,
             _ => Self::default(),
         }
     }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct ImportedMessage { }
+pub struct unit_message { }
 
-impl<'a> MessageRead<'a> for ImportedMessage {
+impl<'a> MessageRead<'a> for unit_message {
     fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();
         Ok(Self::default())
     }
 }
 
-impl MessageWrite for ImportedMessage { }
+impl MessageWrite for unit_message { }
 

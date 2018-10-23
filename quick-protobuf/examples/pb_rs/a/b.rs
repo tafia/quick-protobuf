@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'data_types_import.proto' file
+// Automatically generated rust module for 'data_types_import.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
