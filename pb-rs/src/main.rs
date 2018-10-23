@@ -81,8 +81,7 @@ fn run() -> Result<(), ::failure::Error> {
         out_file.as_ref(),
         out_dir.as_ref(),
         &include_paths,
-    )?
-    .single_module(matches.is_present("SINGLE_MOD"))
+    )?.single_module(matches.is_present("SINGLE_MOD"))
     .no_output(matches.is_present("NO_OUTPUT"))
     .error_cycle(matches.is_present("CYCLE"))
     .headers(matches.is_present("HEADERS"));

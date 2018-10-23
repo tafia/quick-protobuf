@@ -56,8 +56,7 @@ impl MessageIndex {
             .skip(1)
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get(*next))
-            })
-            .expect("Message index not found")
+            }).expect("Message index not found")
     }
 
     fn get_message_mut<'a>(&self, desc: &'a mut FileDescriptor) -> &'a mut Message {
@@ -70,8 +69,7 @@ impl MessageIndex {
             .skip(1)
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get_mut(*next))
-            })
-            .expect("Message index not found")
+            }).expect("Message index not found")
     }
 
     fn push(&mut self, i: usize) {

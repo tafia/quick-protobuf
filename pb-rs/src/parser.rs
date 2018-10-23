@@ -78,8 +78,7 @@ named!(
             >> tag!("\"")
             >> path: map!(map_res!(take_until!("\""), str::from_utf8), |s| Path::new(
                 s
-            )
-            .into())
+            ).into())
             >> tag!("\"")
             >> many0!(br)
             >> tag!(";")
@@ -308,27 +307,27 @@ named!(
 
 named!(
     message<Message>,
-    map!(message_events, |(name, events): (
-        String,
-        Vec<MessageEvent>
-    )| {
-        let mut msg = Message {
-            name: name.clone(),
-            ..Message::default()
-        };
-        for e in events {
-            match e {
-                MessageEvent::Field(f) => msg.fields.push(f),
-                MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
-                MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
-                MessageEvent::Message(m) => msg.messages.push(m),
-                MessageEvent::Enumerator(e) => msg.enums.push(e),
-                MessageEvent::OneOf(o) => msg.oneofs.push(o),
-                MessageEvent::Ignore => (),
+    map!(
+        message_events,
+        |(name, events): (String, Vec<MessageEvent>)| {
+            let mut msg = Message {
+                name: name.clone(),
+                ..Message::default()
+            };
+            for e in events {
+                match e {
+                    MessageEvent::Field(f) => msg.fields.push(f),
+                    MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
+                    MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
+                    MessageEvent::Message(m) => msg.messages.push(m),
+                    MessageEvent::Enumerator(e) => msg.enums.push(e),
+                    MessageEvent::OneOf(o) => msg.oneofs.push(o),
+                    MessageEvent::Ignore => (),
+                }
             }
+            msg
         }
-        msg
-    })
+    )
 );
 
 named!(
