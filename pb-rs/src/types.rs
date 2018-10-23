@@ -56,7 +56,8 @@ impl MessageIndex {
             .skip(1)
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get(*next))
-            }).expect("Message index not found")
+            })
+            .expect("Message index not found")
     }
 
     fn get_message_mut<'a>(&self, desc: &'a mut FileDescriptor) -> &'a mut Message {
@@ -69,7 +70,8 @@ impl MessageIndex {
             .skip(1)
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get_mut(*next))
-            }).expect("Message index not found")
+            })
+            .expect("Message index not found")
     }
 
     fn push(&mut self, i: usize) {
@@ -538,35 +540,37 @@ impl Field {
                     )?;
                 }
             },
-            Frequency::Repeated => if self.packed() {
-                write!(
-                    w,
-                    "if self.{}.is_empty() {{ 0 }} else {{ {} + ",
-                    self.name, tag_size
-                )?;
-                match self.typ.wire_type_num_non_packed() {
-                    1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
-                    5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
-                    _ => writeln!(
+            Frequency::Repeated => {
+                if self.packed() {
+                    write!(
                         w,
-                        "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}",
-                        self.name,
-                        self.typ.get_size("s")
-                    )?,
+                        "if self.{}.is_empty() {{ 0 }} else {{ {} + ",
+                        self.name, tag_size
+                    )?;
+                    match self.typ.wire_type_num_non_packed() {
+                        1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
+                        5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
+                        _ => writeln!(
+                            w,
+                            "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}",
+                            self.name,
+                            self.typ.get_size("s")
+                        )?,
+                    }
+                } else {
+                    match self.typ.wire_type_num_non_packed() {
+                        1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
+                        5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
+                        _ => writeln!(
+                            w,
+                            "self.{}.iter().map(|s| {} + {}).sum::<usize>()",
+                            self.name,
+                            tag_size,
+                            self.typ.get_size("s")
+                        )?,
+                    }
                 }
-            } else {
-                match self.typ.wire_type_num_non_packed() {
-                    1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
-                    5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
-                    _ => writeln!(
-                        w,
-                        "self.{}.iter().map(|s| {} + {}).sum::<usize>()",
-                        self.name,
-                        tag_size,
-                        self.typ.get_size("s")
-                    )?,
-                }
-            },
+            }
         }
         Ok(())
     }

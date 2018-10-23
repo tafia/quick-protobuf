@@ -90,7 +90,8 @@ pub fn sanitize_keyword(ident: &mut String) {
                 } else {
                     s.to_string()
                 }
-            }).collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()
             .join(".");
     }
 }
