@@ -538,35 +538,37 @@ impl Field {
                     )?;
                 }
             },
-            Frequency::Repeated => if self.packed() {
-                write!(
-                    w,
-                    "if self.{}.is_empty() {{ 0 }} else {{ {} + ",
-                    self.name, tag_size
-                )?;
-                match self.typ.wire_type_num_non_packed() {
-                    1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
-                    5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
-                    _ => writeln!(
+            Frequency::Repeated => {
+                if self.packed() {
+                    write!(
                         w,
-                        "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}",
-                        self.name,
-                        self.typ.get_size("s")
-                    )?,
+                        "if self.{}.is_empty() {{ 0 }} else {{ {} + ",
+                        self.name, tag_size
+                    )?;
+                    match self.typ.wire_type_num_non_packed() {
+                        1 => writeln!(w, "sizeof_len(self.{}.len() * 8) }}", self.name)?,
+                        5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
+                        _ => writeln!(
+                            w,
+                            "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}",
+                            self.name,
+                            self.typ.get_size("s")
+                        )?,
+                    }
+                } else {
+                    match self.typ.wire_type_num_non_packed() {
+                        1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
+                        5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
+                        _ => writeln!(
+                            w,
+                            "self.{}.iter().map(|s| {} + {}).sum::<usize>()",
+                            self.name,
+                            tag_size,
+                            self.typ.get_size("s")
+                        )?,
+                    }
                 }
-            } else {
-                match self.typ.wire_type_num_non_packed() {
-                    1 => writeln!(w, "({} + 8) * self.{}.len()", tag_size, self.name)?,
-                    5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
-                    _ => writeln!(
-                        w,
-                        "self.{}.iter().map(|s| {} + {}).sum::<usize>()",
-                        self.name,
-                        tag_size,
-                        self.typ.get_size("s")
-                    )?,
-                }
-            },
+            }
         }
         Ok(())
     }
@@ -1336,6 +1338,13 @@ pub struct FileDescriptor {
 }
 
 impl FileDescriptor {
+    pub fn run(configs: &[Config]) -> Result<()> {
+        for config in configs {
+            Self::write_proto(&config)?
+        }
+        Ok(())
+    }
+
     pub fn write_proto(config: &Config) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&config.in_file, &config.import_search_path)?;
 
@@ -1879,7 +1888,7 @@ fn split_package(package: &str) -> (&str, &str) {
     }
 }
 
-const MAGIC_HEADER: &'static str = "//! Automatically generated mod.rs";
+const MAGIC_HEADER: &'static str = "// Automatically generated mod.rs";
 
 /// Given a file path, create or update the mod.rs file within its folder
 fn update_mod_file(path: &Path) -> Result<()> {
