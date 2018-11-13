@@ -88,7 +88,7 @@ pub struct EnumIndex {
 }
 
 impl EnumIndex {
-    fn get_enum<'a>(&self, desc: &'a FileDescriptor) -> &'a Enumerator {
+    pub fn get_enum<'a>(&self, desc: &'a FileDescriptor) -> &'a Enumerator {
         let enums = if self.msg_index.indexes.is_empty() {
             &desc.enums
         } else {
