@@ -30,6 +30,7 @@ fn main() {
         no_output: false,
         error_cycle: false,
         headers: false,
+        custom_struct_derive: vec![]
     };
     FileDescriptor::write_proto(&config).unwrap();
 

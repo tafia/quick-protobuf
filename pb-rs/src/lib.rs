@@ -65,6 +65,7 @@ pub struct ConfigBuilder {
     no_output: bool,
     error_cycle: bool,
     headers: bool,
+    custom_struct_derive: Vec<String>,
 }
 
 impl ConfigBuilder {
@@ -147,6 +148,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Add custom values to #[derive(...)] at the beginning of every structure
+    pub fn custom_struct_derive(mut self, val: Vec<String>) -> Self {
+        self.custom_struct_derive = val;
+        self
+    }
+
     /// Build Config from this ConfigBuilder
     pub fn build(self) -> Vec<Config> {
         self.in_files
@@ -170,6 +177,7 @@ impl ConfigBuilder {
                     no_output: self.no_output,
                     error_cycle: self.error_cycle,
                     headers: self.headers,
+                    custom_struct_derive: self.custom_struct_derive.clone(),
                 }
             })
             .collect()
