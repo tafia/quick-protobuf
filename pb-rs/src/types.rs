@@ -801,8 +801,13 @@ impl Message {
         Ok(())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
-        writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
+    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {;
+        let mut custom_struct_derive = desc.custom_struct_derive.join(", ");
+        if custom_struct_derive.len() > 0 {
+            custom_struct_derive += ", ";
+        }
+
+        writeln!(w, "#[derive({}Debug, Default, PartialEq, Clone)]", custom_struct_derive)?;
         if self.is_unit() {
             writeln!(w, "pub struct {} {{ }}", self.name)?;
             return Ok(());
@@ -1388,6 +1393,7 @@ pub struct Config {
     pub no_output: bool,
     pub error_cycle: bool,
     pub headers: bool,
+    pub custom_struct_derive: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1398,6 +1404,7 @@ pub struct FileDescriptor {
     pub messages: Vec<Message>,
     pub enums: Vec<Enumerator>,
     pub module: String,
+    pub custom_struct_derive: Vec<String>,
 }
 
 impl FileDescriptor {
@@ -1474,6 +1481,9 @@ impl FileDescriptor {
             }
             return Ok(());
         }
+
+        // The write fuctions have access to the FileDescriptor - we need the custom_struct_derives
+        desc.custom_struct_derive = config.custom_struct_derive.clone();
 
         let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
         let mut w = BufWriter::new(File::create(&out_file)?);

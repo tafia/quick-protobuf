@@ -39,6 +39,7 @@ fn main() {
         no_output: false,
         error_cycle: false, // may change a required field to an optional
         headers: false, // do not generate headers
+        custom_struct_derive: vec![] // Nothing
     };
 
     FileDescriptor::write_proto(&config).unwrap();
