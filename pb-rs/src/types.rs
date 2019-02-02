@@ -756,6 +756,7 @@ pub struct Message {
     pub path: PathBuf,
     pub import: PathBuf,
     pub index: MessageIndex,
+    pub rpc_services: Vec<RpcService>,
 }
 
 impl Message {
@@ -1180,7 +1181,6 @@ impl RpcService {
 }
 
 pub type RpcGeneratorFunction =  Box< Fn(&RpcService, &mut Write) -> Result<()> >;
-pub type StructGeneratorFunction =  Box< Fn(&RpcService, &mut Write) -> Result<()> >;
 
 #[derive(Debug, Clone, Default)]
 pub struct Enumerator {
