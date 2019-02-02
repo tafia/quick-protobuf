@@ -395,6 +395,25 @@ fn print_results(name: &str, a: &[u64], b: &[u64], c: &[u64], print_header: bool
     );
 }
 
+#[derive(Default)]
+struct RpcTest;
+
+impl perftest_data_quick::PerftestService for RpcTest {
+    fn test(&self, arg: &perftest_data_quick::Test1) -> Result<perftest_data_quick::Test1, failure::Error> {
+        println!("Also (not performance related but fun to know) - Rpc test was successful!");
+        let ret = perftest_data_quick::Test1::default();
+        Ok(ret)
+    }
+}
+
+fn test_rpc() {
+    use perftest_data_quick::PerftestService;
+
+    let rpc = RpcTest::default();
+    let arg = perftest_data_quick::Test1::default();
+    let _unhandled_its_okay_were_just_testing_here = rpc.test(&arg);
+}
+
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() > 3 {
@@ -477,6 +496,8 @@ fn main() {
     let b = runner.quick_run_test_bytes(&test_data_quick.test_large_bytearrays);
     let c = runner.prost_test(&test_data_prost.test_large_bytearrays);
     print_results("test_large_bytearrays", &a, &b, &c, false);
+
+    test_rpc();
 
     runner.check();
 }
