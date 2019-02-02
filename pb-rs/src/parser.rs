@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 use std::str;
 
 use nom::{digit, hex_digit, multispace};
-use types::{Enumerator, Field, FieldType, FileDescriptor, Frequency, Message, OneOf, Syntax};
+use types::{RpcService, RpcFunctionDeclaration, Enumerator, Field, FieldType, FileDescriptor, Frequency, Message, OneOf, Syntax};
 
 fn is_word(b: u8) -> bool {
     match b {
@@ -266,6 +266,46 @@ named!(
     )
 );
 
+named!(
+    rpc_function_declaration<RpcFunctionDeclaration>,
+    do_parse!(
+        tag!("rpc")
+            >> many1!(br)
+            >> name: word
+            >> tag!("(")
+            >> many0!(br)
+            >> arg: word
+            >> many0!(br)
+            >> tag!(")")
+            >> many1!(br)
+            >> tag!("returns")
+            >> many1!(br)
+            >> tag!("(")
+            >> many0!(br)
+            >> ret: word
+            >> many0!(br)
+            >> tag!(");")
+            >> many0!(br)
+            >> (RpcFunctionDeclaration{name, arg, ret})
+    )
+);
+
+named!(
+    rpc_service<RpcService>,
+    do_parse!(
+        dbg!(tag!("service"))
+            >> many1!(br)
+            >> service_name: dbg!(word)
+            >> many0!(br)
+            >> tag!("{")
+            >> many0!(br)
+            >> functions: many0!(rpc_function_declaration)
+            >> many0!(br)
+            >> tag!("}")
+            >> (RpcService{service_name, functions})
+    )
+);
+
 enum MessageEvent {
     Message(Message),
     Enumerator(Enumerator),
@@ -373,25 +413,13 @@ named!(
     do_parse!(tag!("option") >> many1!(br) >> take_until_and_consume!(";") >> ())
 );
 
-named!(
-    service_ignore<()>,
-    do_parse!(
-        tag!("service")
-            >> many1!(br)
-            >> word
-            >> many0!(br)
-            >> tag!("{")
-            >> take_until_and_consume!("}")
-            >> ()
-    )
-);
-
 enum Event {
     Syntax(Syntax),
     Import(PathBuf),
     Package(String),
     Message(Message),
     Enum(Enumerator),
+    RpcService(RpcService),
     Ignore,
 }
 
@@ -402,8 +430,8 @@ named!(
             package => { |p| Event::Package(p) } |
             message => { |m| Event::Message(m) } |
             enumerator => { |e| Event::Enum(e) } |
+            rpc_service => { |r| Event::RpcService(r) } |
             option_ignore => { |_| Event::Ignore } |
-            service_ignore => { |_| Event::Ignore } |
             br => { |_| Event::Ignore })
 );
 
@@ -417,6 +445,7 @@ named!(pub file_descriptor<FileDescriptor>,
                    Event::Package(p) => desc.package = p,
                    Event::Message(m) => desc.messages.push(m),
                    Event::Enum(e) => desc.enums.push(e),
+                   Event::RpcService(r) => desc.rpc_services.push(r),
                    Event::Ignore => (),
                }
            }
@@ -587,6 +616,47 @@ mod test {
             assert_eq!(2, mess.fields.len());
         } else {
             panic!("Could not parse reserved fields message");
+        }
+    }
+
+    #[test]
+    fn test_rpc_service() {
+        let msg = r#"
+            service RpcService {
+                rpc function0(InStruct0) returns (OutStruct0);
+                rpc function1(InStruct1) returns (OutStruct1);
+            }
+        "#;
+
+        match file_descriptor( msg.as_bytes() ) {
+            ::nom::IResult::Done(_, descriptor) => {
+                println!("Services found: {:?}", descriptor.rpc_services);
+                let service = &descriptor.rpc_services.get(0).expect("Service not found!");
+                let func0 = service.functions.get(0).expect("Function 0 not returned!");
+                let func1 = service.functions.get(1).expect("Function 1 not returned!");
+                assert_eq!("RpcService", service.service_name);
+                assert_eq!("function0", func0.name);
+                assert_eq!("InStruct0", func0.arg);
+                assert_eq!("OutStruct0", func0.ret);
+                assert_eq!("function1", func1.name);
+                assert_eq!("InStruct1", func1.arg);
+                assert_eq!("OutStruct1", func1.ret);
+            },
+            other => panic!("Could not parse RPC Service: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_rpc_function() {
+        let msg = r#"rpc function_name(Arg) returns (Ret);"#;
+
+        match rpc_function_declaration( msg.as_bytes() ) {
+            ::nom::IResult::Done(_, declaration) => {
+                assert_eq!("function_name", declaration.name);
+                assert_eq!("Arg", declaration.arg);
+                assert_eq!("Ret", declaration.ret);
+            },
+            other => panic!("Could not parse RPC Function Declaration: {:?}", other),
         }
     }
 
