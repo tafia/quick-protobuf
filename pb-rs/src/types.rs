@@ -673,6 +673,7 @@ pub struct Message {
     pub path: PathBuf,
     pub import: PathBuf,
     pub index: MessageIndex,
+    pub rpc_services: Vec<RpcService>,
 }
 
 impl Message {
@@ -1043,6 +1044,28 @@ impl Message {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct RpcFunctionDeclaration {
+    pub name: String,
+    pub arg: String,
+    pub ret: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RpcService  {
+    pub service_name: String,
+    pub functions: Vec<RpcFunctionDeclaration>,
+}
+
+impl RpcService {
+    fn write_definition<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
+        (config.custom_rpc_generator)(self, w)
+    }
+}
+
+pub type RpcGeneratorFunction =  Box< Fn(&RpcService, &mut Write) -> Result<()> >;
+
+
+#[derive(Debug, Clone, Default)]
 pub struct Enumerator {
     pub name: String,
     pub fields: Vec<(String, i32)>,
@@ -1331,6 +1354,7 @@ pub struct Config {
     pub error_cycle: bool,
     pub headers: bool,
     pub custom_struct_derive: Vec<String>,
+    pub custom_rpc_generator: RpcGeneratorFunction,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1342,6 +1366,7 @@ pub struct FileDescriptor {
     pub enums: Vec<Enumerator>,
     pub module: String,
     pub custom_struct_derive: Vec<String>,
+    pub rpc_services: Vec<RpcService>
 }
 
 impl FileDescriptor {
@@ -1424,7 +1449,7 @@ impl FileDescriptor {
 
         let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
         let mut w = BufWriter::new(File::create(&out_file)?);
-        desc.write(&mut w, name, config.headers)?;
+        desc.write(&mut w, name, config)?;
         update_mod_file(&out_file)
     }
 
@@ -1763,13 +1788,13 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn write<W: Write>(&self, w: &mut W, filename: &str, headers: bool) -> Result<()> {
+    fn write<W: Write>(&self, w: &mut W, filename: &str, config: &Config) -> Result<()> {
         println!(
             "Found {} messages, and {} enums",
             self.messages.len(),
             self.enums.len()
         );
-        if headers {
+        if config.headers {
             self.write_headers(w, filename)?;
         }
         self.write_package_start(w)?;
@@ -1777,6 +1802,7 @@ impl FileDescriptor {
         self.write_imports(w)?;
         self.write_enums(w)?;
         self.write_messages(w)?;
+        self.write_rpc_services(w, config)?;
         self.write_package_end(w)?;
         Ok(())
     }
@@ -1868,6 +1894,15 @@ impl FileDescriptor {
             m.write_from_i32(w)?;
             writeln!(w, "")?;
             m.write_from_str(w)?;
+        }
+        Ok(())
+    }
+
+    fn write_rpc_services<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
+        for m in self.rpc_services.iter() {
+            println!("Writing Rpc {}", m.service_name);
+            writeln!(w, "")?;
+            m.write_definition(w, config)?;
         }
         Ok(())
     }

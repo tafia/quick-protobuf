@@ -39,7 +39,8 @@ fn main() {
         no_output: false,
         error_cycle: false, // may change a required field to an optional
         headers: false, // do not generate headers
-        custom_struct_derive: vec![] // Nothing
+        custom_struct_derive: vec![], // Nothing
+        custom_rpc_generator: RpcGeneratorFunction::default(),
     };
 
     FileDescriptor::write_proto(&config).unwrap();

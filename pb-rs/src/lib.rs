@@ -56,6 +56,7 @@ use types::Config;
 ///     FileDescriptor::run(&config_builder.build()).unwrap()
 /// }
 /// ```
+
 #[derive(Debug, Default)]
 pub struct ConfigBuilder {
     in_files: Vec<PathBuf>,
@@ -178,6 +179,7 @@ impl ConfigBuilder {
                     error_cycle: self.error_cycle,
                     headers: self.headers,
                     custom_struct_derive: self.custom_struct_derive.clone(),
+                    custom_rpc_generator: Box::new(|_,_| Ok(())),
                 }
             }).collect()
     }
