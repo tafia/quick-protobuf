@@ -46,3 +46,7 @@ message PerftestData {
     repeated TestBytes test_small_bytearrays = 7;
     repeated TestBytes test_large_bytearrays = 8;
 }
+
+service PerftestService {
+    rpc test(Test1) returns (Test1);
+}
