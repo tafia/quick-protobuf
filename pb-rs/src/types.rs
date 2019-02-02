@@ -673,7 +673,6 @@ pub struct Message {
     pub path: PathBuf,
     pub import: PathBuf,
     pub index: MessageIndex,
-    pub rpc_services: Vec<RpcService>,
 }
 
 impl Message {
@@ -710,11 +709,11 @@ impl Message {
         self.fields.is_empty() && self.oneofs.is_empty()
     }
 
-    fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         println!("Writing message {}{}", self.get_modules(desc), self.name);
         writeln!(w, "")?;
 
-        self.write_definition(w, desc)?;
+        self.write_definition(w, desc, config)?;
         writeln!(w, "")?;
         self.write_impl_message_read(w, desc)?;
         writeln!(w, "")?;
@@ -742,7 +741,7 @@ impl Message {
                 writeln!(w, "use super::*;")?;
             }
             for m in &self.messages {
-                m.write(w, desc)?;
+                m.write(w, desc, config)?;
             }
             for e in &self.enums {
                 e.write(w)?;
@@ -758,8 +757,8 @@ impl Message {
         Ok(())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {;
-        let mut custom_struct_derive = desc.custom_struct_derive.join(", ");
+    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {;
+        let mut custom_struct_derive = config.custom_struct_derive.join(", ");
         if custom_struct_derive.len() > 0 {
             custom_struct_derive += ", ";
         }
@@ -1365,7 +1364,6 @@ pub struct FileDescriptor {
     pub messages: Vec<Message>,
     pub enums: Vec<Enumerator>,
     pub module: String,
-    pub custom_struct_derive: Vec<String>,
     pub rpc_services: Vec<RpcService>
 }
 
@@ -1443,9 +1441,6 @@ impl FileDescriptor {
             }
             return Ok(());
         }
-
-        // The write fuctions have access to the FileDescriptor - we need the custom_struct_derives
-        desc.custom_struct_derive = config.custom_struct_derive.clone();
 
         let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
         let mut w = BufWriter::new(File::create(&out_file)?);
@@ -1801,7 +1796,7 @@ impl FileDescriptor {
         self.write_uses(w)?;
         self.write_imports(w)?;
         self.write_enums(w)?;
-        self.write_messages(w)?;
+        self.write_messages(w, config)?;
         self.write_rpc_services(w, config)?;
         self.write_package_end(w)?;
         Ok(())
@@ -1907,9 +1902,9 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn write_messages<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_messages<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         for m in self.messages.iter().filter(|m| !m.imported) {
-            m.write(w, &self)?;
+            m.write(w, &self, config)?;
         }
         Ok(())
     }
