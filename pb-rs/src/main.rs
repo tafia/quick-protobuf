@@ -75,13 +75,14 @@ fn run() -> Result<(), ::failure::Error> {
                 .short("C")
                 .required(false)
                 .help("The comma separated values to add to #[derive(...)] for every struct"),
-        .get_matches();
+        ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
     let include_paths = path_vec(values_t!(matches, "INCLUDE_PATH", String));
     let out_file = matches.value_of("OUTPUT").map(|o| PathBuf::from(o));
     let out_dir = matches.value_of("OUTPUT_DIR").map(|o| PathBuf::from(o));
-    let custom_struct_derive: Vec<String> = matches.value_of("CUSTOMSTRUCTDERIVE").map(|o| o.split(","));
+    let custom_struct_derive: Vec<String> = matches.value_of("CUSTOMSTRUCTDERIVE").unwrap_or("")
+        .split(",").map(|s| s.to_string()).collect();
 
     let compiler = ConfigBuilder::new(
         &in_files,
@@ -92,8 +93,8 @@ fn run() -> Result<(), ::failure::Error> {
     .single_module(matches.is_present("SINGLE_MOD"))
     .no_output(matches.is_present("NO_OUTPUT"))
     .error_cycle(matches.is_present("CYCLE"))
-    .headers(matches.is_present("HEADERS"));
-    .custom_struct_derive(custom_struct_derive)
+    .headers(matches.is_present("HEADERS"))
+    .custom_struct_derive(custom_struct_derive);
 
     FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
 }
