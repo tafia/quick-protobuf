@@ -756,7 +756,6 @@ pub struct Message {
     pub path: PathBuf,
     pub import: PathBuf,
     pub index: MessageIndex,
-    pub rpc_services: Vec<RpcService>,
 }
 
 impl Message {
@@ -1610,9 +1609,6 @@ impl FileDescriptor {
             }
             return Ok(());
         }
-
-        // The write fuctions have access to the FileDescriptor - we need the custom_struct_derives
-        desc.custom_struct_derive = config.custom_struct_derive.clone();
 
         let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
         let mut w = BufWriter::new(File::create(&out_file)?);
