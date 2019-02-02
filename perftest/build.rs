@@ -14,12 +14,12 @@ fn generate_rpc_add_1_test<W: Write + ?Sized>(rpc: &RpcService, w: &mut W) -> Re
         }
     */
 
-    writeln!(w, "\npub trait {SERVICE} {{", SERVICE = rpc.service_name);
+    writeln!(w, "\npub trait {SERVICE} {{", SERVICE = rpc.service_name)?;
     for func in rpc.functions.iter() {
         writeln!(w, "   fn {FUNC}(&self, arg: &{ARG}) -> std::result::Result<{RET}, failure::Error>;", 
-            FUNC = func.name, ARG = func.arg, RET = func.ret);
+            FUNC = func.name, ARG = func.arg, RET = func.ret)?;
     }
-    writeln!(w, "}}\n");
+    writeln!(w, "}}\n")?;
 
     Ok(())
 }
