@@ -56,7 +56,8 @@ impl MessageIndex {
             .skip(1)
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get(*next))
-            }).expect("Message index not found")
+            })
+            .expect("Message index not found")
     }
 
     fn get_message_mut<'a>(&self, desc: &'a mut FileDescriptor) -> &'a mut Message {
@@ -69,7 +70,8 @@ impl MessageIndex {
             .skip(1)
             .fold(first_message, |cur, next| {
                 cur.and_then(|msg| msg.messages.get_mut(*next))
-            }).expect("Message index not found")
+            })
+            .expect("Message index not found")
     }
 
     fn push(&mut self, i: usize) {
@@ -549,7 +551,10 @@ impl Field {
                 w,
                 "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
                 self.name,
-                self.default.as_ref().map_or_else(|| self.typ.regular_default(desc).unwrap_or("None"), |s| s.as_str()),
+                self.default.as_ref().map_or_else(
+                    || self.typ.regular_default(desc).unwrap_or("None"),
+                    |s| s.as_str()
+                ),
                 tag_size,
                 self.typ.get_size(&format!("&self.{}", self.name))
             )?,
@@ -628,7 +633,10 @@ impl Field {
                     w,
                     "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
                     self.name,
-                    self.default.as_ref().map_or_else(|| self.typ.regular_default(desc).unwrap_or("None"), |s| s.as_str()),
+                    self.default.as_ref().map_or_else(
+                        || self.typ.regular_default(desc).unwrap_or("None"),
+                        |s| s.as_str()
+                    ),
                     self.tag(),
                     self.typ
                         .get_write(&format!("&self.{}", self.name), self.boxed)
@@ -1685,7 +1693,8 @@ impl FileDescriptor {
                                     .filter(|f| f.frequency == Frequency::Required)
                                     .filter(|f| {
                                         f.typ.message().map_or(false, |m| cycle.contains(m))
-                                    }) {
+                                    })
+                                {
                                     f.boxed = true;
                                     f.frequency = Frequency::Optional;
                                 }
@@ -1771,7 +1780,8 @@ impl FileDescriptor {
                         vec![&mut **key, &mut **value].into_iter()
                     }
                     _ => vec![typ].into_iter(),
-                }) {
+                })
+            {
                 if let FieldType::MessageOrEnum(name) = typ.clone() {
                     let test_names: Vec<String> = if name.starts_with(".") {
                         vec![name.clone().split_off(1)]

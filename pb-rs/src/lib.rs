@@ -171,6 +171,7 @@ impl ConfigBuilder {
                     error_cycle: self.error_cycle,
                     headers: self.headers,
                 }
-            }).collect()
+            })
+            .collect()
     }
 }

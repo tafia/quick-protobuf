@@ -1,19 +1,8 @@
-// Automatically generated rust module for 'test_default_values_pb.proto' file
-
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(unused_imports)]
-#![allow(unknown_lints)]
-#![allow(clippy)]
-#![cfg_attr(rustfmt, rustfmt_skip)]
-
-
-use std::io::Write;
-use std::borrow::Cow;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
 use super::*;
+use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result, Writer};
+use std::borrow::Cow;
+use std::io::Write;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum EnumForDefaultValue {
@@ -111,7 +100,9 @@ impl<'a> MessageRead<'a> for TestDefaultValues<'a> {
                 Ok(122) => msg.bytes_field = r.read_bytes(bytes).map(Cow::Borrowed)?,
                 Ok(128) => msg.enum_field = r.read_enum(bytes)?,
                 Ok(136) => msg.enum_field_without_default = Some(r.read_enum(bytes)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -121,44 +112,132 @@ impl<'a> MessageRead<'a> for TestDefaultValues<'a> {
 
 impl<'a> MessageWrite for TestDefaultValues<'a> {
     fn get_size(&self) -> usize {
-        0
-        + if self.double_field == 1f64 { 0 } else { 1 + 8 }
-        + if self.float_field == 2f32 { 0 } else { 1 + 4 }
-        + if self.int32_field == 3i32 { 0 } else { 1 + sizeof_varint(*(&self.int32_field) as u64) }
-        + if self.int64_field == 4i64 { 0 } else { 1 + sizeof_varint(*(&self.int64_field) as u64) }
-        + if self.uint32_field == 5u32 { 0 } else { 1 + sizeof_varint(*(&self.uint32_field) as u64) }
-        + if self.uint64_field == 6u64 { 0 } else { 1 + sizeof_varint(*(&self.uint64_field) as u64) }
-        + if self.sint32_field == 7i32 { 0 } else { 1 + sizeof_sint32(*(&self.sint32_field)) }
-        + if self.sint64_field == 8i64 { 0 } else { 1 + sizeof_sint64(*(&self.sint64_field)) }
-        + if self.fixed32_field == 9u32 { 0 } else { 1 + 4 }
-        + if self.fixed64_field == 10u64 { 0 } else { 1 + 8 }
-        + if self.sfixed32_field == 11i32 { 0 } else { 1 + 4 }
-        + if self.sfixed64_field == 12i64 { 0 } else { 1 + 8 }
-        + if self.bool_field == true { 0 } else { 1 + sizeof_varint(*(&self.bool_field) as u64) }
-        + if self.string_field == Cow::Borrowed("abc\n22") { 0 } else { 1 + sizeof_len((&self.string_field).len()) }
-        + if self.bytes_field == Cow::Borrowed(b"cde\n33") { 0 } else { 1 + sizeof_len((&self.bytes_field).len()) }
-        + if self.enum_field == test_default_values::EnumForDefaultValue::TWO { 0 } else { 2 + sizeof_varint(*(&self.enum_field) as u64) }
-        + self.enum_field_without_default.as_ref().map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
+        0 + if self.double_field == 1f64 { 0 } else { 1 + 8 }
+            + if self.float_field == 2f32 { 0 } else { 1 + 4 }
+            + if self.int32_field == 3i32 {
+                0
+            } else {
+                1 + sizeof_varint(*(&self.int32_field) as u64)
+            }
+            + if self.int64_field == 4i64 {
+                0
+            } else {
+                1 + sizeof_varint(*(&self.int64_field) as u64)
+            }
+            + if self.uint32_field == 5u32 {
+                0
+            } else {
+                1 + sizeof_varint(*(&self.uint32_field) as u64)
+            }
+            + if self.uint64_field == 6u64 {
+                0
+            } else {
+                1 + sizeof_varint(*(&self.uint64_field) as u64)
+            }
+            + if self.sint32_field == 7i32 {
+                0
+            } else {
+                1 + sizeof_sint32(*(&self.sint32_field))
+            }
+            + if self.sint64_field == 8i64 {
+                0
+            } else {
+                1 + sizeof_sint64(*(&self.sint64_field))
+            }
+            + if self.fixed32_field == 9u32 { 0 } else { 1 + 4 }
+            + if self.fixed64_field == 10u64 {
+                0
+            } else {
+                1 + 8
+            }
+            + if self.sfixed32_field == 11i32 {
+                0
+            } else {
+                1 + 4
+            }
+            + if self.sfixed64_field == 12i64 {
+                0
+            } else {
+                1 + 8
+            }
+            + if self.bool_field == true {
+                0
+            } else {
+                1 + sizeof_varint(*(&self.bool_field) as u64)
+            }
+            + if self.string_field == Cow::Borrowed("abc\n22") {
+                0
+            } else {
+                1 + sizeof_len((&self.string_field).len())
+            }
+            + if self.bytes_field == Cow::Borrowed(b"cde\n33") {
+                0
+            } else {
+                1 + sizeof_len((&self.bytes_field).len())
+            }
+            + if self.enum_field == test_default_values::EnumForDefaultValue::TWO {
+                0
+            } else {
+                2 + sizeof_varint(*(&self.enum_field) as u64)
+            }
+            + self
+                .enum_field_without_default
+                .as_ref()
+                .map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if self.double_field != 1f64 { w.write_with_tag(9, |w| w.write_double(*&self.double_field))?; }
-        if self.float_field != 2f32 { w.write_with_tag(21, |w| w.write_float(*&self.float_field))?; }
-        if self.int32_field != 3i32 { w.write_with_tag(24, |w| w.write_int32(*&self.int32_field))?; }
-        if self.int64_field != 4i64 { w.write_with_tag(32, |w| w.write_int64(*&self.int64_field))?; }
-        if self.uint32_field != 5u32 { w.write_with_tag(40, |w| w.write_uint32(*&self.uint32_field))?; }
-        if self.uint64_field != 6u64 { w.write_with_tag(48, |w| w.write_uint64(*&self.uint64_field))?; }
-        if self.sint32_field != 7i32 { w.write_with_tag(56, |w| w.write_sint32(*&self.sint32_field))?; }
-        if self.sint64_field != 8i64 { w.write_with_tag(64, |w| w.write_sint64(*&self.sint64_field))?; }
-        if self.fixed32_field != 9u32 { w.write_with_tag(77, |w| w.write_fixed32(*&self.fixed32_field))?; }
-        if self.fixed64_field != 10u64 { w.write_with_tag(81, |w| w.write_fixed64(*&self.fixed64_field))?; }
-        if self.sfixed32_field != 11i32 { w.write_with_tag(93, |w| w.write_sfixed32(*&self.sfixed32_field))?; }
-        if self.sfixed64_field != 12i64 { w.write_with_tag(97, |w| w.write_sfixed64(*&self.sfixed64_field))?; }
-        if self.bool_field != true { w.write_with_tag(104, |w| w.write_bool(*&self.bool_field))?; }
-        if self.string_field != Cow::Borrowed("abc\n22") { w.write_with_tag(114, |w| w.write_string(&**&self.string_field))?; }
-        if self.bytes_field != Cow::Borrowed(b"cde\n33") { w.write_with_tag(122, |w| w.write_bytes(&**&self.bytes_field))?; }
-        if self.enum_field != test_default_values::EnumForDefaultValue::TWO { w.write_with_tag(128, |w| w.write_enum(*&self.enum_field as i32))?; }
-        if let Some(ref s) = self.enum_field_without_default { w.write_with_tag(136, |w| w.write_enum(*s as i32))?; }
+        if self.double_field != 1f64 {
+            w.write_with_tag(9, |w| w.write_double(*&self.double_field))?;
+        }
+        if self.float_field != 2f32 {
+            w.write_with_tag(21, |w| w.write_float(*&self.float_field))?;
+        }
+        if self.int32_field != 3i32 {
+            w.write_with_tag(24, |w| w.write_int32(*&self.int32_field))?;
+        }
+        if self.int64_field != 4i64 {
+            w.write_with_tag(32, |w| w.write_int64(*&self.int64_field))?;
+        }
+        if self.uint32_field != 5u32 {
+            w.write_with_tag(40, |w| w.write_uint32(*&self.uint32_field))?;
+        }
+        if self.uint64_field != 6u64 {
+            w.write_with_tag(48, |w| w.write_uint64(*&self.uint64_field))?;
+        }
+        if self.sint32_field != 7i32 {
+            w.write_with_tag(56, |w| w.write_sint32(*&self.sint32_field))?;
+        }
+        if self.sint64_field != 8i64 {
+            w.write_with_tag(64, |w| w.write_sint64(*&self.sint64_field))?;
+        }
+        if self.fixed32_field != 9u32 {
+            w.write_with_tag(77, |w| w.write_fixed32(*&self.fixed32_field))?;
+        }
+        if self.fixed64_field != 10u64 {
+            w.write_with_tag(81, |w| w.write_fixed64(*&self.fixed64_field))?;
+        }
+        if self.sfixed32_field != 11i32 {
+            w.write_with_tag(93, |w| w.write_sfixed32(*&self.sfixed32_field))?;
+        }
+        if self.sfixed64_field != 12i64 {
+            w.write_with_tag(97, |w| w.write_sfixed64(*&self.sfixed64_field))?;
+        }
+        if self.bool_field != true {
+            w.write_with_tag(104, |w| w.write_bool(*&self.bool_field))?;
+        }
+        if self.string_field != Cow::Borrowed("abc\n22") {
+            w.write_with_tag(114, |w| w.write_string(&**&self.string_field))?;
+        }
+        if self.bytes_field != Cow::Borrowed(b"cde\n33") {
+            w.write_with_tag(122, |w| w.write_bytes(&**&self.bytes_field))?;
+        }
+        if self.enum_field != test_default_values::EnumForDefaultValue::TWO {
+            w.write_with_tag(128, |w| w.write_enum(*&self.enum_field as i32))?;
+        }
+        if let Some(ref s) = self.enum_field_without_default {
+            w.write_with_tag(136, |w| w.write_enum(*s as i32))?;
+        }
         Ok(())
     }
 }
@@ -192,7 +271,9 @@ impl<'a> MessageRead<'a> for TestExtremeDefaultValues {
                 Ok(141) => msg.inf_float = r.read_float(bytes)?,
                 Ok(149) => msg.neg_inf_float = r.read_float(bytes)?,
                 Ok(157) => msg.nan_float = r.read_float(bytes)?,
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -202,23 +283,52 @@ impl<'a> MessageRead<'a> for TestExtremeDefaultValues {
 
 impl MessageWrite for TestExtremeDefaultValues {
     fn get_size(&self) -> usize {
-        0
-        + if self.inf_double == ::std::f64::INFINITY { 0 } else { 1 + 8 }
-        + if self.neg_inf_double == ::std::f64::NEG_INFINITY { 0 } else { 1 + 8 }
-        + if self.nan_double == ::std::f64::NAN { 0 } else { 2 + 8 }
-        + if self.inf_float == ::std::f32::INFINITY { 0 } else { 2 + 4 }
-        + if self.neg_inf_float == ::std::f32::NEG_INFINITY { 0 } else { 2 + 4 }
-        + if self.nan_float == ::std::f32::NAN { 0 } else { 2 + 4 }
+        0 + if self.inf_double == ::std::f64::INFINITY {
+            0
+        } else {
+            1 + 8
+        } + if self.neg_inf_double == ::std::f64::NEG_INFINITY {
+            0
+        } else {
+            1 + 8
+        } + if self.nan_double == ::std::f64::NAN {
+            0
+        } else {
+            2 + 8
+        } + if self.inf_float == ::std::f32::INFINITY {
+            0
+        } else {
+            2 + 4
+        } + if self.neg_inf_float == ::std::f32::NEG_INFINITY {
+            0
+        } else {
+            2 + 4
+        } + if self.nan_float == ::std::f32::NAN {
+            0
+        } else {
+            2 + 4
+        }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if self.inf_double != ::std::f64::INFINITY { w.write_with_tag(113, |w| w.write_double(*&self.inf_double))?; }
-        if self.neg_inf_double != ::std::f64::NEG_INFINITY { w.write_with_tag(121, |w| w.write_double(*&self.neg_inf_double))?; }
-        if self.nan_double != ::std::f64::NAN { w.write_with_tag(129, |w| w.write_double(*&self.nan_double))?; }
-        if self.inf_float != ::std::f32::INFINITY { w.write_with_tag(141, |w| w.write_float(*&self.inf_float))?; }
-        if self.neg_inf_float != ::std::f32::NEG_INFINITY { w.write_with_tag(149, |w| w.write_float(*&self.neg_inf_float))?; }
-        if self.nan_float != ::std::f32::NAN { w.write_with_tag(157, |w| w.write_float(*&self.nan_float))?; }
+        if self.inf_double != ::std::f64::INFINITY {
+            w.write_with_tag(113, |w| w.write_double(*&self.inf_double))?;
+        }
+        if self.neg_inf_double != ::std::f64::NEG_INFINITY {
+            w.write_with_tag(121, |w| w.write_double(*&self.neg_inf_double))?;
+        }
+        if self.nan_double != ::std::f64::NAN {
+            w.write_with_tag(129, |w| w.write_double(*&self.nan_double))?;
+        }
+        if self.inf_float != ::std::f32::INFINITY {
+            w.write_with_tag(141, |w| w.write_float(*&self.inf_float))?;
+        }
+        if self.neg_inf_float != ::std::f32::NEG_INFINITY {
+            w.write_with_tag(149, |w| w.write_float(*&self.neg_inf_float))?;
+        }
+        if self.nan_float != ::std::f32::NAN {
+            w.write_with_tag(157, |w| w.write_float(*&self.nan_float))?;
+        }
         Ok(())
     }
 }
-

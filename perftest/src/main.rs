@@ -418,7 +418,8 @@ fn main() {
             "{}/{}",
             env!("CARGO_MANIFEST_DIR"),
             "perftest_data.pbbin"
-        )).unwrap();
+        ))
+        .unwrap();
         let mut data = Vec::new();
         is.read_to_end(&mut data).unwrap();
         data

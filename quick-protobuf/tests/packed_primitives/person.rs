@@ -1,19 +1,8 @@
-// Automatically generated rust module for 'person.proto' file
-
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(unused_imports)]
-#![allow(unknown_lints)]
-#![allow(clippy)]
-#![cfg_attr(rustfmt, rustfmt_skip)]
-
-
-use std::io::Write;
-use std::borrow::Cow;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
-use quick_protobuf::sizeofs::*;
 use super::*;
+use quick_protobuf::sizeofs::*;
+use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result, Writer};
+use std::borrow::Cow;
+use std::io::Write;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum City {
@@ -58,7 +47,9 @@ impl<'a> MessageRead<'a> for Address {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.city = Some(r.read_enum(bytes)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -68,12 +59,16 @@ impl<'a> MessageRead<'a> for Address {
 
 impl MessageWrite for Address {
     fn get_size(&self) -> usize {
-        0
-        + self.city.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        0 + self
+            .city
+            .as_ref()
+            .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.city { w.write_with_tag(8, |w| w.write_enum(*s as i32))?; }
+        if let Some(ref s) = self.city {
+            w.write_with_tag(8, |w| w.write_enum(*s as i32))?;
+        }
         Ok(())
     }
 }
@@ -91,7 +86,9 @@ impl<'a> MessageRead<'a> for Person<'a> {
             match r.next_tag(bytes) {
                 Ok(18) => msg.address = Some(r.read_message::<Address>(bytes)?),
                 Ok(26) => msg.names.push(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -101,14 +98,24 @@ impl<'a> MessageRead<'a> for Person<'a> {
 
 impl<'a> MessageWrite for Person<'a> {
     fn get_size(&self) -> usize {
-        0
-        + self.address.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
-        + self.names.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
+        0 + self
+            .address
+            .as_ref()
+            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+            + self
+                .names
+                .iter()
+                .map(|s| 1 + sizeof_len((s).len()))
+                .sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.address { w.write_with_tag(18, |w| w.write_message(s))?; }
-        for s in &self.names { w.write_with_tag(26, |w| w.write_string(&**s))?; }
+        if let Some(ref s) = self.address {
+            w.write_with_tag(18, |w| w.write_message(s))?;
+        }
+        for s in &self.names {
+            w.write_with_tag(26, |w| w.write_string(&**s))?;
+        }
         Ok(())
     }
 }
@@ -126,7 +133,9 @@ impl<'a> MessageRead<'a> for PersonPacked<'a> {
             match r.next_tag(bytes) {
                 Ok(18) => msg.address = Some(r.read_message::<Address>(bytes)?),
                 Ok(26) => msg.names.push(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(t) => { r.read_unknown(bytes, t)?; }
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
                 Err(e) => return Err(e),
             }
         }
@@ -136,15 +145,24 @@ impl<'a> MessageRead<'a> for PersonPacked<'a> {
 
 impl<'a> MessageWrite for PersonPacked<'a> {
     fn get_size(&self) -> usize {
-        0
-        + self.address.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
-        + self.names.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
+        0 + self
+            .address
+            .as_ref()
+            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+            + self
+                .names
+                .iter()
+                .map(|s| 1 + sizeof_len((s).len()))
+                .sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.address { w.write_with_tag(18, |w| w.write_message(s))?; }
-        for s in &self.names { w.write_with_tag(26, |w| w.write_string(&**s))?; }
+        if let Some(ref s) = self.address {
+            w.write_with_tag(18, |w| w.write_message(s))?;
+        }
+        for s in &self.names {
+            w.write_with_tag(26, |w| w.write_string(&**s))?;
+        }
         Ok(())
     }
 }
-

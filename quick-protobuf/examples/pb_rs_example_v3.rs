@@ -47,15 +47,15 @@ fn main() {
         test_oneof: OneOftest_oneof::f1(2),
 
         f_repeated_string: vec![Cow::Borrowed("goat"), Cow::Borrowed("running")],
-        f_repeated_baz_message: vec![
-            BazMessage {
-                nested: Some(data_types::mod_BazMessage::Nested {
-                    f_nested: Some(data_types::mod_BazMessage::mod_Nested::NestedMessage { f_nested: 2 }),
+        f_repeated_baz_message: vec![BazMessage {
+            nested: Some(data_types::mod_BazMessage::Nested {
+                f_nested: Some(data_types::mod_BazMessage::mod_Nested::NestedMessage {
+                    f_nested: 2,
                 }),
-                b_int64: 10,
-                b_string: Cow::Borrowed("boom\n"),
-            }
-        ],
+            }),
+            b_int64: 10,
+            b_string: Cow::Borrowed("boom\n"),
+        }],
 
         // Each message implements Default ... which makes it much easier
         ..FooMessage::default()
@@ -95,7 +95,6 @@ fn main() {
 
     println!("Message read back and everything matches!");
     println!("{:#?}", read_message);
-
 
     let message = RepeatedMessage {
         bar_message: vec![BarMessage { b_int32: 0 }, BarMessage { b_int32: 9 }],

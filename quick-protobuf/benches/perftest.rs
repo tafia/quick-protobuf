@@ -74,7 +74,8 @@ fn generate_repeated_bool() -> Vec<TestRepeatedBool> {
     (1..10)
         .map(|j| TestRepeatedBool {
             values: (0..100).map(|i| i % j == 0).collect(),
-        }).collect()
+        })
+        .collect()
 }
 
 perfbench!(
@@ -88,7 +89,8 @@ fn generate_repeated_packed_int32() -> Vec<TestRepeatedPackedInt32> {
     (1..40)
         .map(|j| TestRepeatedPackedInt32 {
             values: (0..100).map(|i| i * j).collect(),
-        }).collect()
+        })
+        .collect()
 }
 
 perfbench!(
@@ -102,7 +104,8 @@ fn generate_repeated_packed_float() -> Vec<TestRepeatedPackedFloat<'static>> {
     (1..40)
         .map(|j| TestRepeatedPackedFloat {
             values: Cow::Owned((0..100).map(|i| (i * j) as f32).collect()),
-        }).collect()
+        })
+        .collect()
 }
 
 perfbench!(
@@ -184,7 +187,8 @@ fn generate_strings() -> Vec<TestStrings<'static>> {
             s1: s.by_ref().next(),
             s2: s.by_ref().next(),
             s3: s.by_ref().next(),
-        }).collect()
+        })
+        .collect()
 }
 
 perfbench!(generate_strings, TestStrings, write_strings, read_strings);
@@ -197,7 +201,8 @@ fn generate_small_bytes() -> Vec<TestBytes<'static>> {
     (1..800)
         .map(|_| TestBytes {
             b1: s.by_ref().next(),
-        }).collect()
+        })
+        .collect()
 }
 
 perfbench!(
@@ -221,7 +226,8 @@ fn generate_large_bytes() -> Vec<TestBytes<'static>> {
                     cur
                 },
             ))),
-        }).collect()
+        })
+        .collect()
 }
 
 perfbench!(
@@ -240,7 +246,8 @@ fn generate_map() -> Vec<TestMap<'static>> {
                 .take(500)
                 .map(|s| (Cow::Owned(s.to_string()), s.len() as u32))
                 .collect(),
-        }).collect()
+        })
+        .collect()
 }
 
 perfbench!(generate_map, TestMap, write_map, read_map);

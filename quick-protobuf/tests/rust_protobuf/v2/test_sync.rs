@@ -29,7 +29,8 @@ fn test_sync() {
                 let read = TestTypesSingular::from_reader(&mut reader, &bytes).unwrap();
                 read.int32_field
             })
-        }).collect();
+        })
+        .collect();
 
     let results = threads
         .into_iter()
