@@ -549,11 +549,7 @@ impl Field {
                 w,
                 "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
                 self.name,
-                self.default
-                    .iter()
-                    .next()
-                    .map(|s| s.as_str())
-                    .unwrap_or(self.typ.regular_default(desc).unwrap_or("None")),
+                self.default.as_ref().map_or_else(|| self.typ.regular_default(desc).unwrap_or("None"), |s| s.as_str()),
                 tag_size,
                 self.typ.get_size(&format!("&self.{}", self.name))
             )?,
@@ -632,11 +628,7 @@ impl Field {
                     w,
                     "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
                     self.name,
-                    self.default
-                        .iter()
-                        .next()
-                        .map(|s| s.as_str())
-                        .unwrap_or(self.typ.regular_default(desc).unwrap_or("None")),
+                    self.default.as_ref().map_or_else(|| self.typ.regular_default(desc).unwrap_or("None"), |s| s.as_str()),
                     self.tag(),
                     self.typ
                         .get_write(&format!("&self.{}", self.name), self.boxed)
@@ -1108,10 +1100,11 @@ impl Enumerator {
             .partially_qualified_fields
             .iter()
             .map(|pqf| {
-                let mut fqf = pqf.0.clone();
-                if self.module != "" {
-                    fqf.insert_str(0, format!("{}::", &self.module.replace(".", "::")).as_str());
-                }
+                let fqf = if self.module.is_empty() {
+                    pqf.0.clone()
+                } else {
+                    format!("{}::{}", self.module.replace(".", "::"), pqf.0)
+                };
                 (fqf, pqf.1)
             })
             .collect();
