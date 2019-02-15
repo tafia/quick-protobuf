@@ -1,13 +1,3 @@
-//! Automatically generated rust module for 'mesos.proto' file
-
-#![allow(non_snake_case)]
-#![allow(non_upper_case_globals)]
-#![allow(non_camel_case_types)]
-#![allow(unused_imports)]
-#![allow(unknown_lints)]
-#![allow(clippy)]
-#![cfg_attr(rustfmt, rustfmt_skip)]
-
 
 use std::io::Write;
 use std::borrow::Cow;
@@ -1188,10 +1178,7 @@ pub struct HTTPCheckInfo<'a> {
 
 impl<'a> MessageRead<'a> for HTTPCheckInfo<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
-        let mut msg = HTTPCheckInfo {
-            protocol: mesos::v1::mod_NetworkInfo::Protocol::IPv4,
-            ..Self::default()
-        };
+        let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(40) => msg.protocol = r.read_enum(bytes)?,
@@ -1235,10 +1222,7 @@ pub struct TCPCheckInfo {
 
 impl<'a> MessageRead<'a> for TCPCheckInfo {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
-        let mut msg = TCPCheckInfo {
-            protocol: mesos::v1::mod_NetworkInfo::Protocol::IPv4,
-            ..Self::default()
-        };
+        let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(16) => msg.protocol = r.read_enum(bytes)?,
@@ -6598,10 +6582,7 @@ pub struct IPAddress<'a> {
 
 impl<'a> MessageRead<'a> for IPAddress<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
-        let mut msg = IPAddress {
-            protocol: mesos::v1::mod_NetworkInfo::Protocol::IPv4,
-            ..Self::default()
-        };
+        let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.protocol = r.read_enum(bytes)?,
@@ -7229,10 +7210,7 @@ pub struct DockerInfo<'a> {
 
 impl<'a> MessageRead<'a> for DockerInfo<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
-        let mut msg = DockerInfo {
-            network: mesos::v1::mod_ContainerInfo::mod_DockerInfo::Network::HOST,
-            ..Self::default()
-        };
+        let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.image = r.read_string(bytes).map(Cow::Borrowed)?,

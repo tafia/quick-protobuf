@@ -7,21 +7,21 @@ use std::borrow::Cow;
 #[test]
 fn test1() {
     let mut test1 = Test1::default();
-    test1.a = Some(150);
+    test1.a = 150;
     test_serialize_deserialize!("08 96 01", &test1, Test1);
 }
 
 #[test]
 fn test2() {
     let mut test2 = Test2::default();
-    test2.b = Some(Cow::Borrowed("testing"));
+    test2.b = Cow::Borrowed("testing");
     test_serialize_deserialize!("12 07 74 65 73 74 69 6e 67", &test2, Test2);
 }
 
 #[test]
 fn test3() {
     let mut test1 = Test1::default();
-    test1.a = Some(150);
+    test1.a = 150;
     let mut test3 = Test3::default();
     test3.c = Some(test1);
     test_serialize_deserialize!("1a 03 08 96 01", &test3, Test3);
@@ -48,6 +48,7 @@ fn test_read_packed_expect_unpacked() {
     test_packed_unpacked.packed = vec![17i32, 1000];
     test_packed_unpacked.unpacked = Vec::new();
     test_deserialize!("2a 03 11 e8 07", &test_packed_unpacked, TestPackedUnpacked);
+    test_serialize_deserialize_length_delimited!(&test_packed_unpacked, TestPackedUnpacked);
 }
 
 #[test]
@@ -83,22 +84,22 @@ fn test_read_junk() {
 #[test]
 fn test_types_singular() {
     let mut message = TestTypesSingular::default();
-    message.double_field = Some(19f64);
-    message.float_field = Some(20f32);
-    message.int32_field = Some(21);
-    message.int64_field = Some(-22);
-    message.uint32_field = Some(23);
-    message.uint64_field = Some(24);
-    message.sint32_field = Some(-25);
-    message.sint64_field = Some(26);
-    message.fixed32_field = Some(27);
-    message.fixed64_field = Some(28);
-    message.sfixed32_field = Some(-29);
-    message.sfixed64_field = Some(30);
-    message.bool_field = Some(true);
-    message.string_field = Some(Cow::Borrowed("thirty two"));
-    message.bytes_field = Some(Cow::Owned(vec![33u8, 34]));
-    message.enum_field = Some(TestEnumDescriptor::BLUE);
+    message.double_field = 19f64;
+    message.float_field = 20f32;
+    message.int32_field = 21;
+    message.int64_field = -22;
+    message.uint32_field = 23;
+    message.uint64_field = 24;
+    message.sint32_field = -25;
+    message.sint64_field = 26;
+    message.fixed32_field = 27;
+    message.fixed64_field = 28;
+    message.sfixed32_field = -29;
+    message.sfixed64_field = 30;
+    message.bool_field = true;
+    message.string_field = Cow::Borrowed("thirty two");
+    message.bytes_field = Cow::Owned(vec![33u8, 34]);
+    message.enum_field = TestEnumDescriptor::BLUE;
     test_serialize_deserialize_length_delimited!(&message, TestTypesSingular);
 }
 
@@ -156,7 +157,7 @@ fn test_types_repeated_packed() {
 #[test]
 fn test_default_instance() {
     let d = TestDefaultInstance::default();
-    assert_eq!(None, d.field.and_then(|f| f.s));
+    assert_eq!(None, d.field.and_then(|f| Some(f.s)));
 }
 
 // #[test]
@@ -230,12 +231,12 @@ fn test_truncated_repeated_packed() {
 fn test_bug_sint() {
     {
         let mut x = TestBugSint::default();
-        x.s32 = Some(-1);
+        x.s32 = -1;
         test_serialize_deserialize!("08 01", &x, TestBugSint);
     }
     {
         let mut x = TestBugSint::default();
-        x.s64 = Some(-2);
+        x.s64 = -2;
         test_serialize_deserialize!("10 03", &x, TestBugSint);
     }
 }

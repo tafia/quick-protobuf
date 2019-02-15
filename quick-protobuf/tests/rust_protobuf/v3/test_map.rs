@@ -8,7 +8,7 @@ use std::borrow::Cow;
 fn test_map() {
     let mut map = TestMap::default();
     let mut entry = TestMapEntry::default();
-    entry.v = Some(10);
+    entry.v = 10;
 
     test_serialize_deserialize!("", &map, TestMap);
 
@@ -27,7 +27,7 @@ fn test_map_with_object() {
     let mut map = TestMap::default();
 
     let mut entry = TestMapEntry::default();
-    entry.v = Some(10);
+    entry.v = 10;
 
     test_serialize_deserialize!("", &map, TestMap);
 

@@ -39,7 +39,7 @@ impl<'a> From<&'a str> for FooEnum {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct BarMessage {
-    pub b_required_int32: i32,
+    pub b_int32: i32,
 }
 
 impl<'a> MessageRead<'a> for BarMessage {
@@ -47,7 +47,7 @@ impl<'a> MessageRead<'a> for BarMessage {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(8) => msg.b_required_int32 = r.read_int32(bytes)?,
+                Ok(8) => msg.b_int32 = r.read_int32(bytes)?,
                 Ok(t) => {
                     r.read_unknown(bytes, t)?;
                 }
@@ -60,43 +60,51 @@ impl<'a> MessageRead<'a> for BarMessage {
 
 impl MessageWrite for BarMessage {
     fn get_size(&self) -> usize {
-        0 + 1 + sizeof_varint(*(&self.b_required_int32) as u64)
+        0 + if self.b_int32 == 0i32 {
+            0
+        } else {
+            1 + sizeof_varint(*(&self.b_int32) as u64)
+        }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        w.write_with_tag(8, |w| w.write_int32(*&self.b_required_int32))?;
+        if self.b_int32 != 0i32 {
+            w.write_with_tag(8, |w| w.write_int32(*&self.b_int32))?;
+        }
         Ok(())
     }
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct FooMessage<'a> {
-    pub f_int32: Option<i32>,
-    pub f_int64: Option<i64>,
-    pub f_uint32: Option<u32>,
-    pub f_uint64: Option<u64>,
-    pub f_sint32: Option<i32>,
+    pub f_int32: i32,
+    pub f_int64: i64,
+    pub f_uint32: u32,
+    pub f_uint64: u64,
+    pub f_sint32: i32,
     pub f_sint64: i64,
     pub f_bool: bool,
-    pub f_FooEnum: Option<FooEnum>,
-    pub f_fixed64: Option<u64>,
-    pub f_sfixed64: Option<i64>,
+    pub f_FooEnum: FooEnum,
+    pub f_fixed64: u64,
+    pub f_sfixed64: i64,
     pub f_fixed32: u32,
-    pub f_sfixed32: Option<i32>,
-    pub f_double: Option<f64>,
-    pub f_float: Option<f32>,
-    pub f_bytes: Option<Cow<'a, [u8]>>,
-    pub f_string: Option<Cow<'a, str>>,
+    pub f_sfixed32: i32,
+    pub f_double: f64,
+    pub f_float: f32,
+    pub f_bytes: Cow<'a, [u8]>,
+    pub f_string: Cow<'a, str>,
     pub f_self_message: Option<Box<FooMessage<'a>>>,
     pub f_bar_message: Option<BarMessage>,
     pub f_repeated_int32: Vec<i32>,
     pub f_repeated_packed_int32: Vec<i32>,
     pub f_repeated_packed_float: Cow<'a, [f32]>,
     pub f_imported: Option<a::b::ImportedMessage>,
-    pub f_baz: Option<BazMessage>,
+    pub f_baz: Option<BazMessage<'a>>,
     pub f_nested: Option<mod_BazMessage::Nested>,
-    pub f_nested_enum: Option<mod_BazMessage::mod_Nested::NestedEnum>,
+    pub f_nested_enum: mod_BazMessage::mod_Nested::NestedEnum,
     pub f_map: HashMap<Cow<'a, str>, i32>,
+    pub f_repeated_string: Vec<Cow<'a, str>>,
+    pub f_repeated_baz_message: Vec<BazMessage<'a>>,
     pub test_oneof: mod_FooMessage::OneOftest_oneof<'a>,
 }
 
@@ -109,27 +117,29 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
         };
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(8) => msg.f_int32 = Some(r.read_int32(bytes)?),
-                Ok(16) => msg.f_int64 = Some(r.read_int64(bytes)?),
-                Ok(24) => msg.f_uint32 = Some(r.read_uint32(bytes)?),
-                Ok(32) => msg.f_uint64 = Some(r.read_uint64(bytes)?),
-                Ok(40) => msg.f_sint32 = Some(r.read_sint32(bytes)?),
+                Ok(8) => msg.f_int32 = r.read_int32(bytes)?,
+                Ok(16) => msg.f_int64 = r.read_int64(bytes)?,
+                Ok(24) => msg.f_uint32 = r.read_uint32(bytes)?,
+                Ok(32) => msg.f_uint64 = r.read_uint64(bytes)?,
+                Ok(40) => msg.f_sint32 = r.read_sint32(bytes)?,
                 Ok(48) => msg.f_sint64 = r.read_sint64(bytes)?,
                 Ok(56) => msg.f_bool = r.read_bool(bytes)?,
-                Ok(64) => msg.f_FooEnum = Some(r.read_enum(bytes)?),
-                Ok(73) => msg.f_fixed64 = Some(r.read_fixed64(bytes)?),
-                Ok(81) => msg.f_sfixed64 = Some(r.read_sfixed64(bytes)?),
+                Ok(64) => msg.f_FooEnum = r.read_enum(bytes)?,
+                Ok(73) => msg.f_fixed64 = r.read_fixed64(bytes)?,
+                Ok(81) => msg.f_sfixed64 = r.read_sfixed64(bytes)?,
                 Ok(93) => msg.f_fixed32 = r.read_fixed32(bytes)?,
-                Ok(101) => msg.f_sfixed32 = Some(r.read_sfixed32(bytes)?),
-                Ok(105) => msg.f_double = Some(r.read_double(bytes)?),
-                Ok(117) => msg.f_float = Some(r.read_float(bytes)?),
-                Ok(122) => msg.f_bytes = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
-                Ok(130) => msg.f_string = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(101) => msg.f_sfixed32 = r.read_sfixed32(bytes)?,
+                Ok(105) => msg.f_double = r.read_double(bytes)?,
+                Ok(117) => msg.f_float = r.read_float(bytes)?,
+                Ok(122) => msg.f_bytes = r.read_bytes(bytes).map(Cow::Borrowed)?,
+                Ok(130) => msg.f_string = r.read_string(bytes).map(Cow::Borrowed)?,
                 Ok(138) => {
                     msg.f_self_message = Some(Box::new(r.read_message::<FooMessage>(bytes)?))
                 }
                 Ok(146) => msg.f_bar_message = Some(r.read_message::<BarMessage>(bytes)?),
-                Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
+                Ok(154) => {
+                    msg.f_repeated_int32 = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?
+                }
                 Ok(162) => {
                     msg.f_repeated_packed_int32 =
                         r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?
@@ -138,7 +148,7 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
                 Ok(178) => msg.f_imported = Some(r.read_message::<a::b::ImportedMessage>(bytes)?),
                 Ok(186) => msg.f_baz = Some(r.read_message::<BazMessage>(bytes)?),
                 Ok(194) => msg.f_nested = Some(r.read_message::<mod_BazMessage::Nested>(bytes)?),
-                Ok(200) => msg.f_nested_enum = Some(r.read_enum(bytes)?),
+                Ok(200) => msg.f_nested_enum = r.read_enum(bytes)?,
                 Ok(210) => {
                     let (key, value) = r.read_map(
                         bytes,
@@ -147,6 +157,12 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
                     )?;
                     msg.f_map.insert(key, value);
                 }
+                Ok(242) => msg
+                    .f_repeated_string
+                    .push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(250) => msg
+                    .f_repeated_baz_message
+                    .push(r.read_message::<BazMessage>(bytes)?),
                 Ok(216) => {
                     msg.test_oneof = mod_FooMessage::OneOftest_oneof::f1(r.read_int32(bytes)?)
                 }
@@ -170,54 +186,54 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
 
 impl<'a> MessageWrite for FooMessage<'a> {
     fn get_size(&self) -> usize {
-        0 + self
-            .f_int32
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .f_int64
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .f_uint32
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .f_uint64
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .f_sint32
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_sint32(*(m)))
-            + if self.f_sint64 == 4i64 {
-                0
-            } else {
-                1 + sizeof_sint64(*(&self.f_sint64))
-            }
-            + if self.f_bool == true {
-                0
-            } else {
-                1 + sizeof_varint(*(&self.f_bool) as u64)
-            }
-            + self
-                .f_FooEnum
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self.f_fixed64.as_ref().map_or(0, |_| 1 + 8)
-            + self.f_sfixed64.as_ref().map_or(0, |_| 1 + 8)
+        0 + if self.f_int32 == 0i32 {
+            0
+        } else {
+            1 + sizeof_varint(*(&self.f_int32) as u64)
+        } + if self.f_int64 == 0i64 {
+            0
+        } else {
+            1 + sizeof_varint(*(&self.f_int64) as u64)
+        } + if self.f_uint32 == 0u32 {
+            0
+        } else {
+            1 + sizeof_varint(*(&self.f_uint32) as u64)
+        } + if self.f_uint64 == 0u64 {
+            0
+        } else {
+            1 + sizeof_varint(*(&self.f_uint64) as u64)
+        } + if self.f_sint32 == 0i32 {
+            0
+        } else {
+            1 + sizeof_sint32(*(&self.f_sint32))
+        } + if self.f_sint64 == 4i64 {
+            0
+        } else {
+            1 + sizeof_sint64(*(&self.f_sint64))
+        } + if self.f_bool == true {
+            0
+        } else {
+            1 + sizeof_varint(*(&self.f_bool) as u64)
+        } + if self.f_FooEnum == data_types::FooEnum::FIRST_VALUE {
+            0
+        } else {
+            1 + sizeof_varint(*(&self.f_FooEnum) as u64)
+        } + if self.f_fixed64 == 0u64 { 0 } else { 1 + 8 }
+            + if self.f_sfixed64 == 0i64 { 0 } else { 1 + 8 }
             + if self.f_fixed32 == 0u32 { 0 } else { 1 + 4 }
-            + self.f_sfixed32.as_ref().map_or(0, |_| 1 + 4)
-            + self.f_double.as_ref().map_or(0, |_| 1 + 8)
-            + self.f_float.as_ref().map_or(0, |_| 1 + 4)
-            + self
-                .f_bytes
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_len((m).len()))
-            + self
-                .f_string
-                .as_ref()
-                .map_or(0, |m| 2 + sizeof_len((m).len()))
+            + if self.f_sfixed32 == 0i32 { 0 } else { 1 + 4 }
+            + if self.f_double == 0f64 { 0 } else { 1 + 8 }
+            + if self.f_float == 0f32 { 0 } else { 1 + 4 }
+            + if self.f_bytes == Cow::Borrowed(b"") {
+                0
+            } else {
+                1 + sizeof_len((&self.f_bytes).len())
+            }
+            + if self.f_string == Cow::Borrowed("") {
+                0
+            } else {
+                2 + sizeof_len((&self.f_string).len())
+            }
             + self
                 .f_self_message
                 .as_ref()
@@ -226,11 +242,16 @@ impl<'a> MessageWrite for FooMessage<'a> {
                 .f_bar_message
                 .as_ref()
                 .map_or(0, |m| 2 + sizeof_len((m).get_size()))
-            + self
-                .f_repeated_int32
-                .iter()
-                .map(|s| 2 + sizeof_varint(*(s) as u64))
-                .sum::<usize>()
+            + if self.f_repeated_int32.is_empty() {
+                0
+            } else {
+                2 + sizeof_len(
+                    self.f_repeated_int32
+                        .iter()
+                        .map(|s| sizeof_varint(*(s) as u64))
+                        .sum::<usize>(),
+                )
+            }
             + if self.f_repeated_packed_int32.is_empty() {
                 0
             } else {
@@ -258,16 +279,27 @@ impl<'a> MessageWrite for FooMessage<'a> {
                 .f_nested
                 .as_ref()
                 .map_or(0, |m| 2 + sizeof_len((m).get_size()))
-            + self
-                .f_nested_enum
-                .as_ref()
-                .map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
+            + if self.f_nested_enum == data_types::mod_BazMessage::mod_Nested::NestedEnum::Foo {
+                0
+            } else {
+                2 + sizeof_varint(*(&self.f_nested_enum) as u64)
+            }
             + self
                 .f_map
                 .iter()
                 .map(|(k, v)| {
                     2 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))
                 })
+                .sum::<usize>()
+            + self
+                .f_repeated_string
+                .iter()
+                .map(|s| 2 + sizeof_len((s).len()))
+                .sum::<usize>()
+            + self
+                .f_repeated_baz_message
+                .iter()
+                .map(|s| 2 + sizeof_len((s).get_size()))
                 .sum::<usize>()
             + match self.test_oneof {
                 mod_FooMessage::OneOftest_oneof::f1(ref m) => 2 + sizeof_varint(*(m) as u64),
@@ -278,20 +310,20 @@ impl<'a> MessageWrite for FooMessage<'a> {
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.f_int32 {
-            w.write_with_tag(8, |w| w.write_int32(*s))?;
+        if self.f_int32 != 0i32 {
+            w.write_with_tag(8, |w| w.write_int32(*&self.f_int32))?;
         }
-        if let Some(ref s) = self.f_int64 {
-            w.write_with_tag(16, |w| w.write_int64(*s))?;
+        if self.f_int64 != 0i64 {
+            w.write_with_tag(16, |w| w.write_int64(*&self.f_int64))?;
         }
-        if let Some(ref s) = self.f_uint32 {
-            w.write_with_tag(24, |w| w.write_uint32(*s))?;
+        if self.f_uint32 != 0u32 {
+            w.write_with_tag(24, |w| w.write_uint32(*&self.f_uint32))?;
         }
-        if let Some(ref s) = self.f_uint64 {
-            w.write_with_tag(32, |w| w.write_uint64(*s))?;
+        if self.f_uint64 != 0u64 {
+            w.write_with_tag(32, |w| w.write_uint64(*&self.f_uint64))?;
         }
-        if let Some(ref s) = self.f_sint32 {
-            w.write_with_tag(40, |w| w.write_sint32(*s))?;
+        if self.f_sint32 != 0i32 {
+            w.write_with_tag(40, |w| w.write_sint32(*&self.f_sint32))?;
         }
         if self.f_sint64 != 4i64 {
             w.write_with_tag(48, |w| w.write_sint64(*&self.f_sint64))?;
@@ -299,32 +331,32 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if self.f_bool != true {
             w.write_with_tag(56, |w| w.write_bool(*&self.f_bool))?;
         }
-        if let Some(ref s) = self.f_FooEnum {
-            w.write_with_tag(64, |w| w.write_enum(*s as i32))?;
+        if self.f_FooEnum != data_types::FooEnum::FIRST_VALUE {
+            w.write_with_tag(64, |w| w.write_enum(*&self.f_FooEnum as i32))?;
         }
-        if let Some(ref s) = self.f_fixed64 {
-            w.write_with_tag(73, |w| w.write_fixed64(*s))?;
+        if self.f_fixed64 != 0u64 {
+            w.write_with_tag(73, |w| w.write_fixed64(*&self.f_fixed64))?;
         }
-        if let Some(ref s) = self.f_sfixed64 {
-            w.write_with_tag(81, |w| w.write_sfixed64(*s))?;
+        if self.f_sfixed64 != 0i64 {
+            w.write_with_tag(81, |w| w.write_sfixed64(*&self.f_sfixed64))?;
         }
         if self.f_fixed32 != 0u32 {
             w.write_with_tag(93, |w| w.write_fixed32(*&self.f_fixed32))?;
         }
-        if let Some(ref s) = self.f_sfixed32 {
-            w.write_with_tag(101, |w| w.write_sfixed32(*s))?;
+        if self.f_sfixed32 != 0i32 {
+            w.write_with_tag(101, |w| w.write_sfixed32(*&self.f_sfixed32))?;
         }
-        if let Some(ref s) = self.f_double {
-            w.write_with_tag(105, |w| w.write_double(*s))?;
+        if self.f_double != 0f64 {
+            w.write_with_tag(105, |w| w.write_double(*&self.f_double))?;
         }
-        if let Some(ref s) = self.f_float {
-            w.write_with_tag(117, |w| w.write_float(*s))?;
+        if self.f_float != 0f32 {
+            w.write_with_tag(117, |w| w.write_float(*&self.f_float))?;
         }
-        if let Some(ref s) = self.f_bytes {
-            w.write_with_tag(122, |w| w.write_bytes(&**s))?;
+        if self.f_bytes != Cow::Borrowed(b"") {
+            w.write_with_tag(122, |w| w.write_bytes(&**&self.f_bytes))?;
         }
-        if let Some(ref s) = self.f_string {
-            w.write_with_tag(130, |w| w.write_string(&**s))?;
+        if self.f_string != Cow::Borrowed("") {
+            w.write_with_tag(130, |w| w.write_string(&**&self.f_string))?;
         }
         if let Some(ref s) = self.f_self_message {
             w.write_with_tag(138, |w| w.write_message(&**s))?;
@@ -332,9 +364,12 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_bar_message {
             w.write_with_tag(146, |w| w.write_message(s))?;
         }
-        for s in &self.f_repeated_int32 {
-            w.write_with_tag(152, |w| w.write_int32(*s))?;
-        }
+        w.write_packed_with_tag(
+            154,
+            &self.f_repeated_int32,
+            |w, m| w.write_int32(*m),
+            &|m| sizeof_varint(*(m) as u64),
+        )?;
         w.write_packed_with_tag(
             162,
             &self.f_repeated_packed_int32,
@@ -351,8 +386,8 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if let Some(ref s) = self.f_nested {
             w.write_with_tag(194, |w| w.write_message(s))?;
         }
-        if let Some(ref s) = self.f_nested_enum {
-            w.write_with_tag(200, |w| w.write_enum(*s as i32))?;
+        if self.f_nested_enum != data_types::mod_BazMessage::mod_Nested::NestedEnum::Foo {
+            w.write_with_tag(200, |w| w.write_enum(*&self.f_nested_enum as i32))?;
         }
         for (k, v) in self.f_map.iter() {
             w.write_with_tag(210, |w| {
@@ -364,6 +399,12 @@ impl<'a> MessageWrite for FooMessage<'a> {
                     |w| w.write_int32(*v),
                 )
             })?;
+        }
+        for s in &self.f_repeated_string {
+            w.write_with_tag(242, |w| w.write_string(&**s))?;
+        }
+        for s in &self.f_repeated_baz_message {
+            w.write_with_tag(250, |w| w.write_message(s))?;
         }
         match self.test_oneof {
             mod_FooMessage::OneOftest_oneof::f1(ref m) => {
@@ -402,16 +443,20 @@ pub mod mod_FooMessage {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct BazMessage {
+pub struct BazMessage<'a> {
     pub nested: Option<mod_BazMessage::Nested>,
+    pub b_int64: i64,
+    pub b_string: Cow<'a, str>,
 }
 
-impl<'a> MessageRead<'a> for BazMessage {
+impl<'a> MessageRead<'a> for BazMessage<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.nested = Some(r.read_message::<mod_BazMessage::Nested>(bytes)?),
+                Ok(16) => msg.b_int64 = r.read_int64(bytes)?,
+                Ok(26) => msg.b_string = r.read_string(bytes).map(Cow::Borrowed)?,
                 Ok(t) => {
                     r.read_unknown(bytes, t)?;
                 }
@@ -422,17 +467,33 @@ impl<'a> MessageRead<'a> for BazMessage {
     }
 }
 
-impl MessageWrite for BazMessage {
+impl<'a> MessageWrite for BazMessage<'a> {
     fn get_size(&self) -> usize {
         0 + self
             .nested
             .as_ref()
             .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+            + if self.b_int64 == 0i64 {
+                0
+            } else {
+                1 + sizeof_varint(*(&self.b_int64) as u64)
+            }
+            + if self.b_string == Cow::Borrowed("") {
+                0
+            } else {
+                1 + sizeof_len((&self.b_string).len())
+            }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.nested {
             w.write_with_tag(10, |w| w.write_message(s))?;
+        }
+        if self.b_int64 != 0i64 {
+            w.write_with_tag(16, |w| w.write_int64(*&self.b_int64))?;
+        }
+        if self.b_string != Cow::Borrowed("") {
+            w.write_with_tag(26, |w| w.write_string(&**&self.b_string))?;
         }
         Ok(())
     }
@@ -444,7 +505,7 @@ pub mod mod_BazMessage {
 
     #[derive(Debug, Default, PartialEq, Clone)]
     pub struct Nested {
-        pub f_nested: mod_BazMessage::mod_Nested::NestedMessage,
+        pub f_nested: Option<mod_BazMessage::mod_Nested::NestedMessage>,
     }
 
     impl<'a> MessageRead<'a> for Nested {
@@ -453,8 +514,9 @@ pub mod mod_BazMessage {
             while !r.is_eof() {
                 match r.next_tag(bytes) {
                     Ok(10) => {
-                        msg.f_nested =
-                            r.read_message::<mod_BazMessage::mod_Nested::NestedMessage>(bytes)?
+                        msg.f_nested = Some(
+                            r.read_message::<mod_BazMessage::mod_Nested::NestedMessage>(bytes)?,
+                        )
                     }
                     Ok(t) => {
                         r.read_unknown(bytes, t)?;
@@ -468,11 +530,16 @@ pub mod mod_BazMessage {
 
     impl MessageWrite for Nested {
         fn get_size(&self) -> usize {
-            0 + 1 + sizeof_len((&self.f_nested).get_size())
+            0 + self
+                .f_nested
+                .as_ref()
+                .map_or(0, |m| 1 + sizeof_len((m).get_size()))
         }
 
         fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-            w.write_with_tag(10, |w| w.write_message(&self.f_nested))?;
+            if let Some(ref s) = self.f_nested {
+                w.write_with_tag(10, |w| w.write_message(s))?;
+            }
             Ok(())
         }
     }
@@ -504,11 +571,17 @@ pub mod mod_BazMessage {
 
         impl MessageWrite for NestedMessage {
             fn get_size(&self) -> usize {
-                0 + 1 + sizeof_varint(*(&self.f_nested) as u64)
+                0 + if self.f_nested == 0i32 {
+                    0
+                } else {
+                    1 + sizeof_varint(*(&self.f_nested) as u64)
+                }
             }
 
             fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-                w.write_with_tag(8, |w| w.write_int32(*&self.f_nested))?;
+                if self.f_nested != 0i32 {
+                    w.write_with_tag(8, |w| w.write_int32(*&self.f_nested))?;
+                }
                 Ok(())
             }
         }
@@ -550,4 +623,42 @@ pub mod mod_BazMessage {
 
     }
 
+}
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct RepeatedMessage {
+    pub bar_message: Vec<BarMessage>,
+}
+
+impl<'a> MessageRead<'a> for RepeatedMessage {
+    fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
+        let mut msg = Self::default();
+        while !r.is_eof() {
+            match r.next_tag(bytes) {
+                Ok(10) => msg.bar_message.push(r.read_message::<BarMessage>(bytes)?),
+                Ok(t) => {
+                    r.read_unknown(bytes, t)?;
+                }
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(msg)
+    }
+}
+
+impl MessageWrite for RepeatedMessage {
+    fn get_size(&self) -> usize {
+        0 + self
+            .bar_message
+            .iter()
+            .map(|s| 1 + sizeof_len((s).get_size()))
+            .sum::<usize>()
+    }
+
+    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+        for s in &self.bar_message {
+            w.write_with_tag(10, |w| w.write_message(s))?;
+        }
+        Ok(())
+    }
 }

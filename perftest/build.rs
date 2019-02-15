@@ -17,7 +17,8 @@ fn main() {
         customize: protobuf_codegen_pure::Customize {
             ..Default::default()
         },
-    }).expect("protoc");
+    })
+    .expect("protoc");
 
     // quick-protobuf
     let quick_dest = Path::new(&out_dir).join("perftest_data_quick.rs");

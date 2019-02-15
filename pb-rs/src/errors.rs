@@ -42,10 +42,8 @@ pub enum Error {
     )]
     InvalidImport(String),
     /// Empty read
-    #[fail(
-        display = "No message or enum were read;\
-                   either definition might be invalid or there were only unsupported structures"
-    )]
+    #[fail(display = "No message or enum were read;\
+                   either definition might be invalid or there were only unsupported structures")]
     EmptyRead,
     /// enum or message not found
     #[fail(display = "Could not find message or enum {}", _0)]
@@ -58,10 +56,7 @@ pub enum Error {
     /// read_fn implementation for Maps
     #[fail(display = "There should be a special case for maps")]
     ReadFnMap,
-    #[fail(
-        display = "Messages {:?} are cyclic (missing an optional field)",
-        _0
-    )]
+    #[fail(display = "Messages {:?} are cyclic (missing an optional field)", _0)]
     Cycle(Vec<String>),
     /// --output and --output_directory both used
     #[fail(display = "only one of --output or --output_directory allowed")]
