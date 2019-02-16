@@ -48,6 +48,7 @@ fn main() {
         no_output: false,
         error_cycle: false,
         headers: false,
+        dont_use_cow: false,
         custom_struct_derive: vec![],
         custom_rpc_generator: Box::new(|rpc, writer| generate_rpc_add_1_test(rpc, writer))
     };

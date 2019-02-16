@@ -70,18 +70,24 @@ fn run() -> Result<(), ::failure::Error> {
                 .required(false)
                 .help("Do not add module comments and module attributes in generated file"),
         ).arg(
-            Arg::with_name("CUSTOMSTRUCTDERIVE")
+            Arg::with_name("CUSTOM_STRUCT_DERIVE")
                 .long("custom_struct_derive")
                 .short("C")
                 .required(false)
                 .help("The comma separated values to add to #[derive(...)] for every struct"),
+        ).arg(
+            Arg::with_name("DONT_USE_COW")
+                .required(false)
+                .long("dont_use_cow")
+                .short("c")
+                .help("Don't use Cow for String and Byte types"),
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
     let include_paths = path_vec(values_t!(matches, "INCLUDE_PATH", String));
     let out_file = matches.value_of("OUTPUT").map(|o| PathBuf::from(o));
     let out_dir = matches.value_of("OUTPUT_DIR").map(|o| PathBuf::from(o));
-    let custom_struct_derive: Vec<String> = matches.value_of("CUSTOMSTRUCTDERIVE").unwrap_or("")
+    let custom_struct_derive: Vec<String> = matches.value_of("CUSTOM_STRUCT_DERIVE").unwrap_or("")
         .split(",").map(|s| s.to_string()).collect();
 
     let compiler = ConfigBuilder::new(
@@ -93,7 +99,8 @@ fn run() -> Result<(), ::failure::Error> {
     .single_module(matches.is_present("SINGLE_MOD"))
     .no_output(matches.is_present("NO_OUTPUT"))
     .error_cycle(matches.is_present("CYCLE"))
-    .headers(matches.is_present("HEADERS"))
+    .headers(!matches.is_present("HEADERS"))
+    .dont_use_cow(matches.is_present("DONT_USE_COW"))
     .custom_struct_derive(custom_struct_derive);
 
     FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
