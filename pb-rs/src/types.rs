@@ -535,6 +535,13 @@ impl Field {
                     "msg.{} = r.read_packed_fixed(bytes)?.into(),",
                     name
                 )?;
+            }*/
+            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
+                writeln!(
+                    w,
+                    "msg.{} = r.read_packed_fixed(bytes)?.into(),",
+                    name
+                )?;
             }
             Frequency::Repeated if self.packed() => {
                 writeln!(
@@ -1305,6 +1312,14 @@ pub struct OneOf {
 }
 
 impl OneOf {
+    fn convert_field_types(&mut self, from: &FieldType, to: &FieldType) {       
+        for f in self.fields.iter_mut() {
+            if f.typ == *from {
+                f.typ = to.clone();
+            }
+        }
+    }
+
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
         self.fields
             .iter()
