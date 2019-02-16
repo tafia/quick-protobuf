@@ -181,8 +181,8 @@ named!(
             tag!("fixed64") => { |_| FieldType::Fixed64 } |
             tag!("sfixed64") => { |_| FieldType::Sfixed64 } |
             tag!("bool") => { |_| FieldType::Bool } |
-            tag!("string") => { |_| FieldType::String_ } |
-            tag!("bytes") => { |_| FieldType::Bytes } |
+            tag!("string") => { |_| FieldType::StringCow } |
+            tag!("bytes") => { |_| FieldType::BytesCow } |
             tag!("float") => { |_| FieldType::Float } |
             tag!("double") => { |_| FieldType::Double } |
             map_field => { |(k, v)| FieldType::Map(Box::new(k), Box::new(v)) } |
@@ -565,6 +565,7 @@ mod test {
             match mess.fields[0].typ {
                 FieldType::Map(ref key, ref value) => match (&**key, &**value) {
                     (&FieldType::String_, &FieldType::Int32) => (),
+                    (&FieldType::StringCow, &FieldType::Int32) => (),
                     _ => panic!(
                         "Expecting Map<String, Int32> found Map<{:?}, {:?}>",
                         key, value
