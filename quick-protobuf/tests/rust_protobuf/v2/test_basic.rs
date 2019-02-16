@@ -14,7 +14,7 @@ fn test1() {
 #[test]
 fn test2() {
     let mut test2 = Test2::default();
-    test2.b = Cow::Borrowed("testing");
+    test2.b = "testing".into();
     test_serialize_deserialize!("12 07 74 65 73 74 69 6e 67", &test2, Test2);
 }
 
@@ -96,8 +96,8 @@ fn test_types_singular() {
     message.sfixed32_field = Some(-29);
     message.sfixed64_field = Some(30);
     message.bool_field = Some(true);
-    message.string_field = Some(Cow::Borrowed("thirty two"));
-    message.bytes_field = Some(Cow::Owned(vec![33u8, 34]));
+    message.string_field = Some("thirty two".into());
+    message.bytes_field = Some(vec![33u8, 34].into());
     message.enum_field = Some(TestEnumDescriptor::BLUE);
     test_serialize_deserialize_length_delimited!(&message, TestTypesSingular);
 }
@@ -118,8 +118,8 @@ fn test_types_repeated() {
     message.sfixed32_field = vec![29i32, -30];
     message.sfixed64_field = vec![30i64];
     message.bool_field = vec![true, true];
-    message.string_field = vec![Cow::Borrowed("thirty two"), Cow::Borrowed("thirty three")];
-    message.bytes_field = vec![Cow::Owned(vec![33u8, 34]), Cow::Owned(vec![35u8])];
+    message.string_field = vec!["thirty two".into(), "thirty three".into()];
+    message.bytes_field = vec![vec![33u8, 34].into(), vec![35u8].into()];
     message.enum_field = vec![TestEnumDescriptor::BLUE, TestEnumDescriptor::GREEN];
     test_serialize_deserialize_length_delimited!(&message, TestTypesRepeated);
 }
@@ -127,21 +127,21 @@ fn test_types_repeated() {
 #[test]
 fn test_types_repeated_packed() {
     let mut message = TestTypesRepeatedPacked::default();
-    message.double_field = Cow::Owned(vec![19f64, 20f64]);
-    message.float_field = Cow::Owned(vec![20f32]);
+    message.double_field = vec![19f64, 20f64].into();
+    message.float_field = vec![20f32].into();
     message.int32_field = vec![21i32, -22, 23];
     message.int64_field = vec![22i64];
     message.uint32_field = vec![23u32, 24];
     message.uint64_field = vec![24u64];
     message.sint32_field = vec![25i32];
     message.sint64_field = vec![26i64, -27];
-    message.fixed32_field = Cow::Owned(vec![27u32]);
-    message.fixed64_field = Cow::Owned(vec![28u64]);
-    message.sfixed32_field = Cow::Owned(vec![29i32, -30]);
-    message.sfixed64_field = Cow::Owned(vec![30i64]);
+    message.fixed32_field = vec![27u32].into();
+    message.fixed64_field = vec![28u64].into();
+    message.sfixed32_field = vec![29i32, -30].into();
+    message.sfixed64_field = vec![30i64].into();
     message.bool_field = vec![true, true];
-    message.string_field = vec![Cow::Borrowed("thirty two"), Cow::Borrowed("thirty three")];
-    message.bytes_field = vec![Cow::Owned(vec![33u8, 34]), Cow::Owned(vec![35u8])];
+    message.string_field = vec!["thirty two".into(), "thirty three".into()];
+    message.bytes_field = vec![vec![33u8, 34].into(), vec![35u8].into()];
     message.enum_field = vec![TestEnumDescriptor::BLUE, TestEnumDescriptor::GREEN];
     test_serialize_deserialize_length_delimited!(&message, TestTypesRepeatedPacked);
 }
