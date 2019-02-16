@@ -66,6 +66,7 @@ pub struct ConfigBuilder {
     no_output: bool,
     error_cycle: bool,
     headers: bool,
+    dont_use_cow: bool,
     custom_struct_derive: Vec<String>,
 }
 
@@ -155,6 +156,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Use Cow<_,_> for Strings and Bytes
+    pub fn dont_use_cow(mut self, val: bool) -> Self {
+        self.dont_use_cow = val;
+        self
+    }
+
     /// Build Config from this ConfigBuilder
     pub fn build(self) -> Vec<Config> {
         self.in_files
@@ -178,6 +185,7 @@ impl ConfigBuilder {
                     no_output: self.no_output,
                     error_cycle: self.error_cycle,
                     headers: self.headers,
+                    dont_use_cow: self.dont_use_cow, //Change this to false to not use cow for v2 and v3 tests
                     custom_struct_derive: self.custom_struct_derive.clone(),
                     custom_rpc_generator: Box::new(|_,_| Ok(())),
                 }
