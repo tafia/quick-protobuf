@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'test_basic_pb.proto' file
+// Automatically generated rust module for 'test_basic_pb.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -156,7 +156,7 @@ impl<'a> MessageRead<'a> for Test4 {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(34) => msg.d = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
+                Ok(34) => msg.d = r.read_packed(bytes, |r, bytes| Ok(r.read_int32(bytes)?))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -189,7 +189,7 @@ impl<'a> MessageRead<'a> for TestPackedUnpacked {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(32) => msg.unpacked.push(r.read_int32(bytes)?),
-                Ok(42) => msg.packed = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
+                Ok(42) => msg.packed = r.read_packed(bytes, |r, bytes| Ok(r.read_int32(bytes)?))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -640,22 +640,22 @@ impl<'a> MessageRead<'a> for TestTypesRepeatedPacked<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.double_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(18) => msg.float_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(26) => msg.int32_field = r.read_packed(bytes, |r, bytes| r.read_int32(bytes))?,
-                Ok(34) => msg.int64_field = r.read_packed(bytes, |r, bytes| r.read_int64(bytes))?,
-                Ok(42) => msg.uint32_field = r.read_packed(bytes, |r, bytes| r.read_uint32(bytes))?,
-                Ok(50) => msg.uint64_field = r.read_packed(bytes, |r, bytes| r.read_uint64(bytes))?,
-                Ok(58) => msg.sint32_field = r.read_packed(bytes, |r, bytes| r.read_sint32(bytes))?,
-                Ok(66) => msg.sint64_field = r.read_packed(bytes, |r, bytes| r.read_sint64(bytes))?,
-                Ok(74) => msg.fixed32_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(82) => msg.fixed64_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(90) => msg.sfixed32_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(98) => msg.sfixed64_field = Cow::Borrowed(r.read_packed_fixed(bytes)?),
-                Ok(106) => msg.bool_field = r.read_packed(bytes, |r, bytes| r.read_bool(bytes))?,
+                Ok(10) => msg.double_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(18) => msg.float_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(26) => msg.int32_field = r.read_packed(bytes, |r, bytes| Ok(r.read_int32(bytes)?))?,
+                Ok(34) => msg.int64_field = r.read_packed(bytes, |r, bytes| Ok(r.read_int64(bytes)?))?,
+                Ok(42) => msg.uint32_field = r.read_packed(bytes, |r, bytes| Ok(r.read_uint32(bytes)?))?,
+                Ok(50) => msg.uint64_field = r.read_packed(bytes, |r, bytes| Ok(r.read_uint64(bytes)?))?,
+                Ok(58) => msg.sint32_field = r.read_packed(bytes, |r, bytes| Ok(r.read_sint32(bytes)?))?,
+                Ok(66) => msg.sint64_field = r.read_packed(bytes, |r, bytes| Ok(r.read_sint64(bytes)?))?,
+                Ok(74) => msg.fixed32_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(82) => msg.fixed64_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(90) => msg.sfixed32_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(98) => msg.sfixed64_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(106) => msg.bool_field = r.read_packed(bytes, |r, bytes| Ok(r.read_bool(bytes)?))?,
                 Ok(114) => msg.string_field.push(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(122) => msg.bytes_field.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
-                Ok(130) => msg.enum_field = r.read_packed(bytes, |r, bytes| r.read_enum(bytes))?,
+                Ok(130) => msg.enum_field = r.read_packed(bytes, |r, bytes| Ok(r.read_enum(bytes)?))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -728,7 +728,7 @@ impl<'a> MessageRead<'a> for TestTruncated<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(18) => msg.ints = Cow::Borrowed(r.read_packed_fixed(bytes)?),
+                Ok(18) => msg.ints = r.read_packed_fixed(bytes)?.into(),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }

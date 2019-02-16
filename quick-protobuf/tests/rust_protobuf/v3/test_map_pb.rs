@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'test_map_pb.proto' file
+// Automatically generated rust module for 'test_map_pb.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -28,11 +28,11 @@ impl<'a> MessageRead<'a> for TestMap<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_uint32(bytes))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_uint32(bytes)?))?;
                     msg.m.insert(key, value);
                 }
                 Ok(18) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| r.read_string(bytes).map(Cow::Borrowed), |r, bytes| r.read_message::<TestMapEntry>(bytes))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_message::<TestMapEntry>(bytes)?))?;
                     msg.mm.insert(key, value);
                 }
                 Ok(t) => { r.read_unknown(bytes, t)?; }

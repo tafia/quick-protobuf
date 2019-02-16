@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'test_ident_pb.proto' file
+// Automatically generated rust module for 'test_ident_pb.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -100,7 +100,7 @@ impl<'a> MessageRead<'a> for TestType<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(18) => msg.struct_pb.push(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(26) => msg.ref_pb = r.read_packed(bytes, |r, bytes| r.read_uint32(bytes))?,
+                Ok(26) => msg.ref_pb = r.read_packed(bytes, |r, bytes| Ok(r.read_uint32(bytes)?))?,
                 Ok(10) => msg.type_pb = mod_TestType::OneOftype_pb::s(r.read_string(bytes).map(Cow::Borrowed)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),

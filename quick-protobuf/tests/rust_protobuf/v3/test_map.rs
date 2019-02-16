@@ -12,12 +12,12 @@ fn test_map() {
 
     test_serialize_deserialize!("", &map, TestMap);
 
-    map.m.insert(Cow::Borrowed("two"), 2);
+    map.m.insert("two".into(), 2);
     test_serialize_deserialize!("0a 07 0a 03 74 77 6f 10 02", &map, TestMap);
 
-    map.m.insert(Cow::Borrowed("sixty six"), 66);
+    map.m.insert("sixty six".into(), 66);
     // Insert map entry sub message
-    map.mm.insert(Cow::Borrowed("map"), entry);
+    map.mm.insert("map".into(), entry);
     // cannot (easily) test hex, because order is not specified
     test_serialize_deserialize_length_delimited!(&map, TestMap);
 }
@@ -31,7 +31,7 @@ fn test_map_with_object() {
 
     test_serialize_deserialize!("", &map, TestMap);
 
-    map.mm.insert(Cow::Borrowed("map"), entry);
+    map.mm.insert("map".into(), entry);
     // cannot (easily) test hex, because order is not specified
     test_serialize_deserialize_length_delimited!(&map, TestMap);
 }

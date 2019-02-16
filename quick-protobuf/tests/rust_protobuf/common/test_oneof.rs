@@ -34,8 +34,8 @@ fn test_types() {
     t(|o| o.one = mod_TestOneof::OneOfone::sfixed32_field(20));
     t(|o| o.one = mod_TestOneof::OneOfone::sfixed64_field(21));
     t(|o| o.one = mod_TestOneof::OneOfone::bool_field(true));
-    t(|o| o.one = mod_TestOneof::OneOfone::string_field(Cow::Borrowed("asas")));
-    t(|o| o.one = mod_TestOneof::OneOfone::bytes_field(Cow::Owned(vec![99, 100])));
+    t(|o| o.one = mod_TestOneof::OneOfone::string_field("asas".into()));
+    t(|o| o.one = mod_TestOneof::OneOfone::bytes_field(vec![99, 100].into()));
     t(|o| o.one = mod_TestOneof::OneOfone::enum_field(EnumForOneof::A));
     t(|o| {
         let mut msg = MessageForOneof::default();
