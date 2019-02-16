@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'test_import_pkg_nested_pb.proto' file
+// Automatically generated rust module for 'test_import_pkg_nested_pb.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
