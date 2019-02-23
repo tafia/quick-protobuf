@@ -292,7 +292,7 @@ named!(
 named!(
     rpc_service<RpcService>,
     do_parse!(
-        dbg!(tag!("service"))
+        tag!("service")
             >> many1!(br)
             >> service_name: dbg!(word)
             >> many0!(br)
