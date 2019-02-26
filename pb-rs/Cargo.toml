@@ -21,4 +21,4 @@ walkdir = "2.2.5"
 
 [features]
 default = []
-generateImplFromForEnums = ['generateImplFromForEnums']
+generateImplFromForEnums = []
