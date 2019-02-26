@@ -1351,6 +1351,31 @@ impl OneOf {
         }
         writeln!(w, "    None,")?;
         writeln!(w, "}}")?;
+
+        if cfg!(feature = "generateImplFromForEnums") {
+            self.generate_impl_from_for_enums(w, desc)
+        } else { 
+            Ok(())
+        }
+    }
+
+    fn generate_impl_from_for_enums<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+        // For the first of each enumeration type, generate an impl From<> for it.
+        let mut handled_fields = Vec::new();
+        for f in &self.fields {
+            let rust_type = f.typ.rust_type(desc)?;
+            if handled_fields.contains(&rust_type) {
+                continue;
+            }
+            writeln!(w, "impl From<{}> for OneOf{} {{", rust_type, self.name)?; // TODO: lifetime.
+            writeln!(w, "   fn from(f: {}) -> OneOf{} {{", rust_type, self.name)?;
+            writeln!(w, "      OneOf{}::{}(f)", self.name, f.name)?;
+            writeln!(w, "   }}")?;
+            writeln!(w, "}}")?;
+
+            handled_fields.push(rust_type);
+        }
+        
         Ok(())
     }
 
