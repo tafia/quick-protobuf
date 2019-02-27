@@ -1458,6 +1458,7 @@ pub struct Config {
     pub dont_use_cow: bool,
     pub custom_struct_derive: Vec<String>,
     pub custom_rpc_generator: RpcGeneratorFunction,
+    pub custom_includes: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1909,7 +1910,7 @@ impl FileDescriptor {
             self.write_headers(w, filename)?;
         }
         self.write_package_start(w)?;
-        self.write_uses(w)?;
+        self.write_uses(w, config)?;
         self.write_imports(w)?;
         self.write_enums(w)?;
         self.write_messages(w, config)?;
@@ -1942,7 +1943,7 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_uses<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         if self.messages.iter().all(|m| m.is_unit()) {
             writeln!(
                 w,
@@ -1970,6 +1971,9 @@ impl FileDescriptor {
             "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
         )?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
+        for include in &config.custom_includes {
+            writeln!(w, "{}", include)?;
+        }
         Ok(())
     }
 
