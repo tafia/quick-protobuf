@@ -188,6 +188,7 @@ impl ConfigBuilder {
                     dont_use_cow: self.dont_use_cow, //Change this to false to not use cow for v2 and v3 tests
                     custom_struct_derive: self.custom_struct_derive.clone(),
                     custom_rpc_generator: Box::new(|_,_| Ok(())),
+                    custom_includes: Vec::new(),
                 }
             })
             .collect()
