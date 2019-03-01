@@ -79,7 +79,7 @@ fn run() -> Result<(), ::failure::Error> {
             Arg::with_name("DONT_USE_COW")
                 .required(false)
                 .long("dont_use_cow")
-                .short("c")
+                .short("D")
                 .help("Don't use Cow for String and Byte types"),
         ).get_matches();
 
