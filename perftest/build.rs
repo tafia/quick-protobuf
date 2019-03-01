@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::{env, fs};
 use std::io::Write;
 
-fn generate_rpc_add_1_test<W: Write + ?Sized>(rpc: &RpcService, w: &mut W) -> Result<(), pb_rs::errors::Error> {
+fn generate_rpc_test<W: Write + ?Sized>(rpc: &RpcService, w: &mut W) -> Result<(), pb_rs::errors::Error> {
     /* Example:
         trait <service> {
             fn <func>(&self, arg: &<arg>) -> Result<<ret>, failure::Error>;
@@ -50,7 +50,8 @@ fn main() {
         headers: false,
         dont_use_cow: false,
         custom_struct_derive: vec![],
-        custom_rpc_generator: Box::new(|rpc, writer| generate_rpc_add_1_test(rpc, writer))
+        custom_rpc_generator: Box::new(|rpc, writer| generate_rpc_test(rpc, writer)),
+        custom_includes: Vec::new()
     };
     FileDescriptor::write_proto(&config).unwrap();
 
