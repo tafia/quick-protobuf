@@ -519,13 +519,6 @@ impl Field {
                 writeln!(w, "msg.{} = {},", name, val_cow)?
             }
             Frequency::Optional => writeln!(w, "msg.{} = Some({}),", name, val_cow)?,
-            /*Frequency::Repeated if self.packed() && self.typ.is_fixed_size() && self.typ.has_cow() => {
-                writeln!(
-                    w,
-                    "msg.{} = Cow::Borrowed(r.read_packed_fixed(bytes)?),",
-                    name
-                )?;
-            }*/
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
                 writeln!(
                     w,
@@ -723,14 +716,8 @@ pub struct Message {
 
 impl Message {
     fn convert_field_types(&mut self, from: &FieldType, to: &FieldType) {
-        for f in self.fields.iter_mut() {
-            if f.typ == *from {
-                f.typ = to.clone();
-            }
-        }
-
-        for o in self.oneofs.iter_mut() {
-            o.convert_field_types(from, to);
+        for f in self.all_fields_mut().filter(|f| f.typ == *from) {
+            f.typ = to.clone();
         }
     }
 
@@ -1239,14 +1226,6 @@ pub struct OneOf {
 }
 
 impl OneOf {
-    fn convert_field_types(&mut self, from: &FieldType, to: &FieldType) {       
-        for f in self.fields.iter_mut() {
-            if f.typ == *from {
-                f.typ = to.clone();
-            }
-        }
-    }
-
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
         self.fields
             .iter()
