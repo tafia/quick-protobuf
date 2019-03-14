@@ -719,6 +719,23 @@ impl Message {
         for f in self.all_fields_mut().filter(|f| f.typ == *from) {
             f.typ = to.clone();
         }
+
+        // If that type is a map with the fieldtype, it must also be converted.
+        for f in self.all_fields_mut() {
+            let new_type: FieldType = match f.typ {
+                FieldType::Map(ref mut key, ref mut value) if **key == *from && **value == *from => { 
+                    FieldType::Map(Box::new(to.clone()), Box::new(to.clone()))
+                },
+                FieldType::Map(ref mut key, ref mut value) if **key == *from => {
+                    FieldType::Map(Box::new(to.clone()), value.clone())
+                },
+                FieldType::Map(ref mut key, ref mut value) if **value == *from => {
+                    FieldType::Map(key.clone(), Box::new(to.clone()))
+                },
+                ref other => other.clone(),
+            };
+            f.typ = new_type;
+        }
     }
 
     fn has_lifetime(&self, desc: &FileDescriptor, ignore: &mut Vec<MessageIndex>) -> bool {
