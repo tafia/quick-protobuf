@@ -10,7 +10,7 @@ pub enum Error {
     Io(#[cause] io::Error),
     /// Nom Error
     #[fail(display = "{}", _0)]
-    Nom(#[cause] ::nom::simple_errors::Err),
+    Nom(String),
 
     // No .proto file provided
     #[fail(display = "No .proto file provided")]
@@ -74,5 +74,12 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
         Error::Io(e)
+    }
+}
+
+impl<'a> std::convert::From<nom::Err<&'a [u8]>> for Error {
+    fn from(e: nom::Err<&'a [u8]>) -> Error {
+        let err_str = format!("{:?}", e);
+        Error::Nom(err_str)
     }
 }
