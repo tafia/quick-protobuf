@@ -1,7 +1,4 @@
 use super::test_text_format_pb::*;
-use std::borrow::Cow;
-
-// use protobuf::text_format::print_to_string;
 
 fn t<F: FnMut(&mut TestTypes)>(_: &str, mut setter: F) {
     let mut m = TestTypes::default();
