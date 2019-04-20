@@ -14,7 +14,7 @@ fn test1() {
 #[test]
 fn test2() {
     let mut test2 = Test2::default();
-    test2.b = Some("testing".into());
+    test2.b = "testing".into();
     test_serialize_deserialize!("12 07 74 65 73 74 69 6e 67", &test2, Test2);
 }
 
@@ -84,22 +84,22 @@ fn test_read_junk() {
 #[test]
 fn test_types_singular() {
     let mut message = TestTypesSingular::default();
-    message.double_field = Some(19f64);
-    message.float_field = Some(20f32);
-    message.int32_field = Some(21);
-    message.int64_field = Some(-22);
-    message.uint32_field = Some(23);
-    message.uint64_field = Some(24);
-    message.sint32_field = Some(-25);
-    message.sint64_field = Some(26);
-    message.fixed32_field = Some(27);
-    message.fixed64_field = Some(28);
-    message.sfixed32_field = Some(-29);
-    message.sfixed64_field = Some(30);
-    message.bool_field = Some(true);
-    message.string_field = Some("thirty two".into());
-    message.bytes_field = Some(vec![33u8, 34].into());
-    message.enum_field = Some(TestEnumDescriptor::BLUE);
+    message.double_field = 19f64;
+    message.float_field = 20f32;
+    message.int32_field = 21;
+    message.int64_field = -22;
+    message.uint32_field = 23;
+    message.uint64_field = 24;
+    message.sint32_field = -25;
+    message.sint64_field = 26;
+    message.fixed32_field = 27;
+    message.fixed64_field = 28;
+    message.sfixed32_field = -29;
+    message.sfixed64_field = 30;
+    message.bool_field = true;
+    message.string_field = "thirty two".into();
+    message.bytes_field = vec![33u8, 34].into();
+    message.enum_field = TestEnumDescriptor::BLUE;
     test_serialize_deserialize_length_delimited!(&message, TestTypesSingular);
 }
 
