@@ -115,10 +115,7 @@ pub struct Feature {
 
 impl<'a> MessageRead<'a> for Feature {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
-        let mut msg = Feature {
-            type_pb: vector_tile::mod_Tile::GeomType::UNKNOWN,
-            ..Self::default()
-        };
+        let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.id = r.read_uint64(bytes)?,
