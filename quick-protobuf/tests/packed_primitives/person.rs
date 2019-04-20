@@ -1,4 +1,3 @@
-use super::*;
 use quick_protobuf::sizeofs::*;
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result, Writer};
 use std::borrow::Cow;
