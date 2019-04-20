@@ -1,4 +1,4 @@
-//! Automatically generated rust module for 'data_types_import_v3.proto' file
+// Automatically generated rust module for 'test_root_pb.proto' file
 
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -12,19 +12,19 @@
 use std::io::Write;
 use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
 use quick_protobuf::sizeofs::*;
-use super::super::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct ImportedMessage {
-    pub i: bool,
+pub struct Root {
+    pub nested: Vec<mod_Root::Nested>,
 }
 
-impl<'a> MessageRead<'a> for ImportedMessage {
+impl<'a> MessageRead<'a> for Root {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(8) => msg.i = r.read_bool(bytes)?,
+                Ok(10) => msg.nested.push(r.read_message::<mod_Root::Nested>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -33,15 +33,33 @@ impl<'a> MessageRead<'a> for ImportedMessage {
     }
 }
 
-impl MessageWrite for ImportedMessage {
+impl MessageWrite for Root {
     fn get_size(&self) -> usize {
         0
-        + if self.i == false { 0 } else { 1 + sizeof_varint(*(&self.i) as u64) }
+        + self.nested.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if self.i != false { w.write_with_tag(8, |w| w.write_bool(*&self.i))?; }
+        for s in &self.nested { w.write_with_tag(10, |w| w.write_message(s))?; }
         Ok(())
     }
+}
+
+pub mod mod_Root {
+
+use super::*;
+
+#[derive(Debug, Default, PartialEq, Clone)]
+pub struct Nested { }
+
+impl<'a> MessageRead<'a> for Nested {
+    fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
+        r.read_to_end();
+        Ok(Self::default())
+    }
+}
+
+impl MessageWrite for Nested { }
+
 }
 

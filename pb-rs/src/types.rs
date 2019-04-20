@@ -480,12 +480,8 @@ impl Field {
         let rust_type = self.typ.rust_type(desc)?;
         match self.frequency {
             _ if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
-            Frequency::Optional
-                if desc.syntax == Syntax::Proto2 && self.default.is_none()
-                    || self.typ.message().is_some() =>
-            {
-                writeln!(w, "Option<{}>,", rust_type)?
-            }
+            Frequency::Optional if self.default.is_some() => writeln!(w, "{},", rust_type)?,
+            Frequency::Optional => writeln!(w, "Option<{}>,", rust_type)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow => {
                 writeln!(w, "Cow<'a, [{}]>,", rust_type)?;
             }
@@ -520,15 +516,11 @@ impl Field {
         write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
             _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({})),", name, val)?,
-            Frequency::Optional
-                if desc.syntax == Syntax::Proto2 && self.default.is_none()
-                    || self.typ.message().is_some() =>
-            {
-                writeln!(w, "msg.{} = Some({}),", name, val_cow)?
-            }
-            Frequency::Required | Frequency::Optional => {
+            Frequency::Required => writeln!(w, "msg.{} = {},", name, val_cow)?,
+            Frequency::Optional if self.default.is_some() => {
                 writeln!(w, "msg.{} = {},", name, val_cow)?
-            }            
+            }
+            Frequency::Optional => writeln!(w, "msg.{} = Some({}),", name, val_cow)?,
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
                 writeln!(
                     w,
