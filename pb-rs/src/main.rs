@@ -64,7 +64,7 @@ fn run() -> Result<(), ::failure::Error> {
                 .required(false)
                 .help("Error out if recursive messages do not have optional fields"),
         ).arg(
-            Arg::with_name("HEADERS")
+            Arg::with_name("NO_HEADERS")
                 .long("no-headers")
                 .short("H")
                 .required(false)
@@ -99,7 +99,7 @@ fn run() -> Result<(), ::failure::Error> {
     .single_module(matches.is_present("SINGLE_MOD"))
     .no_output(matches.is_present("NO_OUTPUT"))
     .error_cycle(matches.is_present("CYCLE"))
-    .headers(matches.is_present("HEADERS"))
+    .headers(!matches.is_present("NO_HEADERS"))
     .dont_use_cow(matches.is_present("DONT_USE_COW"))
     .custom_struct_derive(custom_struct_derive);
 
