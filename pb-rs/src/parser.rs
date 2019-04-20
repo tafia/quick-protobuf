@@ -48,7 +48,7 @@ named!(
     do_parse!(tag!("/*") >> take_until_and_consume!("*/") >> ())
 );
 
-// word break: multispace or comment
+/// word break: multispace or comment
 named!(
     br<()>,
     alt!(map!(multispace, |_| ()) | comment | block_comment)
@@ -472,7 +472,7 @@ mod test {
     }"#;
 
         let mess = message(msg.as_bytes());
-        if let ::nom::IResult::Ok((_, mess)) = mess {
+        if let ::nom::IResult::Done(_, mess) = mess {
             assert_eq!(10, mess.fields.len());
         }
     }
@@ -487,7 +487,7 @@ mod test {
     }"#;
 
         let mess = enumerator(msg.as_bytes());
-        if let ::nom::IResult::Ok((_, mess)) = mess {
+        if let ::nom::IResult::Done(_, mess) = mess {
             assert_eq!(4, mess.fields.len());
         }
     }
@@ -497,7 +497,7 @@ mod test {
         let msg = r#"option optimize_for = SPEED;"#;
 
         match option_ignore(msg.as_bytes()) {
-            ::nom::IResult::Ok((_, _)) => (),
+            ::nom::IResult::Done(_, _) => (),
             e => panic!("Expecting done {:?}", e),
         }
     }
@@ -513,12 +513,11 @@ mod test {
         optional ContainerForNested.NestedEnum e = 2;
     }
     "#;
-        if let Ok((_, desc)) = file_descriptor(msg.as_bytes()) {
-            assert_eq!(
-                vec![Path::new("test_import_nested_imported_pb.proto")],
-                desc.import_paths
-            );
-        }
+        let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
+        assert_eq!(
+            vec![Path::new("test_import_nested_imported_pb.proto")],
+            desc.import_paths
+        );
     }
 
     #[test]
@@ -531,9 +530,8 @@ mod test {
         optional ContainerForNested.NestedEnum e = 2;
     }
     "#;
-        if let Ok((_, desc)) = file_descriptor(msg.as_bytes()) {
-            assert_eq!("foo.bar".to_string(), desc.package);
-        }
+        let desc = file_descriptor(msg.as_bytes()).to_full_result().unwrap();
+        assert_eq!("foo.bar".to_string(), desc.package);
     }
 
     #[test]
@@ -548,7 +546,7 @@ mod test {
     }"#;
 
         let mess = message(msg.as_bytes());
-        if let ::nom::IResult::Ok((_, mess)) = mess {
+        if let ::nom::IResult::Done(_, mess) = mess {
             assert!(mess.messages.len() == 1);
         }
     }
@@ -561,7 +559,7 @@ mod test {
     }"#;
 
         let mess = message(msg.as_bytes());
-        if let ::nom::IResult::Ok((_, mess)) = mess {
+        if let ::nom::IResult::Done(_, mess) = mess {
             assert_eq!(1, mess.fields.len());
             match mess.fields[0].typ {
                 FieldType::Map(ref key, ref value) => match (&**key, &**value) {
@@ -593,7 +591,7 @@ mod test {
     }"#;
 
         let mess = message(msg.as_bytes());
-        if let ::nom::IResult::Ok((_, mess)) = mess {
+        if let ::nom::IResult::Done(_, mess) = mess {
             assert_eq!(1, mess.oneofs.len());
             assert_eq!(3, mess.oneofs[0].fields.len());
         }
@@ -609,7 +607,7 @@ mod test {
     }"#;
 
         let mess = message(msg.as_bytes());
-        if let ::nom::IResult::Ok((_, mess)) = mess {
+        if let ::nom::IResult::Done(_, mess) = mess {
             assert_eq!(Some(vec![4, 15, 17, 18, 19, 20, 30]), mess.reserved_nums);
             assert_eq!(
                 Some(vec!["foo".to_string(), "bar".to_string()]),
@@ -631,7 +629,7 @@ mod test {
         "#;
 
         match file_descriptor( msg.as_bytes() ) {
-            ::nom::IResult::Ok((_, descriptor)) => {
+            ::nom::IResult::Done(_, descriptor) => {
                 println!("Services found: {:?}", descriptor.rpc_services);
                 let service = &descriptor.rpc_services.get(0).expect("Service not found!");
                 let func0 = service.functions.get(0).expect("Function 0 not returned!");
@@ -653,7 +651,7 @@ mod test {
         let msg = r#"rpc function_name(Arg) returns (Ret);"#;
 
         match rpc_function_declaration( msg.as_bytes() ) {
-            ::nom::IResult::Ok((_, declaration)) => {
+            ::nom::IResult::Done(_, declaration) => {
                 assert_eq!("function_name", declaration.name);
                 assert_eq!("Arg", declaration.arg);
                 assert_eq!("Ret", declaration.ret);

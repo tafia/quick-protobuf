@@ -1,5 +1,3 @@
-#![feature(type_alias_enum_variants)]
-
 extern crate failure;
 #[macro_use]
 extern crate failure_derive;

@@ -9,15 +9,15 @@ readme = "README.md"
 repository = "https://github.com/tafia/quick-protobuf"
 
 [dependencies]
-nom = "4.2.3"
-clap ="2.33.0"
-failure = "0.1.5"
-failure_derive = "0.1.5"
-log = "0.4.6"
-env_logger = "0.6.1"
+nom = "3.2.1"
+clap = "2.32.0"
+failure = "0.1.1"
+failure_derive = "0.1.1"
+log = "0.4.4"
+env_logger = "0.5.13"
 
 [dev-dependencies]
-walkdir = "2.2.7"
+walkdir = "2.2.5"
 
 [features]
 default = []
