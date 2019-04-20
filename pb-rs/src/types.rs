@@ -1550,13 +1550,12 @@ impl FileDescriptor {
         desc.resolve_types()?;
         desc.break_cycles(config.error_cycle)?;
         desc.sanity_checks()?;
-        desc.set_defaults()?;
-        desc.sanitize_names();
-        
         if config.dont_use_cow {
             desc.convert_field_types(&FieldType::StringCow, &FieldType::String_);
             desc.convert_field_types(&FieldType::BytesCow, &FieldType::Bytes_);
         }
+        desc.set_defaults()?;
+        desc.sanitize_names();
 
         if config.single_module {
             desc.package = "".to_string();
