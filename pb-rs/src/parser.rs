@@ -2,7 +2,10 @@ use std::path::{Path, PathBuf};
 use std::str;
 
 use nom::{digit, hex_digit, multispace};
-use types::{RpcService, RpcFunctionDeclaration, Enumerator, Field, FieldType, FileDescriptor, Frequency, Message, OneOf, Syntax};
+use types::{
+    Enumerator, Field, FieldType, FileDescriptor, Frequency, Message, OneOf,
+    RpcFunctionDeclaration, RpcService, Syntax,
+};
 
 fn is_word(b: u8) -> bool {
     match b {
@@ -286,7 +289,7 @@ named!(
             >> many0!(br)
             >> tag!(");")
             >> many0!(br)
-            >> (RpcFunctionDeclaration{name, arg, ret})
+            >> (RpcFunctionDeclaration { name, arg, ret })
     )
 );
 
@@ -302,7 +305,10 @@ named!(
             >> functions: many0!(rpc_function_declaration)
             >> many0!(br)
             >> tag!("}")
-            >> (RpcService{service_name, functions})
+            >> (RpcService {
+                service_name,
+                functions
+            })
     )
 );
 
@@ -629,7 +635,7 @@ mod test {
             }
         "#;
 
-        match file_descriptor( msg.as_bytes() ) {
+        match file_descriptor(msg.as_bytes()) {
             ::nom::IResult::Done(_, descriptor) => {
                 println!("Services found: {:?}", descriptor.rpc_services);
                 let service = &descriptor.rpc_services.get(0).expect("Service not found!");
@@ -642,7 +648,7 @@ mod test {
                 assert_eq!("function1", func1.name);
                 assert_eq!("InStruct1", func1.arg);
                 assert_eq!("OutStruct1", func1.ret);
-            },
+            }
             other => panic!("Could not parse RPC Service: {:?}", other),
         }
     }
@@ -651,12 +657,12 @@ mod test {
     fn test_rpc_function() {
         let msg = r#"rpc function_name(Arg) returns (Ret);"#;
 
-        match rpc_function_declaration( msg.as_bytes() ) {
+        match rpc_function_declaration(msg.as_bytes()) {
             ::nom::IResult::Done(_, declaration) => {
                 assert_eq!("function_name", declaration.name);
                 assert_eq!("Arg", declaration.arg);
                 assert_eq!("Ret", declaration.ret);
-            },
+            }
             other => panic!("Could not parse RPC Function Declaration: {:?}", other),
         }
     }

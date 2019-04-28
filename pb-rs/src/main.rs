@@ -87,8 +87,12 @@ fn run() -> Result<(), ::failure::Error> {
     let include_paths = path_vec(values_t!(matches, "INCLUDE_PATH", String));
     let out_file = matches.value_of("OUTPUT").map(|o| PathBuf::from(o));
     let out_dir = matches.value_of("OUTPUT_DIR").map(|o| PathBuf::from(o));
-    let custom_struct_derive: Vec<String> = matches.value_of("CUSTOM_STRUCT_DERIVE").unwrap_or("")
-        .split(",").map(|s| s.to_string()).collect();
+    let custom_struct_derive: Vec<String> = matches
+        .value_of("CUSTOM_STRUCT_DERIVE")
+        .unwrap_or("")
+        .split(",")
+        .map(|s| s.to_string())
+        .collect();
 
     let compiler = ConfigBuilder::new(
         &in_files,

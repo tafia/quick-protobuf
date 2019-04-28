@@ -131,7 +131,7 @@ impl FieldType {
             FieldType::Message(_)
             | FieldType::Map(_, _)
             | FieldType::StringCow
-            | FieldType::BytesCow 
+            | FieldType::BytesCow
             | FieldType::String_
             | FieldType::Bytes_ => false,
             _ => true,
@@ -186,7 +186,7 @@ impl FieldType {
             | FieldType::Bytes_
             | FieldType::Message(_)
             | FieldType::Map(_, _) => 2,
-             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
+            FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         }
     }
@@ -325,7 +325,11 @@ impl FieldType {
         Ok(match *self {
             FieldType::Message(ref msg) => {
                 let m = msg.get_message(desc);
-                let m = format!("r.read_message::<{}{}>(bytes)?", m.get_modules(desc), m.name);
+                let m = format!(
+                    "r.read_message::<{}{}>(bytes)?",
+                    m.get_modules(desc),
+                    m.name
+                );
                 (m.clone(), m)
             }
             FieldType::Map(_, _) => return Err(Error::ReadFnMap),
@@ -333,17 +337,17 @@ impl FieldType {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let cow = format!("{}.map(Cow::Borrowed)?", m);
                 (m, cow)
-            },
+            }
             FieldType::String_ => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let vec = format!("{}?.to_owned()", m);
                 (m, vec)
-            },
+            }
             FieldType::Bytes_ => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let vec = format!("{}?.to_owned()", m);
                 (m, vec)
-            },
+            }
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
             _ => {
                 let m = format!("r.read_{}(bytes)?", self.proto_type());
@@ -475,7 +479,12 @@ impl Field {
         tag(self.number as u32, &self.typ, self.packed())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+    fn write_definition<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
         write!(w, "    pub {}: ", self.name)?;
         let rust_type = self.typ.rust_type(desc)?;
         match self.frequency {
@@ -486,7 +495,9 @@ impl Field {
             {
                 writeln!(w, "Option<{}>,", rust_type)?
             }
-            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow => {
+            Frequency::Repeated
+                if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow =>
+            {
                 writeln!(w, "Cow<'a, [{}]>,", rust_type)?;
             }
             Frequency::Repeated => writeln!(w, "Vec<{}>,", rust_type)?,
@@ -528,13 +539,9 @@ impl Field {
             }
             Frequency::Required | Frequency::Optional => {
                 writeln!(w, "msg.{} = {},", name, val_cow)?
-            }            
+            }
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
-                writeln!(
-                    w,
-                    "msg.{} = r.read_packed_fixed(bytes)?.into(),",
-                    name
-                )?;
+                writeln!(w, "msg.{} = r.read_packed_fixed(bytes)?.into(),", name)?;
             }
             Frequency::Repeated if self.packed() => {
                 writeln!(
@@ -767,15 +774,17 @@ impl Message {
         // If that type is a map with the fieldtype, it must also be converted.
         for f in self.all_fields_mut() {
             let new_type: FieldType = match f.typ {
-                FieldType::Map(ref mut key, ref mut value) if **key == *from && **value == *from => { 
+                FieldType::Map(ref mut key, ref mut value)
+                    if **key == *from && **value == *from =>
+                {
                     FieldType::Map(Box::new(to.clone()), Box::new(to.clone()))
-                },
+                }
                 FieldType::Map(ref mut key, ref mut value) if **key == *from => {
                     FieldType::Map(Box::new(to.clone()), value.clone())
-                },
+                }
                 FieldType::Map(ref mut key, ref mut value) if **value == *from => {
                     FieldType::Map(key.clone(), Box::new(to.clone()))
-                },
+                }
                 ref other => other.clone(),
             };
             f.typ = new_type;
@@ -863,13 +872,22 @@ impl Message {
         Ok(())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {;
+    fn write_definition<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
         let mut custom_struct_derive = config.custom_struct_derive.join(", ");
         if custom_struct_derive.len() > 0 {
             custom_struct_derive += ", ";
         }
 
-        writeln!(w, "#[derive({}Debug, Default, PartialEq, Clone)]", custom_struct_derive)?;
+        writeln!(
+            w,
+            "#[derive({}Debug, Default, PartialEq, Clone)]",
+            custom_struct_derive
+        )?;
         if self.is_unit() {
             writeln!(w, "pub struct {} {{ }}", self.name)?;
             return Ok(());
@@ -894,7 +912,12 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_message_read<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+    fn write_impl_message_read<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
         if self.is_unit() {
             writeln!(w, "impl<'a> MessageRead<'a> for {} {{", self.name)?;
             writeln!(
@@ -971,7 +994,12 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_message_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+    fn write_impl_message_write<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
         if self.is_unit() {
             writeln!(w, "impl MessageWrite for {} {{ }}", self.name)?;
             return Ok(());
@@ -1168,7 +1196,7 @@ pub struct RpcFunctionDeclaration {
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct RpcService  {
+pub struct RpcService {
     pub service_name: String,
     pub functions: Vec<RpcFunctionDeclaration>,
 }
@@ -1179,7 +1207,7 @@ impl RpcService {
     }
 }
 
-pub type RpcGeneratorFunction =  Box< Fn(&RpcService, &mut Write) -> Result<()> >;
+pub type RpcGeneratorFunction = Box<Fn(&RpcService, &mut Write) -> Result<()>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct Enumerator {
@@ -1356,12 +1384,16 @@ impl OneOf {
 
         if cfg!(feature = "generateImplFromForEnums") {
             self.generate_impl_from_for_enums(w, desc)
-        } else { 
+        } else {
             Ok(())
         }
     }
 
-    fn generate_impl_from_for_enums<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn generate_impl_from_for_enums<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+    ) -> Result<()> {
         // For the first of each enumeration type, generate an impl From<> for it.
         let mut handled_fields = Vec::new();
         for f in &self.fields {
@@ -1377,7 +1409,7 @@ impl OneOf {
 
             handled_fields.push(rust_type);
         }
-        
+
         Ok(())
     }
 
@@ -1527,7 +1559,7 @@ pub struct FileDescriptor {
     pub messages: Vec<Message>,
     pub enums: Vec<Enumerator>,
     pub module: String,
-    pub rpc_services: Vec<RpcService>
+    pub rpc_services: Vec<RpcService>,
 }
 
 impl FileDescriptor {
