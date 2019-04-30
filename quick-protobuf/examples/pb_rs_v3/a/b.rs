@@ -1,7 +1,18 @@
-use super::super::*;
-use quick_protobuf::sizeofs::*;
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result, Writer};
+// Automatically generated rust module for 'data_types_import.proto' file
+
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
+
 use std::io::Write;
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::sizeofs::*;
+use super::super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ImportedMessage {
@@ -14,9 +25,7 @@ impl<'a> MessageRead<'a> for ImportedMessage {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.i = r.read_bool(bytes)?,
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -26,17 +35,13 @@ impl<'a> MessageRead<'a> for ImportedMessage {
 
 impl MessageWrite for ImportedMessage {
     fn get_size(&self) -> usize {
-        0 + if self.i == false {
-            0
-        } else {
-            1 + sizeof_varint(*(&self.i) as u64)
-        }
+        0
+        + if self.i == false { 0 } else { 1 + sizeof_varint(*(&self.i) as u64) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if self.i != false {
-            w.write_with_tag(8, |w| w.write_bool(*&self.i))?;
-        }
+        if self.i != false { w.write_with_tag(8, |w| w.write_bool(*&self.i))?; }
         Ok(())
     }
 }
+

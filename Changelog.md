@@ -8,6 +8,15 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.8.0
+
+- Added the ability to use custom RPC generation code
+- Added the ability to modify custom derives such as derive-new
+- (Large change) Added the dont_use_cow method [v2 and v3 tested] which replaces lifetimes 
+and Cow with regular strings and vectors. This will decrease performance - and will 
+eventually be replaced with a whitelist for specific structures instead of a boolean.
+This is meant for the structure to fully own the data it has.
+
 ## pb-rs 0.7.0
 - feat: add a ConfigBuilder
 
