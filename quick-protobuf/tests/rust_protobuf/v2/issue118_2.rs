@@ -1,7 +1,18 @@
-use super::*;
-use quick_protobuf::sizeofs::*;
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result, Writer};
+// Automatically generated rust module for 'issue118-2.proto' file
+
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
+
 use std::io::Write;
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::sizeofs::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct First {
@@ -14,9 +25,7 @@ impl<'a> MessageRead<'a> for First {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.first_field = Some(Box::new(r.read_message::<Fourth>(bytes)?)),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -26,16 +35,12 @@ impl<'a> MessageRead<'a> for First {
 
 impl MessageWrite for First {
     fn get_size(&self) -> usize {
-        0 + self
-            .first_field
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.first_field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.first_field {
-            w.write_with_tag(10, |w| w.write_message(&**s))?;
-        }
+        if let Some(ref s) = self.first_field { w.write_with_tag(10, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
@@ -51,9 +56,7 @@ impl<'a> MessageRead<'a> for Second {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.second_field = Some(Box::new(r.read_message::<First>(bytes)?)),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -63,16 +66,12 @@ impl<'a> MessageRead<'a> for Second {
 
 impl MessageWrite for Second {
     fn get_size(&self) -> usize {
-        0 + self
-            .second_field
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.second_field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.second_field {
-            w.write_with_tag(10, |w| w.write_message(&**s))?;
-        }
+        if let Some(ref s) = self.second_field { w.write_with_tag(10, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
@@ -88,9 +87,7 @@ impl<'a> MessageRead<'a> for Third {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.third_field = Some(Box::new(r.read_message::<First>(bytes)?)),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -100,16 +97,12 @@ impl<'a> MessageRead<'a> for Third {
 
 impl MessageWrite for Third {
     fn get_size(&self) -> usize {
-        0 + self
-            .third_field
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.third_field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.third_field {
-            w.write_with_tag(10, |w| w.write_message(&**s))?;
-        }
+        if let Some(ref s) = self.third_field { w.write_with_tag(10, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
@@ -127,9 +120,7 @@ impl<'a> MessageRead<'a> for Fourth {
             match r.next_tag(bytes) {
                 Ok(10) => msg.fourth_field = Some(Box::new(r.read_message::<Third>(bytes)?)),
                 Ok(18) => msg.fourth_field_2 = Some(Box::new(r.read_message::<Fifth>(bytes)?)),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -139,23 +130,14 @@ impl<'a> MessageRead<'a> for Fourth {
 
 impl MessageWrite for Fourth {
     fn get_size(&self) -> usize {
-        0 + self
-            .fourth_field
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
-            + self
-                .fourth_field_2
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.fourth_field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        + self.fourth_field_2.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.fourth_field {
-            w.write_with_tag(10, |w| w.write_message(&**s))?;
-        }
-        if let Some(ref s) = self.fourth_field_2 {
-            w.write_with_tag(18, |w| w.write_message(&**s))?;
-        }
+        if let Some(ref s) = self.fourth_field { w.write_with_tag(10, |w| w.write_message(&**s))?; }
+        if let Some(ref s) = self.fourth_field_2 { w.write_with_tag(18, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
@@ -171,9 +153,7 @@ impl<'a> MessageRead<'a> for Fifth {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.fifth_field = Some(Box::new(r.read_message::<Second>(bytes)?)),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -183,16 +163,12 @@ impl<'a> MessageRead<'a> for Fifth {
 
 impl MessageWrite for Fifth {
     fn get_size(&self) -> usize {
-        0 + self
-            .fifth_field
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.fifth_field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.fifth_field {
-            w.write_with_tag(10, |w| w.write_message(&**s))?;
-        }
+        if let Some(ref s) = self.fifth_field { w.write_with_tag(10, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
@@ -208,9 +184,7 @@ impl<'a> MessageRead<'a> for Sixth {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.sixth_field = Some(Box::new(r.read_message::<Sixth>(bytes)?)),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -220,16 +194,12 @@ impl<'a> MessageRead<'a> for Sixth {
 
 impl MessageWrite for Sixth {
     fn get_size(&self) -> usize {
-        0 + self
-            .sixth_field
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.sixth_field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.sixth_field {
-            w.write_with_tag(10, |w| w.write_message(&**s))?;
-        }
+        if let Some(ref s) = self.sixth_field { w.write_with_tag(10, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
@@ -245,9 +215,7 @@ impl<'a> MessageRead<'a> for Seventh {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.seventh_field = Some(Box::new(r.read_message::<Eighth>(bytes)?)),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -257,16 +225,12 @@ impl<'a> MessageRead<'a> for Seventh {
 
 impl MessageWrite for Seventh {
     fn get_size(&self) -> usize {
-        0 + self
-            .seventh_field
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.seventh_field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.seventh_field {
-            w.write_with_tag(10, |w| w.write_message(&**s))?;
-        }
+        if let Some(ref s) = self.seventh_field { w.write_with_tag(10, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
@@ -282,9 +246,7 @@ impl<'a> MessageRead<'a> for Eighth {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => msg.eighth_field = Some(Box::new(r.read_message::<Seventh>(bytes)?)),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -294,16 +256,13 @@ impl<'a> MessageRead<'a> for Eighth {
 
 impl MessageWrite for Eighth {
     fn get_size(&self) -> usize {
-        0 + self
-            .eighth_field
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        0
+        + self.eighth_field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.eighth_field {
-            w.write_with_tag(10, |w| w.write_message(&**s))?;
-        }
+        if let Some(ref s) = self.eighth_field { w.write_with_tag(10, |w| w.write_message(&**s))?; }
         Ok(())
     }
 }
+

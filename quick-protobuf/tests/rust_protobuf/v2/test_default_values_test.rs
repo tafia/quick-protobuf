@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::f32;
 use std::f64;
 
@@ -24,7 +23,7 @@ fn test_default_value_simple() {
     assert_eq!(12, d.sfixed64_field);
     assert_eq!(true, d.bool_field);
     assert_eq!("abc\n22", d.string_field);
-    assert_eq!(Cow::Borrowed(b"cde\n33"), d.bytes_field);
+    assert_eq!(b"cde\n33".to_vec(), d.bytes_field.to_vec());
     assert!(EnumForDefaultValue::TWO.eq(&d.enum_field));
     assert!(d
         .enum_field_without_default

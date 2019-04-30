@@ -1,8 +1,19 @@
+// Automatically generated rust module for 'struct.proto' file
+
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
+
+use quick_protobuf::{BytesReader, Result, MessageRead, MessageWrite};
 use super::*;
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result};
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct KeepTheFile {}
+pub struct KeepTheFile { }
 
 impl<'a> MessageRead<'a> for KeepTheFile {
     fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
@@ -11,4 +22,5 @@ impl<'a> MessageRead<'a> for KeepTheFile {
     }
 }
 
-impl MessageWrite for KeepTheFile {}
+impl MessageWrite for KeepTheFile { }
+

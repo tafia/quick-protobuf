@@ -1,3 +1,13 @@
+// Automatically generated rust module for 'vector_tile.proto' file
+
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
 
 use std::io::Write;
 use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
@@ -109,9 +119,9 @@ impl<'a> MessageRead<'a> for Feature {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.id = r.read_uint64(bytes)?,
-                Ok(18) => msg.tags = r.read_packed(bytes, |r, bytes| r.read_uint32(bytes))?,
+                Ok(18) => msg.tags = r.read_packed(bytes, |r, bytes| Ok(r.read_uint32(bytes)?))?,
                 Ok(24) => msg.type_pb = r.read_enum(bytes)?,
-                Ok(34) => msg.geometry = r.read_packed(bytes, |r, bytes| r.read_uint32(bytes))?,
+                Ok(34) => msg.geometry = r.read_packed(bytes, |r, bytes| Ok(r.read_uint32(bytes)?))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }

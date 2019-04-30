@@ -1,7 +1,4 @@
 use super::test_text_format_pb::*;
-use std::borrow::Cow;
-
-// use protobuf::text_format::print_to_string;
 
 fn t<F: FnMut(&mut TestTypes)>(_: &str, mut setter: F) {
     let mut m = TestTypes::default();
@@ -27,10 +24,10 @@ fn test_singular() {
     t("sfixed64_singular: 99", |m| m.sfixed64_singular = Some(99));
     t("bool_singular: false", |m| m.bool_singular = Some(false));
     t("string_singular: \"abc\"", |m| {
-        m.string_singular = Some(Cow::Borrowed("abc"))
+        m.string_singular = Some("abc".into())
     });
     t("bytes_singular: \"def\"", |m| {
-        m.bytes_singular = Some(Cow::Borrowed(b"def"))
+        m.bytes_singular = Some(b"def".to_vec().into())
     });
     t("test_enum_singular: DARK", |m| {
         m.test_enum_singular = Some(TestEnum::DARK)
@@ -57,10 +54,10 @@ fn test_repeated_one() {
     t("sfixed64_repeated: 99", |m| m.sfixed64_repeated.push(99));
     t("bool_repeated: false", |m| m.bool_repeated.push(false));
     t("string_repeated: \"abc\"", |m| {
-        m.string_repeated.push(Cow::Borrowed("abc"))
+        m.string_repeated.push("abc".into())
     });
     t("bytes_repeated: \"def\"", |m| {
-        m.bytes_repeated.push(Cow::Borrowed(b"def"))
+        m.bytes_repeated.push(b"def".to_vec().into())
     });
     t("test_enum_repeated: DARK", |m| {
         m.test_enum_repeated.push(TestEnum::DARK)

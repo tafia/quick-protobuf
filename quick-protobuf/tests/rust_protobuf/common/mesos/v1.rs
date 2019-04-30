@@ -1,3 +1,13 @@
+// Automatically generated rust module for 'mesos.proto' file
+
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
 
 use std::io::Write;
 use std::borrow::Cow;

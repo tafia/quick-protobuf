@@ -113,8 +113,10 @@ pub enum FieldType {
     Fixed64,
     Sfixed64,
     Double,
+    StringCow,
+    BytesCow,
     String_,
-    Bytes,
+    Bytes_,
     Message(MessageIndex),
     MessageOrEnum(String),
     Fixed32,
@@ -128,15 +130,17 @@ impl FieldType {
         match *self {
             FieldType::Message(_)
             | FieldType::Map(_, _)
+            | FieldType::StringCow
+            | FieldType::BytesCow
             | FieldType::String_
-            | FieldType::Bytes => false,
+            | FieldType::Bytes_ => false,
             _ => true,
         }
     }
 
     fn has_cow(&self) -> bool {
         match *self {
-            FieldType::Bytes | FieldType::String_ => true,
+            FieldType::BytesCow | FieldType::StringCow => true,
             FieldType::Map(ref k, ref v) => k.has_cow() || v.has_cow(),
             _ => false,
         }
@@ -158,6 +162,14 @@ impl FieldType {
     }
 
     fn wire_type_num_non_packed(&self) -> u32 {
+        /*
+        0	Varint	int32, int64, uint32, uint64, sint32, sint64, bool, enum
+        1	64-bit	fixed64, sfixed64, double
+        2	Length-delimited	string, bytes, embedded messages, packed repeated fields
+        3	Start group	groups (deprecated)
+        4	End group	groups (deprecated)
+        5	32-bit	fixed32, sfixed32, float
+        */
         match *self {
             FieldType::Int32
             | FieldType::Sint32
@@ -168,8 +180,10 @@ impl FieldType {
             | FieldType::Bool
             | FieldType::Enum(_) => 0,
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => 1,
-            FieldType::String_
-            | FieldType::Bytes
+            FieldType::StringCow
+            | FieldType::BytesCow
+            | FieldType::String_
+            | FieldType::Bytes_
             | FieldType::Message(_)
             | FieldType::Map(_, _) => 2,
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
@@ -194,7 +208,9 @@ impl FieldType {
             FieldType::Sfixed64 => "sfixed64",
             FieldType::Double => "double",
             FieldType::String_ => "string",
-            FieldType::Bytes => "bytes",
+            FieldType::Bytes_ => "bytes",
+            FieldType::StringCow => "string",
+            FieldType::BytesCow => "bytes",
             FieldType::Message(_) => "message",
             FieldType::Map(_, _) => "map",
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
@@ -223,8 +239,10 @@ impl FieldType {
             FieldType::Fixed64 => Some("0u64"),
             FieldType::Sfixed64 => Some("0i64"),
             FieldType::Double => Some("0f64"),
-            FieldType::String_ => Some("Cow::Borrowed(\"\")"),
-            FieldType::Bytes => Some("Cow::Borrowed(b\"\")"),
+            FieldType::StringCow => Some("Cow::Borrowed(\"\")"),
+            FieldType::BytesCow => Some("Cow::Borrowed(b\"\")"),
+            FieldType::String_ => Some("String::default()"),
+            FieldType::Bytes_ => Some("vec![]"),
             FieldType::Enum(ref e) => {
                 let e = e.get_enum(desc);
                 Some(&*e.fully_qualified_fields[0].0)
@@ -250,13 +268,15 @@ impl FieldType {
         ignore: &mut Vec<MessageIndex>,
     ) -> bool {
         match *self {
-            FieldType::String_ | FieldType::Bytes => true, // Cow<[u8]>
+            FieldType::StringCow | FieldType::BytesCow => true, // Cow<[u8]>
             FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc, ignore),
             FieldType::Fixed64
             | FieldType::Sfixed64
             | FieldType::Double
             | FieldType::Fixed32
             | FieldType::Sfixed32
+            | FieldType::String_
+            | FieldType::Bytes_
             | FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref key, ref value) => {
                 key.has_lifetime(desc, false, ignore) || value.has_lifetime(desc, false, ignore)
@@ -273,8 +293,10 @@ impl FieldType {
             FieldType::Uint64 | FieldType::Fixed64 => "u64".to_string(),
             FieldType::Double => "f64".to_string(),
             FieldType::Float => "f32".to_string(),
-            FieldType::String_ => "Cow<'a, str>".to_string(),
-            FieldType::Bytes => "Cow<'a, [u8]>".to_string(),
+            FieldType::StringCow => "Cow<'a, str>".to_string(),
+            FieldType::BytesCow => "Cow<'a, [u8]>".to_string(),
+            FieldType::String_ => "String".to_string(),
+            FieldType::Bytes_ => "Vec<u8>".to_string(),
             FieldType::Bool => "bool".to_string(),
             FieldType::Enum(ref e) => {
                 let e = e.get_enum(desc);
@@ -303,18 +325,32 @@ impl FieldType {
         Ok(match *self {
             FieldType::Message(ref msg) => {
                 let m = msg.get_message(desc);
-                let m = format!("r.read_message::<{}{}>(bytes)", m.get_modules(desc), m.name);
+                let m = format!(
+                    "r.read_message::<{}{}>(bytes)?",
+                    m.get_modules(desc),
+                    m.name
+                );
                 (m.clone(), m)
             }
             FieldType::Map(_, _) => return Err(Error::ReadFnMap),
-            FieldType::String_ | FieldType::Bytes => {
+            FieldType::StringCow | FieldType::BytesCow => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
-                let cow = format!("{}.map(Cow::Borrowed)", m);
+                let cow = format!("{}.map(Cow::Borrowed)?", m);
                 (m, cow)
+            }
+            FieldType::String_ => {
+                let m = format!("r.read_{}(bytes)", self.proto_type());
+                let vec = format!("{}?.to_owned()", m);
+                (m, vec)
+            }
+            FieldType::Bytes_ => {
+                let m = format!("r.read_{}(bytes)", self.proto_type());
+                let vec = format!("{}?.to_owned()", m);
+                (m, vec)
             }
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
             _ => {
-                let m = format!("r.read_{}(bytes)", self.proto_type());
+                let m = format!("r.read_{}(bytes)?", self.proto_type());
                 (m.clone(), m)
             }
         })
@@ -334,7 +370,9 @@ impl FieldType {
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
 
-            FieldType::String_ | FieldType::Bytes => format!("sizeof_len(({}).len())", s),
+            FieldType::StringCow | FieldType::BytesCow => format!("sizeof_len(({}).len())", s),
+
+            FieldType::String_ | FieldType::Bytes_ => format!("sizeof_len(({}).len())", s),
 
             FieldType::Message(_) => format!("sizeof_len(({}).get_size())", s),
 
@@ -363,8 +401,10 @@ impl FieldType {
             | FieldType::Sfixed32
             | FieldType::Float => format!("write_{}(*{})", self.proto_type(), s),
 
+            FieldType::StringCow => format!("write_string(&**{})", s),
+            FieldType::BytesCow => format!("write_bytes(&**{})", s),
             FieldType::String_ => format!("write_string(&**{})", s),
-            FieldType::Bytes => format!("write_bytes(&**{})", s),
+            FieldType::Bytes_ => format!("write_bytes(&**{})", s),
 
             FieldType::Message(_) if boxed => format!("write_message(&**{})", s),
             FieldType::Message(_) => format!("write_message({})", s),
@@ -420,6 +460,9 @@ impl Field {
                 },
                 "Cow<'a, str>" => format!("Cow::Borrowed({})", d),
                 "Cow<'a, [u8]>" => format!("Cow::Borrowed(b{})", d),
+                "String" => format!("String::from({})", d),
+                "Bytes" => format!(r#"b{}"#, d),
+                "Vec<u8>" => format!("b{}.to_vec()", d),
                 "bool" => format!("{}", d.parse::<bool>().unwrap()),
                 e => format!("{}::{}", e, d), // enum, as message and map do not have defaults
             }
@@ -436,7 +479,12 @@ impl Field {
         tag(self.number as u32, &self.typ, self.packed())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_definition<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
         write!(w, "    pub {}: ", self.name)?;
         let rust_type = self.typ.rust_type(desc)?;
         match self.frequency {
@@ -447,7 +495,9 @@ impl Field {
             {
                 writeln!(w, "Option<{}>,", rust_type)?
             }
-            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
+            Frequency::Repeated
+                if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow =>
+            {
                 writeln!(w, "Cow<'a, [{}]>,", rust_type)?;
             }
             Frequency::Repeated => writeln!(w, "Vec<{}>,", rust_type)?,
@@ -463,7 +513,7 @@ impl Field {
             writeln!(
                 w,
                 "                    let (key, value) = \
-                 r.read_map(bytes, |r, bytes| {}, |r, bytes| {})?;",
+                 r.read_map(bytes, |r, bytes| Ok({}), |r, bytes| Ok({}))?;",
                 key.read_fn(desc)?.1,
                 value.read_fn(desc)?.1
             )?;
@@ -480,31 +530,27 @@ impl Field {
         let name = &self.name;
         write!(w, "                Ok({}) => ", self.tag())?;
         match self.frequency {
-            _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({}?)),", name, val)?,
+            _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({})),", name, val)?,
             Frequency::Optional
                 if desc.syntax == Syntax::Proto2 && self.default.is_none()
                     || self.typ.message().is_some() =>
             {
-                writeln!(w, "msg.{} = Some({}?),", name, val_cow)?
+                writeln!(w, "msg.{} = Some({}),", name, val_cow)?
             }
             Frequency::Required | Frequency::Optional => {
-                writeln!(w, "msg.{} = {}?,", name, val_cow)?
+                writeln!(w, "msg.{} = {},", name, val_cow)?
             }
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
-                writeln!(
-                    w,
-                    "msg.{} = Cow::Borrowed(r.read_packed_fixed(bytes)?),",
-                    name
-                )?;
+                writeln!(w, "msg.{} = r.read_packed_fixed(bytes)?.into(),", name)?;
             }
             Frequency::Repeated if self.packed() => {
                 writeln!(
                     w,
-                    "msg.{} = r.read_packed(bytes, |r, bytes| {})?,",
+                    "msg.{} = r.read_packed(bytes, |r, bytes| Ok({}))?,",
                     name, val_cow
                 )?;
             }
-            Frequency::Repeated => writeln!(w, "msg.{}.push({}?),", name, val_cow)?,
+            Frequency::Repeated => writeln!(w, "msg.{}.push({}),", name, val_cow)?,
         }
         Ok(())
     }
@@ -720,6 +766,31 @@ pub struct Message {
 }
 
 impl Message {
+    fn convert_field_types(&mut self, from: &FieldType, to: &FieldType) {
+        for f in self.all_fields_mut().filter(|f| f.typ == *from) {
+            f.typ = to.clone();
+        }
+
+        // If that type is a map with the fieldtype, it must also be converted.
+        for f in self.all_fields_mut() {
+            let new_type: FieldType = match f.typ {
+                FieldType::Map(ref mut key, ref mut value)
+                    if **key == *from && **value == *from =>
+                {
+                    FieldType::Map(Box::new(to.clone()), Box::new(to.clone()))
+                }
+                FieldType::Map(ref mut key, ref mut value) if **key == *from => {
+                    FieldType::Map(Box::new(to.clone()), value.clone())
+                }
+                FieldType::Map(ref mut key, ref mut value) if **value == *from => {
+                    FieldType::Map(key.clone(), Box::new(to.clone()))
+                }
+                ref other => other.clone(),
+            };
+            f.typ = new_type;
+        }
+    }
+
     fn has_lifetime(&self, desc: &FileDescriptor, ignore: &mut Vec<MessageIndex>) -> bool {
         if ignore.contains(&&self.index) {
             return false;
@@ -753,15 +824,15 @@ impl Message {
         self.fields.is_empty() && self.oneofs.is_empty()
     }
 
-    fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         println!("Writing message {}{}", self.get_modules(desc), self.name);
         writeln!(w, "")?;
 
-        self.write_definition(w, desc)?;
+        self.write_definition(w, desc, config)?;
         writeln!(w, "")?;
-        self.write_impl_message_read(w, desc)?;
+        self.write_impl_message_read(w, desc, config)?;
         writeln!(w, "")?;
-        self.write_impl_message_write(w, desc)?;
+        self.write_impl_message_write(w, desc, config)?;
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
             writeln!(w, "")?;
@@ -785,7 +856,7 @@ impl Message {
                 writeln!(w, "use super::*;")?;
             }
             for m in &self.messages {
-                m.write(w, desc)?;
+                m.write(w, desc, config)?;
             }
             for e in &self.enums {
                 e.write(w)?;
@@ -801,20 +872,38 @@ impl Message {
         Ok(())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
-        writeln!(w, "#[derive(Debug, Default, PartialEq, Clone)]")?;
+    fn write_definition<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
+        let mut custom_struct_derive = config.custom_struct_derive.join(", ");
+        if custom_struct_derive.len() > 0 {
+            custom_struct_derive += ", ";
+        }
+
+        writeln!(
+            w,
+            "#[derive({}Debug, Default, PartialEq, Clone)]",
+            custom_struct_derive
+        )?;
         if self.is_unit() {
             writeln!(w, "pub struct {} {{ }}", self.name)?;
             return Ok(());
         }
 
-        if self.has_lifetime(desc, &mut Vec::new()) {
+        let mut ignore = Vec::new();
+        if config.dont_use_cow {
+            ignore.push(self.index.clone());
+        }
+        if self.has_lifetime(desc, &mut ignore) {
             writeln!(w, "pub struct {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "pub struct {} {{", self.name)?;
         }
         for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_definition(w, desc)?;
+            f.write_definition(w, desc, config)?;
         }
         for o in &self.oneofs {
             o.write_message_definition(w, desc)?;
@@ -823,7 +912,12 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_message_read<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_impl_message_read<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
         if self.is_unit() {
             writeln!(w, "impl<'a> MessageRead<'a> for {} {{", self.name)?;
             writeln!(
@@ -837,7 +931,11 @@ impl Message {
             return Ok(());
         }
 
-        if self.has_lifetime(desc, &mut Vec::new()) {
+        let mut ignore = Vec::new();
+        if config.dont_use_cow {
+            ignore.push(self.index.clone());
+        }
+        if self.has_lifetime(desc, &mut ignore) {
             writeln!(w, "impl<'a> MessageRead<'a> for {}<'a> {{", self.name)?;
             writeln!(
                 w,
@@ -896,13 +994,22 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_message_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_impl_message_write<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
         if self.is_unit() {
             writeln!(w, "impl MessageWrite for {} {{ }}", self.name)?;
             return Ok(());
         }
 
-        if self.has_lifetime(desc, &mut Vec::new()) {
+        let mut ignore = Vec::new();
+        if config.dont_use_cow {
+            ignore.push(self.index.clone());
+        }
+        if self.has_lifetime(desc, &mut ignore) {
             writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
@@ -1082,6 +1189,27 @@ impl Message {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct RpcFunctionDeclaration {
+    pub name: String,
+    pub arg: String,
+    pub ret: String,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RpcService {
+    pub service_name: String,
+    pub functions: Vec<RpcFunctionDeclaration>,
+}
+
+impl RpcService {
+    fn write_definition<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
+        (config.custom_rpc_generator)(self, w)
+    }
+}
+
+pub type RpcGeneratorFunction = Box<Fn(&RpcService, &mut Write) -> Result<()>>;
+
+#[derive(Debug, Clone, Default)]
 pub struct Enumerator {
     pub name: String,
     pub fields: Vec<(String, i32)>,
@@ -1253,6 +1381,35 @@ impl OneOf {
         }
         writeln!(w, "    None,")?;
         writeln!(w, "}}")?;
+
+        if cfg!(feature = "generateImplFromForEnums") {
+            self.generate_impl_from_for_enums(w, desc)
+        } else {
+            Ok(())
+        }
+    }
+
+    fn generate_impl_from_for_enums<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+    ) -> Result<()> {
+        // For the first of each enumeration type, generate an impl From<> for it.
+        let mut handled_fields = Vec::new();
+        for f in &self.fields {
+            let rust_type = f.typ.rust_type(desc)?;
+            if handled_fields.contains(&rust_type) {
+                continue;
+            }
+            writeln!(w, "impl From<{}> for OneOf{} {{", rust_type, self.name)?; // TODO: lifetime.
+            writeln!(w, "   fn from(f: {}) -> OneOf{} {{", rust_type, self.name)?;
+            writeln!(w, "      OneOf{}::{}(f)", self.name, f.name)?;
+            writeln!(w, "   }}")?;
+            writeln!(w, "}}")?;
+
+            handled_fields.push(rust_type);
+        }
+
         Ok(())
     }
 
@@ -1296,7 +1453,7 @@ impl OneOf {
             if f.boxed {
                 writeln!(
                     w,
-                    "                Ok({}) => msg.{} = {}OneOf{}::{}(Box::new({}?)),",
+                    "                Ok({}) => msg.{} = {}OneOf{}::{}(Box::new({})),",
                     f.tag(),
                     self.name,
                     self.get_modules(desc),
@@ -1307,7 +1464,7 @@ impl OneOf {
             } else {
                 writeln!(
                     w,
-                    "                Ok({}) => msg.{} = {}OneOf{}::{}({}?),",
+                    "                Ok({}) => msg.{} = {}OneOf{}::{}({}),",
                     f.tag(),
                     self.name,
                     self.get_modules(desc),
@@ -1388,6 +1545,10 @@ pub struct Config {
     pub no_output: bool,
     pub error_cycle: bool,
     pub headers: bool,
+    pub dont_use_cow: bool,
+    pub custom_struct_derive: Vec<String>,
+    pub custom_rpc_generator: RpcGeneratorFunction,
+    pub custom_includes: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1398,6 +1559,7 @@ pub struct FileDescriptor {
     pub messages: Vec<Message>,
     pub enums: Vec<Enumerator>,
     pub module: String,
+    pub rpc_services: Vec<RpcService>,
 }
 
 impl FileDescriptor {
@@ -1419,6 +1581,10 @@ impl FileDescriptor {
         desc.resolve_types()?;
         desc.break_cycles(config.error_cycle)?;
         desc.sanity_checks()?;
+        if config.dont_use_cow {
+            desc.convert_field_types(&FieldType::StringCow, &FieldType::String_);
+            desc.convert_field_types(&FieldType::BytesCow, &FieldType::Bytes_);
+        }
         desc.set_defaults()?;
         desc.sanitize_names();
 
@@ -1477,8 +1643,15 @@ impl FileDescriptor {
 
         let name = config.in_file.file_name().and_then(|e| e.to_str()).unwrap();
         let mut w = BufWriter::new(File::create(&out_file)?);
-        desc.write(&mut w, name, config.headers)?;
+        desc.write(&mut w, name, config)?;
         update_mod_file(&out_file)
+    }
+
+    pub fn convert_field_types(&mut self, from: &FieldType, to: &FieldType) {
+        // Messages and enums are the only structures with types
+        for m in &mut self.messages {
+            m.convert_field_types(from, to);
+        }
     }
 
     /// Opens a proto file, reads it and returns raw parsed data
@@ -1818,20 +1991,21 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn write<W: Write>(&self, w: &mut W, filename: &str, headers: bool) -> Result<()> {
+    fn write<W: Write>(&self, w: &mut W, filename: &str, config: &Config) -> Result<()> {
         println!(
             "Found {} messages, and {} enums",
             self.messages.len(),
             self.enums.len()
         );
-        if headers {
+        if config.headers {
             self.write_headers(w, filename)?;
         }
         self.write_package_start(w)?;
-        self.write_uses(w)?;
+        self.write_uses(w, config)?;
         self.write_imports(w)?;
         self.write_enums(w)?;
-        self.write_messages(w)?;
+        self.write_messages(w, config)?;
+        self.write_rpc_services(w, config)?;
         self.write_package_end(w)?;
         Ok(())
     }
@@ -1860,7 +2034,7 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn write_uses<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_uses<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         if self.messages.iter().all(|m| m.is_unit()) {
             writeln!(
                 w,
@@ -1888,6 +2062,9 @@ impl FileDescriptor {
             "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
         )?;
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
+        for include in &config.custom_includes {
+            writeln!(w, "{}", include)?;
+        }
         Ok(())
     }
 
@@ -1927,9 +2104,18 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn write_messages<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_rpc_services<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
+        for m in self.rpc_services.iter() {
+            println!("Writing Rpc {}", m.service_name);
+            writeln!(w, "")?;
+            m.write_definition(w, config)?;
+        }
+        Ok(())
+    }
+
+    fn write_messages<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         for m in self.messages.iter().filter(|m| !m.imported) {
-            m.write(w, &self)?;
+            m.write(w, &self, config)?;
         }
         Ok(())
     }

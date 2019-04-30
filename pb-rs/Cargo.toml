@@ -18,3 +18,7 @@ env_logger = "0.5.13"
 
 [dev-dependencies]
 walkdir = "2.2.5"
+
+[features]
+default = []
+generateImplFromForEnums = []

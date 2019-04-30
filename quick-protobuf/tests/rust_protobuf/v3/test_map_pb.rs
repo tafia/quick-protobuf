@@ -1,9 +1,20 @@
-use super::*;
-use quick_protobuf::sizeofs::*;
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result, Writer};
+// Automatically generated rust module for 'test_map_pb.proto' file
+
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
+
+use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::io::Write;
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::sizeofs::*;
+use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestMap<'a> {
@@ -17,24 +28,14 @@ impl<'a> MessageRead<'a> for TestMap<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => {
-                    let (key, value) = r.read_map(
-                        bytes,
-                        |r, bytes| r.read_string(bytes).map(Cow::Borrowed),
-                        |r, bytes| r.read_uint32(bytes),
-                    )?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_uint32(bytes)?))?;
                     msg.m.insert(key, value);
                 }
                 Ok(18) => {
-                    let (key, value) = r.read_map(
-                        bytes,
-                        |r, bytes| r.read_string(bytes).map(Cow::Borrowed),
-                        |r, bytes| r.read_message::<TestMapEntry>(bytes),
-                    )?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_message::<TestMapEntry>(bytes)?))?;
                     msg.mm.insert(key, value);
                 }
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -44,43 +45,14 @@ impl<'a> MessageRead<'a> for TestMap<'a> {
 
 impl<'a> MessageWrite for TestMap<'a> {
     fn get_size(&self) -> usize {
-        0 + self
-            .m
-            .iter()
-            .map(|(k, v)| 1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64)))
-            .sum::<usize>()
-            + self
-                .mm
-                .iter()
-                .map(|(k, v)| {
-                    1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_len((v).get_size()))
-                })
-                .sum::<usize>()
+        0
+        + self.m.iter().map(|(k, v)| 1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64))).sum::<usize>()
+        + self.mm.iter().map(|(k, v)| 1 + sizeof_len(2 + sizeof_len((k).len()) + sizeof_len((v).get_size()))).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        for (k, v) in self.m.iter() {
-            w.write_with_tag(10, |w| {
-                w.write_map(
-                    2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64),
-                    10,
-                    |w| w.write_string(&**k),
-                    16,
-                    |w| w.write_uint32(*v),
-                )
-            })?;
-        }
-        for (k, v) in self.mm.iter() {
-            w.write_with_tag(18, |w| {
-                w.write_map(
-                    2 + sizeof_len((k).len()) + sizeof_len((v).get_size()),
-                    10,
-                    |w| w.write_string(&**k),
-                    18,
-                    |w| w.write_message(v),
-                )
-            })?;
-        }
+        for (k, v) in self.m.iter() { w.write_with_tag(10, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_varint(*(v) as u64), 10, |w| w.write_string(&**k), 16, |w| w.write_uint32(*v)))?; }
+        for (k, v) in self.mm.iter() { w.write_with_tag(18, |w| w.write_map(2 + sizeof_len((k).len()) + sizeof_len((v).get_size()), 10, |w| w.write_string(&**k), 18, |w| w.write_message(v)))?; }
         Ok(())
     }
 }
@@ -96,9 +68,7 @@ impl<'a> MessageRead<'a> for TestMapEntry {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.v = r.read_int64(bytes)?,
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -108,17 +78,13 @@ impl<'a> MessageRead<'a> for TestMapEntry {
 
 impl MessageWrite for TestMapEntry {
     fn get_size(&self) -> usize {
-        0 + if self.v == 0i64 {
-            0
-        } else {
-            1 + sizeof_varint(*(&self.v) as u64)
-        }
+        0
+        + if self.v == 0i64 { 0 } else { 1 + sizeof_varint(*(&self.v) as u64) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if self.v != 0i64 {
-            w.write_with_tag(8, |w| w.write_int64(*&self.v))?;
-        }
+        if self.v != 0i64 { w.write_with_tag(8, |w| w.write_int64(*&self.v))?; }
         Ok(())
     }
 }
+

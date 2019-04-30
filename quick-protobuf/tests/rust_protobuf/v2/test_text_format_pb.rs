@@ -1,8 +1,19 @@
-use super::*;
-use quick_protobuf::sizeofs::*;
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Result, Writer};
-use std::borrow::Cow;
+// Automatically generated rust module for 'test_text_format_pb.proto' file
+
+#![allow(non_snake_case)]
+#![allow(non_upper_case_globals)]
+#![allow(non_camel_case_types)]
+#![allow(unused_imports)]
+#![allow(unknown_lints)]
+#![allow(clippy)]
+#![cfg_attr(rustfmt, rustfmt_skip)]
+
+
 use std::io::Write;
+use std::borrow::Cow;
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::sizeofs::*;
+use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TestEnum {
@@ -47,9 +58,7 @@ impl<'a> MessageRead<'a> for TestMessage {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(80) => msg.value = Some(r.read_int32(bytes)?),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -59,16 +68,12 @@ impl<'a> MessageRead<'a> for TestMessage {
 
 impl MessageWrite for TestMessage {
     fn get_size(&self) -> usize {
-        0 + self
-            .value
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        0
+        + self.value.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.value {
-            w.write_with_tag(80, |w| w.write_int32(*s))?;
-        }
+        if let Some(ref s) = self.value { w.write_with_tag(80, |w| w.write_int32(*s))?; }
         Ok(())
     }
 }
@@ -146,19 +151,11 @@ impl<'a> MessageRead<'a> for TestTypes<'a> {
                 Ok(333) => msg.sfixed32_repeated.push(r.read_sfixed32(bytes)?),
                 Ok(337) => msg.sfixed64_repeated.push(r.read_sfixed64(bytes)?),
                 Ok(344) => msg.bool_repeated.push(r.read_bool(bytes)?),
-                Ok(354) => msg
-                    .string_repeated
-                    .push(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(362) => msg
-                    .bytes_repeated
-                    .push(r.read_bytes(bytes).map(Cow::Borrowed)?),
+                Ok(354) => msg.string_repeated.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(362) => msg.bytes_repeated.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(368) => msg.test_enum_repeated.push(r.read_enum(bytes)?),
-                Ok(378) => msg
-                    .test_message_repeated
-                    .push(r.read_message::<TestMessage>(bytes)?),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(378) => msg.test_message_repeated.push(r.read_message::<TestMessage>(bytes)?),
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -168,222 +165,78 @@ impl<'a> MessageRead<'a> for TestTypes<'a> {
 
 impl<'a> MessageWrite for TestTypes<'a> {
     fn get_size(&self) -> usize {
-        0 + self.double_singular.as_ref().map_or(0, |_| 1 + 8)
-            + self.float_singular.as_ref().map_or(0, |_| 1 + 4)
-            + self
-                .int32_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .int64_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .uint32_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .uint64_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .sint32_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_sint32(*(m)))
-            + self
-                .sint64_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_sint64(*(m)))
-            + self.fixed32_singular.as_ref().map_or(0, |_| 1 + 4)
-            + self.fixed64_singular.as_ref().map_or(0, |_| 1 + 8)
-            + self.sfixed32_singular.as_ref().map_or(0, |_| 1 + 4)
-            + self.sfixed64_singular.as_ref().map_or(0, |_| 1 + 8)
-            + self
-                .bool_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
-            + self
-                .string_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_len((m).len()))
-            + self
-                .bytes_singular
-                .as_ref()
-                .map_or(0, |m| 1 + sizeof_len((m).len()))
-            + self
-                .test_enum_singular
-                .as_ref()
-                .map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
-            + self
-                .test_message_singular
-                .as_ref()
-                .map_or(0, |m| 2 + sizeof_len((m).get_size()))
-            + (2 + 8) * self.double_repeated.len()
-            + (2 + 4) * self.float_repeated.len()
-            + self
-                .int32_repeated
-                .iter()
-                .map(|s| 2 + sizeof_varint(*(s) as u64))
-                .sum::<usize>()
-            + self
-                .int64_repeated
-                .iter()
-                .map(|s| 2 + sizeof_varint(*(s) as u64))
-                .sum::<usize>()
-            + self
-                .uint32_repeated
-                .iter()
-                .map(|s| 2 + sizeof_varint(*(s) as u64))
-                .sum::<usize>()
-            + self
-                .uint64_repeated
-                .iter()
-                .map(|s| 2 + sizeof_varint(*(s) as u64))
-                .sum::<usize>()
-            + self
-                .sint32_repeated
-                .iter()
-                .map(|s| 2 + sizeof_sint32(*(s)))
-                .sum::<usize>()
-            + self
-                .sint64_repeated
-                .iter()
-                .map(|s| 2 + sizeof_sint64(*(s)))
-                .sum::<usize>()
-            + (2 + 4) * self.fixed32_repeated.len()
-            + (2 + 8) * self.fixed64_repeated.len()
-            + (2 + 4) * self.sfixed32_repeated.len()
-            + (2 + 8) * self.sfixed64_repeated.len()
-            + self
-                .bool_repeated
-                .iter()
-                .map(|s| 2 + sizeof_varint(*(s) as u64))
-                .sum::<usize>()
-            + self
-                .string_repeated
-                .iter()
-                .map(|s| 2 + sizeof_len((s).len()))
-                .sum::<usize>()
-            + self
-                .bytes_repeated
-                .iter()
-                .map(|s| 2 + sizeof_len((s).len()))
-                .sum::<usize>()
-            + self
-                .test_enum_repeated
-                .iter()
-                .map(|s| 2 + sizeof_varint(*(s) as u64))
-                .sum::<usize>()
-            + self
-                .test_message_repeated
-                .iter()
-                .map(|s| 2 + sizeof_len((s).get_size()))
-                .sum::<usize>()
+        0
+        + self.double_singular.as_ref().map_or(0, |_| 1 + 8)
+        + self.float_singular.as_ref().map_or(0, |_| 1 + 4)
+        + self.int32_singular.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.int64_singular.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.uint32_singular.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.uint64_singular.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.sint32_singular.as_ref().map_or(0, |m| 1 + sizeof_sint32(*(m)))
+        + self.sint64_singular.as_ref().map_or(0, |m| 1 + sizeof_sint64(*(m)))
+        + self.fixed32_singular.as_ref().map_or(0, |_| 1 + 4)
+        + self.fixed64_singular.as_ref().map_or(0, |_| 1 + 8)
+        + self.sfixed32_singular.as_ref().map_or(0, |_| 1 + 4)
+        + self.sfixed64_singular.as_ref().map_or(0, |_| 1 + 8)
+        + self.bool_singular.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.string_singular.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        + self.bytes_singular.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
+        + self.test_enum_singular.as_ref().map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
+        + self.test_message_singular.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
+        + (2 + 8) * self.double_repeated.len()
+        + (2 + 4) * self.float_repeated.len()
+        + self.int32_repeated.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        + self.int64_repeated.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        + self.uint32_repeated.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        + self.uint64_repeated.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        + self.sint32_repeated.iter().map(|s| 2 + sizeof_sint32(*(s))).sum::<usize>()
+        + self.sint64_repeated.iter().map(|s| 2 + sizeof_sint64(*(s))).sum::<usize>()
+        + (2 + 4) * self.fixed32_repeated.len()
+        + (2 + 8) * self.fixed64_repeated.len()
+        + (2 + 4) * self.sfixed32_repeated.len()
+        + (2 + 8) * self.sfixed64_repeated.len()
+        + self.bool_repeated.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        + self.string_repeated.iter().map(|s| 2 + sizeof_len((s).len())).sum::<usize>()
+        + self.bytes_repeated.iter().map(|s| 2 + sizeof_len((s).len())).sum::<usize>()
+        + self.test_enum_repeated.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
+        + self.test_message_repeated.iter().map(|s| 2 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.double_singular {
-            w.write_with_tag(9, |w| w.write_double(*s))?;
-        }
-        if let Some(ref s) = self.float_singular {
-            w.write_with_tag(21, |w| w.write_float(*s))?;
-        }
-        if let Some(ref s) = self.int32_singular {
-            w.write_with_tag(24, |w| w.write_int32(*s))?;
-        }
-        if let Some(ref s) = self.int64_singular {
-            w.write_with_tag(32, |w| w.write_int64(*s))?;
-        }
-        if let Some(ref s) = self.uint32_singular {
-            w.write_with_tag(40, |w| w.write_uint32(*s))?;
-        }
-        if let Some(ref s) = self.uint64_singular {
-            w.write_with_tag(48, |w| w.write_uint64(*s))?;
-        }
-        if let Some(ref s) = self.sint32_singular {
-            w.write_with_tag(56, |w| w.write_sint32(*s))?;
-        }
-        if let Some(ref s) = self.sint64_singular {
-            w.write_with_tag(64, |w| w.write_sint64(*s))?;
-        }
-        if let Some(ref s) = self.fixed32_singular {
-            w.write_with_tag(77, |w| w.write_fixed32(*s))?;
-        }
-        if let Some(ref s) = self.fixed64_singular {
-            w.write_with_tag(81, |w| w.write_fixed64(*s))?;
-        }
-        if let Some(ref s) = self.sfixed32_singular {
-            w.write_with_tag(93, |w| w.write_sfixed32(*s))?;
-        }
-        if let Some(ref s) = self.sfixed64_singular {
-            w.write_with_tag(97, |w| w.write_sfixed64(*s))?;
-        }
-        if let Some(ref s) = self.bool_singular {
-            w.write_with_tag(104, |w| w.write_bool(*s))?;
-        }
-        if let Some(ref s) = self.string_singular {
-            w.write_with_tag(114, |w| w.write_string(&**s))?;
-        }
-        if let Some(ref s) = self.bytes_singular {
-            w.write_with_tag(122, |w| w.write_bytes(&**s))?;
-        }
-        if let Some(ref s) = self.test_enum_singular {
-            w.write_with_tag(128, |w| w.write_enum(*s as i32))?;
-        }
-        if let Some(ref s) = self.test_message_singular {
-            w.write_with_tag(138, |w| w.write_message(s))?;
-        }
-        for s in &self.double_repeated {
-            w.write_with_tag(249, |w| w.write_double(*s))?;
-        }
-        for s in &self.float_repeated {
-            w.write_with_tag(261, |w| w.write_float(*s))?;
-        }
-        for s in &self.int32_repeated {
-            w.write_with_tag(264, |w| w.write_int32(*s))?;
-        }
-        for s in &self.int64_repeated {
-            w.write_with_tag(272, |w| w.write_int64(*s))?;
-        }
-        for s in &self.uint32_repeated {
-            w.write_with_tag(280, |w| w.write_uint32(*s))?;
-        }
-        for s in &self.uint64_repeated {
-            w.write_with_tag(288, |w| w.write_uint64(*s))?;
-        }
-        for s in &self.sint32_repeated {
-            w.write_with_tag(296, |w| w.write_sint32(*s))?;
-        }
-        for s in &self.sint64_repeated {
-            w.write_with_tag(304, |w| w.write_sint64(*s))?;
-        }
-        for s in &self.fixed32_repeated {
-            w.write_with_tag(317, |w| w.write_fixed32(*s))?;
-        }
-        for s in &self.fixed64_repeated {
-            w.write_with_tag(321, |w| w.write_fixed64(*s))?;
-        }
-        for s in &self.sfixed32_repeated {
-            w.write_with_tag(333, |w| w.write_sfixed32(*s))?;
-        }
-        for s in &self.sfixed64_repeated {
-            w.write_with_tag(337, |w| w.write_sfixed64(*s))?;
-        }
-        for s in &self.bool_repeated {
-            w.write_with_tag(344, |w| w.write_bool(*s))?;
-        }
-        for s in &self.string_repeated {
-            w.write_with_tag(354, |w| w.write_string(&**s))?;
-        }
-        for s in &self.bytes_repeated {
-            w.write_with_tag(362, |w| w.write_bytes(&**s))?;
-        }
-        for s in &self.test_enum_repeated {
-            w.write_with_tag(368, |w| w.write_enum(*s as i32))?;
-        }
-        for s in &self.test_message_repeated {
-            w.write_with_tag(378, |w| w.write_message(s))?;
-        }
+        if let Some(ref s) = self.double_singular { w.write_with_tag(9, |w| w.write_double(*s))?; }
+        if let Some(ref s) = self.float_singular { w.write_with_tag(21, |w| w.write_float(*s))?; }
+        if let Some(ref s) = self.int32_singular { w.write_with_tag(24, |w| w.write_int32(*s))?; }
+        if let Some(ref s) = self.int64_singular { w.write_with_tag(32, |w| w.write_int64(*s))?; }
+        if let Some(ref s) = self.uint32_singular { w.write_with_tag(40, |w| w.write_uint32(*s))?; }
+        if let Some(ref s) = self.uint64_singular { w.write_with_tag(48, |w| w.write_uint64(*s))?; }
+        if let Some(ref s) = self.sint32_singular { w.write_with_tag(56, |w| w.write_sint32(*s))?; }
+        if let Some(ref s) = self.sint64_singular { w.write_with_tag(64, |w| w.write_sint64(*s))?; }
+        if let Some(ref s) = self.fixed32_singular { w.write_with_tag(77, |w| w.write_fixed32(*s))?; }
+        if let Some(ref s) = self.fixed64_singular { w.write_with_tag(81, |w| w.write_fixed64(*s))?; }
+        if let Some(ref s) = self.sfixed32_singular { w.write_with_tag(93, |w| w.write_sfixed32(*s))?; }
+        if let Some(ref s) = self.sfixed64_singular { w.write_with_tag(97, |w| w.write_sfixed64(*s))?; }
+        if let Some(ref s) = self.bool_singular { w.write_with_tag(104, |w| w.write_bool(*s))?; }
+        if let Some(ref s) = self.string_singular { w.write_with_tag(114, |w| w.write_string(&**s))?; }
+        if let Some(ref s) = self.bytes_singular { w.write_with_tag(122, |w| w.write_bytes(&**s))?; }
+        if let Some(ref s) = self.test_enum_singular { w.write_with_tag(128, |w| w.write_enum(*s as i32))?; }
+        if let Some(ref s) = self.test_message_singular { w.write_with_tag(138, |w| w.write_message(s))?; }
+        for s in &self.double_repeated { w.write_with_tag(249, |w| w.write_double(*s))?; }
+        for s in &self.float_repeated { w.write_with_tag(261, |w| w.write_float(*s))?; }
+        for s in &self.int32_repeated { w.write_with_tag(264, |w| w.write_int32(*s))?; }
+        for s in &self.int64_repeated { w.write_with_tag(272, |w| w.write_int64(*s))?; }
+        for s in &self.uint32_repeated { w.write_with_tag(280, |w| w.write_uint32(*s))?; }
+        for s in &self.uint64_repeated { w.write_with_tag(288, |w| w.write_uint64(*s))?; }
+        for s in &self.sint32_repeated { w.write_with_tag(296, |w| w.write_sint32(*s))?; }
+        for s in &self.sint64_repeated { w.write_with_tag(304, |w| w.write_sint64(*s))?; }
+        for s in &self.fixed32_repeated { w.write_with_tag(317, |w| w.write_fixed32(*s))?; }
+        for s in &self.fixed64_repeated { w.write_with_tag(321, |w| w.write_fixed64(*s))?; }
+        for s in &self.sfixed32_repeated { w.write_with_tag(333, |w| w.write_sfixed32(*s))?; }
+        for s in &self.sfixed64_repeated { w.write_with_tag(337, |w| w.write_sfixed64(*s))?; }
+        for s in &self.bool_repeated { w.write_with_tag(344, |w| w.write_bool(*s))?; }
+        for s in &self.string_repeated { w.write_with_tag(354, |w| w.write_string(&**s))?; }
+        for s in &self.bytes_repeated { w.write_with_tag(362, |w| w.write_bytes(&**s))?; }
+        for s in &self.test_enum_repeated { w.write_with_tag(368, |w| w.write_enum(*s as i32))?; }
+        for s in &self.test_message_repeated { w.write_with_tag(378, |w| w.write_message(s))?; }
         Ok(())
     }
 }
@@ -399,9 +252,7 @@ impl<'a> MessageRead<'a> for TestTextFormatRustIdentifier {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.const_pb = Some(r.read_bool(bytes)?),
-                Ok(t) => {
-                    r.read_unknown(bytes, t)?;
-                }
+                Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
         }
@@ -411,16 +262,13 @@ impl<'a> MessageRead<'a> for TestTextFormatRustIdentifier {
 
 impl MessageWrite for TestTextFormatRustIdentifier {
     fn get_size(&self) -> usize {
-        0 + self
-            .const_pb
-            .as_ref()
-            .map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        0
+        + self.const_pb.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.const_pb {
-            w.write_with_tag(8, |w| w.write_bool(*s))?;
-        }
+        if let Some(ref s) = self.const_pb { w.write_with_tag(8, |w| w.write_bool(*s))?; }
         Ok(())
     }
 }
+
