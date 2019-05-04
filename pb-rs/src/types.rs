@@ -509,7 +509,7 @@ impl Field {
     fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         // special case for FieldType::Map: destructure tuple before inserting in HashMap
         if let FieldType::Map(ref key, ref value) = self.typ {
-            writeln!(w, "                Ok({}) => {{", self.tag())?;
+            writeln!(w, "                Ok({:#o}) => {{", self.tag())?;
             writeln!(
                 w,
                 "                    let (key, value) = \
@@ -528,7 +528,7 @@ impl Field {
 
         let (val, val_cow) = self.typ.read_fn(desc)?;
         let name = &self.name;
-        write!(w, "                Ok({}) => ", self.tag())?;
+        write!(w, "                Ok({:#o}) => ", self.tag())?;
         match self.frequency {
             _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({})),", name, val)?,
             Frequency::Optional
@@ -655,7 +655,7 @@ impl Field {
                         writeln!(
                             w,
                             "        if let Some(ref s) = \
-                             self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                             self.{} {{ w.write_with_tag({:#o}, |w| w.{})?; }}",
                             self.name,
                             self.tag(),
                             self.typ.get_write("s", self.boxed)
@@ -664,7 +664,7 @@ impl Field {
                     Some(d) => {
                         writeln!(
                             w,
-                            "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                            "        if self.{} != {} {{ w.write_with_tag({:#o}, |w| w.{})?; }}",
                             self.name,
                             d,
                             self.tag(),
@@ -677,7 +677,7 @@ impl Field {
             Frequency::Optional => {
                 writeln!(
                     w,
-                    "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                    "        if self.{} != {} {{ w.write_with_tag({:#o}, |w| w.{})?; }}",
                     self.name,
                     self.default.as_ref().map_or_else(
                         || self.typ.regular_default(desc).unwrap_or("None"),
@@ -691,7 +691,7 @@ impl Field {
             Frequency::Required if self.typ.is_map() => {
                 writeln!(
                     w,
-                    "        for (k, v) in self.{}.iter() {{ w.write_with_tag({}, |w| w.{})?; }}",
+                    "        for (k, v) in self.{}.iter() {{ w.write_with_tag({:#o}, |w| w.{})?; }}",
                     self.name,
                     self.tag(),
                     self.typ.get_write("", false)
@@ -700,7 +700,7 @@ impl Field {
             Frequency::Required => {
                 writeln!(
                     w,
-                    "        w.write_with_tag({}, |w| w.{})?;",
+                    "        w.write_with_tag({:#o}, |w| w.{})?;",
                     self.tag(),
                     self.typ
                         .get_write(&format!("&self.{}", self.name), self.boxed)
@@ -708,13 +708,13 @@ impl Field {
             }
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => writeln!(
                 w,
-                "        w.write_packed_fixed_with_tag({}, &self.{})?;",
+                "        w.write_packed_fixed_with_tag({:#o}, &self.{})?;",
                 self.tag(),
                 self.name
             )?,
             Frequency::Repeated if self.packed() => writeln!(
                 w,
-                "        w.write_packed_with_tag({}, &self.{}, |w, m| w.{}, &|m| {})?;",
+                "        w.write_packed_with_tag({:#o}, &self.{}, |w, m| w.{}, &|m| {})?;",
                 self.tag(),
                 self.name,
                 self.typ.get_write("m", self.boxed),
@@ -723,7 +723,7 @@ impl Field {
             Frequency::Repeated => {
                 writeln!(
                     w,
-                    "        for s in &self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                    "        for s in &self.{} {{ w.write_with_tag({:#o}, |w| w.{})?; }}",
                     self.name,
                     self.tag(),
                     self.typ.get_write("s", self.boxed)
@@ -1453,7 +1453,7 @@ impl OneOf {
             if f.boxed {
                 writeln!(
                     w,
-                    "                Ok({}) => msg.{} = {}OneOf{}::{}(Box::new({})),",
+                    "                Ok({:#o}) => msg.{} = {}OneOf{}::{}(Box::new({})),",
                     f.tag(),
                     self.name,
                     self.get_modules(desc),
@@ -1464,7 +1464,7 @@ impl OneOf {
             } else {
                 writeln!(
                     w,
-                    "                Ok({}) => msg.{} = {}OneOf{}::{}({}),",
+                    "                Ok({:#o}) => msg.{} = {}OneOf{}::{}({}),",
                     f.tag(),
                     self.name,
                     self.get_modules(desc),
@@ -1518,7 +1518,7 @@ impl OneOf {
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             writeln!(
                 w,
-                "            {}OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},",
+                "            {}OneOf{}::{}(ref m) => {{ w.write_with_tag({:#o}, |w| w.{})? }},",
                 self.get_modules(desc),
                 self.name,
                 f.name,
