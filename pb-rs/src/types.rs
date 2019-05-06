@@ -834,6 +834,11 @@ impl Message {
         writeln!(w, "")?;
         self.write_impl_message_write(w, desc, config)?;
 
+        if desc.rentals && self.has_lifetime(desc, &mut Vec::new()) {
+            writeln!(w, "")?;
+            self.write_impl_rentals(w)?;
+        }
+
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
             writeln!(w, "")?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
@@ -1018,6 +1023,53 @@ impl Message {
         writeln!(w, "")?;
         self.write_write_message(w, desc)?;
         writeln!(w, "}}")?;
+        Ok(())
+    }
+
+    fn write_impl_rentals<W: Write>(&self, w: &mut W) -> Result<()> {
+        write!(w,
+            r#"
+            rental! {{
+                mod mod_{name}Rental {{
+                    use super::*;
+
+                    #[rental(covariant, debug)]
+                    pub struct {name}Rental {{
+                        buf: Vec<u8>,
+                        proto: {name}<'buf>,
+                    }}
+                }}
+            }}
+            pub use self::mod_{name}Rental::{name}Rental;
+
+            impl TryFrom<Vec<u8>> for {name}Rental {{
+                type Error=quick_protobuf::Error;
+
+                fn try_from(buf: Vec<u8>) -> Result<Self> {{
+                    Self::try_new_or_drop(buf, |buf| {{
+                        let mut reader = BytesReader::from_bytes(&buf);
+                        let proto = {name}::from_reader(&mut reader, &buf);
+                        proto
+                    }})
+                }}
+            }}
+
+            #[cfg(feature = "test_helpers")]
+            impl<'a> From<{name}<'a>> for {name}Rental {{
+                fn from(proto: {name}) -> Self {{
+                    use quick_protobuf::{{MessageWrite, Writer}};
+
+                    let mut buf = Vec::new();
+                    let mut writer = Writer::new(&mut buf);
+                    proto.write_message(&mut writer).expect("bad proto serialization");
+                    Self::new(buf, |buf| {{
+                        let mut reader = BytesReader::from_bytes(&buf);
+                        let proto = {name}::from_reader(&mut reader, &buf).expect("bad proto deserialization");
+                        proto
+                    }})
+                }}
+            }}
+            "#, name = self.name)?;
         Ok(())
     }
 
@@ -1549,6 +1601,7 @@ pub struct Config {
     pub custom_struct_derive: Vec<String>,
     pub custom_rpc_generator: RpcGeneratorFunction,
     pub custom_includes: Vec<String>,
+    pub rentals: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1560,6 +1613,7 @@ pub struct FileDescriptor {
     pub enums: Vec<Enumerator>,
     pub module: String,
     pub rpc_services: Vec<RpcService>,
+    pub rentals: bool,
 }
 
 impl FileDescriptor {
@@ -1572,6 +1626,7 @@ impl FileDescriptor {
 
     pub fn write_proto(config: &Config) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&config.in_file, &config.import_search_path)?;
+        desc.rentals = config.rentals;
 
         if desc.messages.is_empty() && desc.enums.is_empty() {
             // There could had been unsupported structures, so bail early
@@ -2061,6 +2116,11 @@ impl FileDescriptor {
             w,
             "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
         )?;
+
+        if self.rentals {
+            writeln!(w, "use std::convert::TryFrom;")?;
+        }
+
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
         for include in &config.custom_includes {
             writeln!(w, "{}", include)?;

@@ -67,6 +67,7 @@ pub struct ConfigBuilder {
     headers: bool,
     dont_use_cow: bool,
     custom_struct_derive: Vec<String>,
+    rentals: bool,
 }
 
 impl ConfigBuilder {
@@ -161,6 +162,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Generate Rental structs when the proto stuct has a lifetime
+    pub fn rentals(mut self, val: bool) -> Self {
+        self.rentals = val;
+        self
+    }
+
     /// Build Config from this ConfigBuilder
     pub fn build(self) -> Vec<Config> {
         self.in_files
@@ -188,6 +195,7 @@ impl ConfigBuilder {
                     custom_struct_derive: self.custom_struct_derive.clone(),
                     custom_rpc_generator: Box::new(|_, _| Ok(())),
                     custom_includes: Vec::new(),
+                    rentals: self.rentals,
                 }
             })
             .collect()
