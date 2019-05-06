@@ -1,7 +1,7 @@
 use quick_protobuf::*;
 
 use super::test_oneof_pb::*;
-use rust_protobuf::hex::{decode_hex, encode_hex};
+use crate::rust_protobuf::hex::{decode_hex, encode_hex};
 
 fn t<F>(f: F)
 where

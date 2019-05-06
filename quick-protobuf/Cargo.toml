@@ -8,6 +8,7 @@ license = "MIT"
 readme = "README.md" 
 documentation = "https://docs.rs/quick-protobuf"
 repository = "https://github.com/tafia/quick-protobuf"
+edition = "2018"
 
 [dependencies]
 byteorder = "1.2.4"

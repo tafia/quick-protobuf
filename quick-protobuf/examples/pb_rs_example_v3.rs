@@ -4,12 +4,12 @@ mod pb_rs_v3;
 
 use std::borrow::Cow;
 
-use pb_rs_v3::data_types::mod_FooMessage::OneOftest_oneof;
-use pb_rs_v3::data_types::{self, BarMessage, BazMessage, FooMessage, RepeatedMessage};
+use crate::pb_rs_v3::data_types::mod_FooMessage::OneOftest_oneof;
+use crate::pb_rs_v3::data_types::{self, BarMessage, BazMessage, FooMessage, RepeatedMessage};
 
 // Imported fields contain package a.b, which is translated into
 // mod_a::mod_b rust module
-use pb_rs_v3::a::b::ImportedMessage;
+use crate::pb_rs_v3::a::b::ImportedMessage;
 
 use quick_protobuf::{deserialize_from_slice, serialize_into_vec, BytesReader, Writer};
 

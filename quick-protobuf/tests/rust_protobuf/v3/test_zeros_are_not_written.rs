@@ -1,6 +1,6 @@
 use quick_protobuf::*;
 
-use rust_protobuf::hex::{encode_hex, decode_hex};
+use crate::rust_protobuf::hex::{encode_hex, decode_hex};
 use super::basic::*;
 
 #[test]
