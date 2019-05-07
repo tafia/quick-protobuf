@@ -1,4 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+set -e
+
+mkdir -p quick-protobuf/examples/pb_rs_v3/rental 
+cargo run -p pb-rs -- -r -d quick-protobuf/examples/pb_rs_v3/rental quick-protobuf/examples/pb_rs_v3/*.proto
+cargo run -p quick-protobuf --example pb_rs_example_v3_rental
 
 cargo run -p pb-rs quick-protobuf/examples/pb_rs/data_types_import.proto
 cargo run -p pb-rs quick-protobuf/examples/pb_rs/data_types.proto
@@ -11,3 +17,4 @@ cargo run -p quick-protobuf --example pb_rs_example_v3
 
 cd quick-protobuf/tests/rust_protobuf
 ./generate.sh
+cargo test -p pb-rs -p quick-protobuf
