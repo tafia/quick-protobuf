@@ -2,8 +2,8 @@
 
 use std::io::Write;
 
-use errors::Result;
-use message::MessageWrite;
+use crate::errors::Result;
+use crate::message::MessageWrite;
 
 use byteorder::LittleEndian as LE;
 use byteorder::WriteBytesExt;
@@ -312,7 +312,7 @@ impl<W: Write> Writer<W> {
 /// Serialize a `MessageWrite` into a `Vec`
 pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
     let len = message.get_size();
-    let mut v = Vec::with_capacity(len + ::sizeofs::sizeof_len(len));
+    let mut v = Vec::with_capacity(len + crate::sizeofs::sizeof_len(len));
     {
         let mut writer = Writer::new(&mut v);
         writer.write_message(message)?;

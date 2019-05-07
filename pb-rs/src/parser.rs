@@ -1,11 +1,11 @@
 use std::path::{Path, PathBuf};
 use std::str;
 
-use nom::{digit, hex_digit, multispace};
-use types::{
+use crate::types::{
     Enumerator, Field, FieldType, FileDescriptor, Frequency, Message, OneOf,
     RpcFunctionDeclaration, RpcService, Syntax,
 };
+use nom::{digit, hex_digit, multispace};
 
 fn is_word(b: u8) -> bool {
     match b {

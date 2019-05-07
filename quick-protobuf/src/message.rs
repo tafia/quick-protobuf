@@ -6,9 +6,9 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use errors::Result;
-use reader::BytesReader;
-use writer::Writer;
+use crate::errors::Result;
+use crate::reader::BytesReader;
+use crate::writer::Writer;
 
 /// A trait to handle deserialization based on parsed `Field`s
 pub trait MessageWrite: Sized {

@@ -15,7 +15,7 @@ pub mod reader;
 pub mod sizeofs;
 pub mod writer;
 
-pub use errors::{Error, Result};
-pub use message::{MessageRead, MessageWrite};
-pub use reader::{deserialize_from_slice, BytesReader, Reader};
-pub use writer::{serialize_into_vec, Writer};
+pub use crate::errors::{Error, Result};
+pub use crate::message::{MessageRead, MessageWrite};
+pub use crate::reader::{deserialize_from_slice, BytesReader, Reader};
+pub use crate::writer::{serialize_into_vec, Writer};

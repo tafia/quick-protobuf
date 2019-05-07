@@ -11,8 +11,8 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
 
-use errors::{Error, Result};
-use message::MessageRead;
+use crate::errors::{Error, Result};
+use crate::message::MessageRead;
 
 use byteorder::ByteOrder;
 use byteorder::LittleEndian as LE;

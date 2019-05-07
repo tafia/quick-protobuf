@@ -1,6 +1,6 @@
+use crate::types::{FileDescriptor, Frequency, MessageIndex};
 use std::cmp::min;
 use std::collections::HashMap;
-use types::{FileDescriptor, Frequency, MessageIndex};
 
 /// a recursice strongly connected component function
 ///

@@ -8,7 +8,7 @@ mod perftest_data;
 use std::borrow::Cow;
 use std::cmp::min;
 
-use perftest_data::*;
+use crate::perftest_data::*;
 
 use quick_protobuf::message::MessageWrite;
 use quick_protobuf::MessageRead;

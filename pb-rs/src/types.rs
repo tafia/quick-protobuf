@@ -4,9 +4,9 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
-use errors::{Error, Result};
-use keywords::sanitize_keyword;
-use parser::file_descriptor;
+use crate::errors::{Error, Result};
+use crate::keywords::sanitize_keyword;
+use crate::parser::file_descriptor;
 
 fn sizeof_varint(v: u32) -> usize {
     match v {
