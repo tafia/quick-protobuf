@@ -220,9 +220,9 @@ impl MessageWrite for TestOptionalMessages {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestStrings<'a> {
-    pub s1: Option<Cow<'a, str>>,
-    pub s2: Option<Cow<'a, str>>,
-    pub s3: Option<Cow<'a, str>>,
+    pub s1: Option<&'a str>,
+    pub s2: Option<&'a str>,
+    pub s3: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for TestStrings<'a> {
@@ -230,9 +230,9 @@ impl<'a> MessageRead<'a> for TestStrings<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.s1 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(18) => msg.s2 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(26) => msg.s3 = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.s1 = Some(r.read_string(bytes)?),
+                Ok(18) => msg.s2 = Some(r.read_string(bytes)?),
+                Ok(26) => msg.s3 = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -290,7 +290,7 @@ impl<'a> MessageWrite for TestBytes<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestMap<'a> {
-    pub value: HashMap<Cow<'a, str>, u32>,
+    pub value: HashMap<&'a str, u32>,
 }
 
 impl<'a> MessageRead<'a> for TestMap<'a> {
@@ -299,7 +299,7 @@ impl<'a> MessageRead<'a> for TestMap<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_uint32(bytes)?))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes)?), |r, bytes| Ok(r.read_uint32(bytes)?))?;
                     msg.value.insert(key, value);
                 }
                 Ok(t) => { r.read_unknown(bytes, t)?; }

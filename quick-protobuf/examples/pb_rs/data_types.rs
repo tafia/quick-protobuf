@@ -96,7 +96,7 @@ pub struct FooMessage<'a> {
     pub f_double: Option<f64>,
     pub f_float: Option<f32>,
     pub f_bytes: Option<Cow<'a, [u8]>>,
-    pub f_string: Option<Cow<'a, str>>,
+    pub f_string: Option<&'a str>,
     pub f_self_message: Option<Box<FooMessage<'a>>>,
     pub f_bar_message: Option<BarMessage>,
     pub f_repeated_int32: Vec<i32>,
@@ -106,7 +106,7 @@ pub struct FooMessage<'a> {
     pub f_baz: Option<BazMessage>,
     pub f_nested: Option<mod_BazMessage::Nested>,
     pub f_nested_enum: Option<mod_BazMessage::mod_Nested::NestedEnum>,
-    pub f_map: HashMap<Cow<'a, str>, i32>,
+    pub f_map: HashMap<&'a str, i32>,
     pub test_oneof: mod_FooMessage::OneOftest_oneof<'a>,
 }
 
@@ -134,7 +134,7 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
                 Ok(105) => msg.f_double = Some(r.read_double(bytes)?),
                 Ok(117) => msg.f_float = Some(r.read_float(bytes)?),
                 Ok(122) => msg.f_bytes = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
-                Ok(130) => msg.f_string = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(130) => msg.f_string = Some(r.read_string(bytes)?),
                 Ok(138) => msg.f_self_message = Some(Box::new(r.read_message::<FooMessage>(bytes)?)),
                 Ok(146) => msg.f_bar_message = Some(r.read_message::<BarMessage>(bytes)?),
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
@@ -145,12 +145,12 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
                 Ok(194) => msg.f_nested = Some(r.read_message::<mod_BazMessage::Nested>(bytes)?),
                 Ok(200) => msg.f_nested_enum = Some(r.read_enum(bytes)?),
                 Ok(210) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_int32(bytes)?))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes)?), |r, bytes| Ok(r.read_int32(bytes)?))?;
                     msg.f_map.insert(key, value);
                 }
                 Ok(216) => msg.test_oneof = mod_FooMessage::OneOftest_oneof::f1(r.read_int32(bytes)?),
                 Ok(224) => msg.test_oneof = mod_FooMessage::OneOftest_oneof::f2(r.read_bool(bytes)?),
-                Ok(234) => msg.test_oneof = mod_FooMessage::OneOftest_oneof::f3(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(234) => msg.test_oneof = mod_FooMessage::OneOftest_oneof::f3(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -238,7 +238,7 @@ use super::*;
 pub enum OneOftest_oneof<'a> {
     f1(i32),
     f2(bool),
-    f3(Cow<'a, str>),
+    f3(&'a str),
     None,
 }
 

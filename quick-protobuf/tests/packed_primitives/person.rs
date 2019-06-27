@@ -81,7 +81,7 @@ impl MessageWrite for Address {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Person<'a> {
     pub address: Option<Address>,
-    pub names: Vec<Cow<'a, str>>,
+    pub names: Vec<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Person<'a> {
@@ -90,7 +90,7 @@ impl<'a> MessageRead<'a> for Person<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(18) => msg.address = Some(r.read_message::<Address>(bytes)?),
-                Ok(26) => msg.names.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.names.push(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -116,7 +116,7 @@ impl<'a> MessageWrite for Person<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct PersonPacked<'a> {
     pub address: Option<Address>,
-    pub names: Vec<Cow<'a, str>>,
+    pub names: Vec<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for PersonPacked<'a> {
@@ -125,7 +125,7 @@ impl<'a> MessageRead<'a> for PersonPacked<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(18) => msg.address = Some(r.read_message::<Address>(bytes)?),
-                Ok(26) => msg.names.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.names.push(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }

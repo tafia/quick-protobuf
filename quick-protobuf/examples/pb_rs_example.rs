@@ -22,7 +22,7 @@ fn main() {
         f_int32: Some(54),
 
         // strings are borrowed (Cow)
-        f_string: Some(Cow::Borrowed("Hello world from example!")),
+        f_string: Some("Hello world from example!"),
 
         // bytes too
         f_bytes: Some(Cow::Borrowed(b"I see you!")),
@@ -39,7 +39,7 @@ fn main() {
         f_nested_enum: Some(data_types::mod_BazMessage::mod_Nested::NestedEnum::Baz),
 
         // a map!
-        f_map: vec![(Cow::Borrowed("foo"), 1), (Cow::Borrowed("bar"), 2)]
+        f_map: vec![("foo", 1), ("bar", 2)]
             .into_iter()
             .collect(),
 

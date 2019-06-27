@@ -22,7 +22,7 @@ fn main() {
         f_int32: 54,
 
         // strings are borrowed (Cow)
-        f_string: Cow::Borrowed("Hello world from example!"),
+        f_string: "Hello world from example!",
 
         // bytes too
         f_bytes: Cow::Borrowed(b"I see you!"),
@@ -39,14 +39,14 @@ fn main() {
         f_nested_enum: data_types::mod_BazMessage::mod_Nested::NestedEnum::Baz,
 
         // a map!
-        f_map: vec![(Cow::Borrowed("foo"), 1), (Cow::Borrowed("bar"), 2)]
+        f_map: vec![("foo", 1), ("bar", 2)]
             .into_iter()
             .collect(),
 
         // a oneof value
         test_oneof: OneOftest_oneof::f1(2),
 
-        f_repeated_string: vec![Cow::Borrowed("goat"), Cow::Borrowed("running")],
+        f_repeated_string: vec!["goat", "running"],
         f_repeated_baz_message: vec![BazMessage {
             nested: Some(data_types::mod_BazMessage::Nested {
                 f_nested: Some(data_types::mod_BazMessage::mod_Nested::NestedMessage {
@@ -54,7 +54,7 @@ fn main() {
                 }),
             }),
             b_int64: 10,
-            b_string: Cow::Borrowed("boom\n"),
+            b_string: "boom\n",
         }],
 
         // Each message implements Default ... which makes it much easier

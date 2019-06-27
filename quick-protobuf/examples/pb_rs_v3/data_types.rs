@@ -96,7 +96,7 @@ pub struct FooMessage<'a> {
     pub f_double: f64,
     pub f_float: f32,
     pub f_bytes: Cow<'a, [u8]>,
-    pub f_string: Cow<'a, str>,
+    pub f_string: &'a str,
     pub f_self_message: Option<Box<FooMessage<'a>>>,
     pub f_bar_message: Option<BarMessage>,
     pub f_repeated_int32: Vec<i32>,
@@ -106,8 +106,8 @@ pub struct FooMessage<'a> {
     pub f_baz: Option<BazMessage<'a>>,
     pub f_nested: Option<mod_BazMessage::Nested>,
     pub f_nested_enum: mod_BazMessage::mod_Nested::NestedEnum,
-    pub f_map: HashMap<Cow<'a, str>, i32>,
-    pub f_repeated_string: Vec<Cow<'a, str>>,
+    pub f_map: HashMap<&'a str, i32>,
+    pub f_repeated_string: Vec<&'a str>,
     pub f_repeated_baz_message: Vec<BazMessage<'a>>,
     pub test_oneof: mod_FooMessage::OneOftest_oneof<'a>,
 }
@@ -136,7 +136,7 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
                 Ok(105) => msg.f_double = r.read_double(bytes)?,
                 Ok(117) => msg.f_float = r.read_float(bytes)?,
                 Ok(122) => msg.f_bytes = r.read_bytes(bytes).map(Cow::Borrowed)?,
-                Ok(130) => msg.f_string = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(130) => msg.f_string = r.read_string(bytes)?,
                 Ok(138) => msg.f_self_message = Some(Box::new(r.read_message::<FooMessage>(bytes)?)),
                 Ok(146) => msg.f_bar_message = Some(r.read_message::<BarMessage>(bytes)?),
                 Ok(154) => msg.f_repeated_int32 = r.read_packed(bytes, |r, bytes| Ok(r.read_int32(bytes)?))?,
@@ -147,14 +147,14 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
                 Ok(194) => msg.f_nested = Some(r.read_message::<mod_BazMessage::Nested>(bytes)?),
                 Ok(200) => msg.f_nested_enum = r.read_enum(bytes)?,
                 Ok(210) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_int32(bytes)?))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes)?), |r, bytes| Ok(r.read_int32(bytes)?))?;
                     msg.f_map.insert(key, value);
                 }
-                Ok(242) => msg.f_repeated_string.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(242) => msg.f_repeated_string.push(r.read_string(bytes)?),
                 Ok(250) => msg.f_repeated_baz_message.push(r.read_message::<BazMessage>(bytes)?),
                 Ok(216) => msg.test_oneof = mod_FooMessage::OneOftest_oneof::f1(r.read_int32(bytes)?),
                 Ok(224) => msg.test_oneof = mod_FooMessage::OneOftest_oneof::f2(r.read_bool(bytes)?),
-                Ok(234) => msg.test_oneof = mod_FooMessage::OneOftest_oneof::f3(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(234) => msg.test_oneof = mod_FooMessage::OneOftest_oneof::f3(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -246,7 +246,7 @@ use super::*;
 pub enum OneOftest_oneof<'a> {
     f1(i32),
     f2(bool),
-    f3(Cow<'a, str>),
+    f3(&'a str),
     None,
 }
 
@@ -262,7 +262,7 @@ impl<'a> Default for OneOftest_oneof<'a> {
 pub struct BazMessage<'a> {
     pub nested: Option<mod_BazMessage::Nested>,
     pub b_int64: i64,
-    pub b_string: Cow<'a, str>,
+    pub b_string: &'a str,
 }
 
 impl<'a> MessageRead<'a> for BazMessage<'a> {
@@ -272,7 +272,7 @@ impl<'a> MessageRead<'a> for BazMessage<'a> {
             match r.next_tag(bytes) {
                 Ok(10) => msg.nested = Some(r.read_message::<mod_BazMessage::Nested>(bytes)?),
                 Ok(16) => msg.b_int64 = r.read_int64(bytes)?,
-                Ok(26) => msg.b_string = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(26) => msg.b_string = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }

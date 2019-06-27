@@ -293,7 +293,7 @@ impl FieldType {
             FieldType::Uint64 | FieldType::Fixed64 => "u64".to_string(),
             FieldType::Double => "f64".to_string(),
             FieldType::Float => "f32".to_string(),
-            FieldType::StringCow => "Cow<'a, str>".to_string(),
+            FieldType::StringCow => "&'a str".to_string(),
             FieldType::BytesCow => "Cow<'a, [u8]>".to_string(),
             FieldType::String_ => "String".to_string(),
             FieldType::Bytes_ => "Vec<u8>".to_string(),
@@ -333,9 +333,14 @@ impl FieldType {
                 (m.clone(), m)
             }
             FieldType::Map(_, _) => return Err(Error::ReadFnMap),
-            FieldType::StringCow | FieldType::BytesCow => {
+            FieldType::BytesCow => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let cow = format!("{}.map(Cow::Borrowed)?", m);
+                (m, cow)
+            }
+            FieldType::StringCow => {
+                let m = format!("r.read_{}(bytes)", self.proto_type());
+                let cow = format!("{}?", m);
                 (m, cow)
             }
             FieldType::String_ => {

@@ -18,8 +18,8 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestMap<'a> {
-    pub m: HashMap<Cow<'a, str>, u32>,
-    pub mm: HashMap<Cow<'a, str>, TestMapEntry>,
+    pub m: HashMap<&'a str, u32>,
+    pub mm: HashMap<&'a str, TestMapEntry>,
 }
 
 impl<'a> MessageRead<'a> for TestMap<'a> {
@@ -28,11 +28,11 @@ impl<'a> MessageRead<'a> for TestMap<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(10) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_uint32(bytes)?))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes)?), |r, bytes| Ok(r.read_uint32(bytes)?))?;
                     msg.m.insert(key, value);
                 }
                 Ok(18) => {
-                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes).map(Cow::Borrowed)?), |r, bytes| Ok(r.read_message::<TestMapEntry>(bytes)?))?;
+                    let (key, value) = r.read_map(bytes, |r, bytes| Ok(r.read_string(bytes)?), |r, bytes| Ok(r.read_message::<TestMapEntry>(bytes)?))?;
                     msg.mm.insert(key, value);
                 }
                 Ok(t) => { r.read_unknown(bytes, t)?; }

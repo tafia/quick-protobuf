@@ -83,7 +83,7 @@ impl MessageWrite for Test1 {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Test2<'a> {
-    pub b: Cow<'a, str>,
+    pub b: &'a str,
 }
 
 impl<'a> MessageRead<'a> for Test2<'a> {
@@ -91,7 +91,7 @@ impl<'a> MessageRead<'a> for Test2<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(18) => msg.b = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(18) => msg.b = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -308,7 +308,7 @@ impl MessageWrite for TestSelfReference {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestDefaultInstanceField<'a> {
-    pub s: Option<Cow<'a, str>>,
+    pub s: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for TestDefaultInstanceField<'a> {
@@ -316,7 +316,7 @@ impl<'a> MessageRead<'a> for TestDefaultInstanceField<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.s = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.s = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -414,7 +414,7 @@ pub struct TestTypesSingular<'a> {
     pub sfixed32_field: Option<i32>,
     pub sfixed64_field: Option<i64>,
     pub bool_field: Option<bool>,
-    pub string_field: Option<Cow<'a, str>>,
+    pub string_field: Option<&'a str>,
     pub bytes_field: Option<Cow<'a, [u8]>>,
     pub enum_field: Option<basic::TestEnumDescriptor>,
 }
@@ -437,7 +437,7 @@ impl<'a> MessageRead<'a> for TestTypesSingular<'a> {
                 Ok(93) => msg.sfixed32_field = Some(r.read_sfixed32(bytes)?),
                 Ok(97) => msg.sfixed64_field = Some(r.read_sfixed64(bytes)?),
                 Ok(104) => msg.bool_field = Some(r.read_bool(bytes)?),
-                Ok(114) => msg.string_field = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(114) => msg.string_field = Some(r.read_string(bytes)?),
                 Ok(122) => msg.bytes_field = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(128) => msg.enum_field = Some(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -505,7 +505,7 @@ pub struct TestTypesRepeated<'a> {
     pub sfixed32_field: Vec<i32>,
     pub sfixed64_field: Vec<i64>,
     pub bool_field: Vec<bool>,
-    pub string_field: Vec<Cow<'a, str>>,
+    pub string_field: Vec<&'a str>,
     pub bytes_field: Vec<Cow<'a, [u8]>>,
     pub enum_field: Vec<basic::TestEnumDescriptor>,
 }
@@ -528,7 +528,7 @@ impl<'a> MessageRead<'a> for TestTypesRepeated<'a> {
                 Ok(93) => msg.sfixed32_field.push(r.read_sfixed32(bytes)?),
                 Ok(97) => msg.sfixed64_field.push(r.read_sfixed64(bytes)?),
                 Ok(104) => msg.bool_field.push(r.read_bool(bytes)?),
-                Ok(114) => msg.string_field.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(114) => msg.string_field.push(r.read_string(bytes)?),
                 Ok(122) => msg.bytes_field.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(128) => msg.enum_field.push(r.read_enum(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -596,7 +596,7 @@ pub struct TestTypesRepeatedPacked<'a> {
     pub sfixed32_field: Cow<'a, [i32]>,
     pub sfixed64_field: Cow<'a, [i64]>,
     pub bool_field: Vec<bool>,
-    pub string_field: Vec<Cow<'a, str>>,
+    pub string_field: Vec<&'a str>,
     pub bytes_field: Vec<Cow<'a, [u8]>>,
     pub enum_field: Vec<basic::TestEnumDescriptor>,
 }
@@ -619,7 +619,7 @@ impl<'a> MessageRead<'a> for TestTypesRepeatedPacked<'a> {
                 Ok(90) => msg.sfixed32_field = r.read_packed_fixed(bytes)?.into(),
                 Ok(98) => msg.sfixed64_field = r.read_packed_fixed(bytes)?.into(),
                 Ok(106) => msg.bool_field = r.read_packed(bytes, |r, bytes| Ok(r.read_bool(bytes)?))?,
-                Ok(114) => msg.string_field.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(114) => msg.string_field.push(r.read_string(bytes)?),
                 Ok(122) => msg.bytes_field.push(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(130) => msg.enum_field = r.read_packed(bytes, |r, bytes| Ok(r.read_enum(bytes)?))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }

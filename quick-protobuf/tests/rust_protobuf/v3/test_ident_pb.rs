@@ -89,7 +89,7 @@ impl MessageWrite for Message { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestType<'a> {
-    pub struct_pb: Vec<Cow<'a, str>>,
+    pub struct_pb: Vec<&'a str>,
     pub ref_pb: Vec<u32>,
     pub type_pb: mod_TestType::OneOftype_pb<'a>,
 }
@@ -99,9 +99,9 @@ impl<'a> MessageRead<'a> for TestType<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(18) => msg.struct_pb.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.struct_pb.push(r.read_string(bytes)?),
                 Ok(26) => msg.ref_pb = r.read_packed(bytes, |r, bytes| Ok(r.read_uint32(bytes)?))?,
-                Ok(10) => msg.type_pb = mod_TestType::OneOftype_pb::s(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.type_pb = mod_TestType::OneOftype_pb::s(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -135,7 +135,7 @@ use super::*;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum OneOftype_pb<'a> {
-    s(Cow<'a, str>),
+    s(&'a str),
     None,
 }
 

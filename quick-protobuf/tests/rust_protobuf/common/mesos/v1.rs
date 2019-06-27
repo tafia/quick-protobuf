@@ -179,7 +179,7 @@ impl<'a> From<&'a str> for OperationState {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct FrameworkID<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for FrameworkID<'a> {
@@ -187,7 +187,7 @@ impl<'a> MessageRead<'a> for FrameworkID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -210,7 +210,7 @@ impl<'a> MessageWrite for FrameworkID<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct OfferID<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for OfferID<'a> {
@@ -218,7 +218,7 @@ impl<'a> MessageRead<'a> for OfferID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -241,7 +241,7 @@ impl<'a> MessageWrite for OfferID<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct AgentID<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for AgentID<'a> {
@@ -249,7 +249,7 @@ impl<'a> MessageRead<'a> for AgentID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -272,7 +272,7 @@ impl<'a> MessageWrite for AgentID<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TaskID<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for TaskID<'a> {
@@ -280,7 +280,7 @@ impl<'a> MessageRead<'a> for TaskID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -303,7 +303,7 @@ impl<'a> MessageWrite for TaskID<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ExecutorID<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for ExecutorID<'a> {
@@ -311,7 +311,7 @@ impl<'a> MessageRead<'a> for ExecutorID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -334,7 +334,7 @@ impl<'a> MessageWrite for ExecutorID<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ContainerID<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
     pub parent: Option<Box<mesos::v1::ContainerID<'a>>>,
 }
 
@@ -343,7 +343,7 @@ impl<'a> MessageRead<'a> for ContainerID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(18) => msg.parent = Some(Box::new(r.read_message::<mesos::v1::ContainerID>(bytes)?)),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -369,7 +369,7 @@ impl<'a> MessageWrite for ContainerID<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ResourceProviderID<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for ResourceProviderID<'a> {
@@ -377,7 +377,7 @@ impl<'a> MessageRead<'a> for ResourceProviderID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -400,7 +400,7 @@ impl<'a> MessageWrite for ResourceProviderID<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct OperationID<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for OperationID<'a> {
@@ -408,7 +408,7 @@ impl<'a> MessageRead<'a> for OperationID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -493,8 +493,8 @@ impl MessageWrite for DurationInfo {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Address<'a> {
-    pub hostname: Option<Cow<'a, str>>,
-    pub ip: Option<Cow<'a, str>>,
+    pub hostname: Option<&'a str>,
+    pub ip: Option<&'a str>,
     pub port: i32,
 }
 
@@ -503,8 +503,8 @@ impl<'a> MessageRead<'a> for Address<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.hostname = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(18) => msg.ip = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.hostname = Some(r.read_string(bytes)?),
+                Ok(18) => msg.ip = Some(r.read_string(bytes)?),
                 Ok(24) => msg.port = r.read_int32(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -532,11 +532,11 @@ impl<'a> MessageWrite for Address<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct URL<'a> {
-    pub scheme: Cow<'a, str>,
+    pub scheme: &'a str,
     pub address: mesos::v1::Address<'a>,
-    pub path: Option<Cow<'a, str>>,
+    pub path: Option<&'a str>,
     pub query: Vec<mesos::v1::Parameter<'a>>,
-    pub fragment: Option<Cow<'a, str>>,
+    pub fragment: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for URL<'a> {
@@ -544,11 +544,11 @@ impl<'a> MessageRead<'a> for URL<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.scheme = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.scheme = r.read_string(bytes)?,
                 Ok(18) => msg.address = r.read_message::<mesos::v1::Address>(bytes)?,
-                Ok(26) => msg.path = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.path = Some(r.read_string(bytes)?),
                 Ok(34) => msg.query.push(r.read_message::<mesos::v1::Parameter>(bytes)?),
-                Ok(42) => msg.fragment = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(42) => msg.fragment = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -614,8 +614,8 @@ impl MessageWrite for Unavailability {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct MachineID<'a> {
-    pub hostname: Option<Cow<'a, str>>,
-    pub ip: Option<Cow<'a, str>>,
+    pub hostname: Option<&'a str>,
+    pub ip: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for MachineID<'a> {
@@ -623,8 +623,8 @@ impl<'a> MessageRead<'a> for MachineID<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.hostname = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(18) => msg.ip = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.hostname = Some(r.read_string(bytes)?),
+                Ok(18) => msg.ip = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -728,16 +728,16 @@ impl<'a> From<&'a str> for Mode {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct FrameworkInfo<'a> {
-    pub user: Cow<'a, str>,
-    pub name: Cow<'a, str>,
+    pub user: &'a str,
+    pub name: &'a str,
     pub id: Option<mesos::v1::FrameworkID<'a>>,
     pub failover_timeout: f64,
     pub checkpoint: bool,
-    pub role: Cow<'a, str>,
-    pub roles: Vec<Cow<'a, str>>,
-    pub hostname: Option<Cow<'a, str>>,
-    pub principal: Option<Cow<'a, str>>,
-    pub webui_url: Option<Cow<'a, str>>,
+    pub role: &'a str,
+    pub roles: Vec<&'a str>,
+    pub hostname: Option<&'a str>,
+    pub principal: Option<&'a str>,
+    pub webui_url: Option<&'a str>,
     pub capabilities: Vec<mesos::v1::mod_FrameworkInfo::Capability>,
     pub labels: Option<mesos::v1::Labels<'a>>,
 }
@@ -746,21 +746,21 @@ impl<'a> MessageRead<'a> for FrameworkInfo<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = FrameworkInfo {
             failover_timeout: 0.0f64,
-            role: Cow::Borrowed("*", deprecated=true),
+            role: &'a str::"*", deprecated=true,
             ..Self::default()
         };
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.user = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.user = r.read_string(bytes)?,
+                Ok(18) => msg.name = r.read_string(bytes)?,
                 Ok(26) => msg.id = Some(r.read_message::<mesos::v1::FrameworkID>(bytes)?),
                 Ok(33) => msg.failover_timeout = r.read_double(bytes)?,
                 Ok(40) => msg.checkpoint = r.read_bool(bytes)?,
-                Ok(50) => msg.role = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(98) => msg.roles.push(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(58) => msg.hostname = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(66) => msg.principal = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(74) => msg.webui_url = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(50) => msg.role = r.read_string(bytes)?,
+                Ok(98) => msg.roles.push(r.read_string(bytes)?),
+                Ok(58) => msg.hostname = Some(r.read_string(bytes)?),
+                Ok(66) => msg.principal = Some(r.read_string(bytes)?),
+                Ok(74) => msg.webui_url = Some(r.read_string(bytes)?),
                 Ok(82) => msg.capabilities.push(r.read_message::<mesos::v1::mod_FrameworkInfo::Capability>(bytes)?),
                 Ok(90) => msg.labels = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -779,7 +779,7 @@ impl<'a> MessageWrite for FrameworkInfo<'a> {
         + self.id.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + if self.failover_timeout == 0.0f64 { 0 } else { 1 + 8 }
         + if self.checkpoint == false { 0 } else { 1 + sizeof_varint(*(&self.checkpoint) as u64) }
-        + if self.role == Cow::Borrowed("*", deprecated=true) { 0 } else { 1 + sizeof_len((&self.role).len()) }
+        + if self.role == &'a str::"*", deprecated=true { 0 } else { 1 + sizeof_len((&self.role).len()) }
         + self.roles.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
         + self.hostname.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
         + self.principal.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
@@ -794,7 +794,7 @@ impl<'a> MessageWrite for FrameworkInfo<'a> {
         if let Some(ref s) = self.id { w.write_with_tag(26, |w| w.write_message(s))?; }
         if self.failover_timeout != 0.0f64 { w.write_with_tag(33, |w| w.write_double(*&self.failover_timeout))?; }
         if self.checkpoint != false { w.write_with_tag(40, |w| w.write_bool(*&self.checkpoint))?; }
-        if self.role != Cow::Borrowed("*", deprecated=true) { w.write_with_tag(50, |w| w.write_string(&**&self.role))?; }
+        if self.role != &'a str::"*", deprecated=true { w.write_with_tag(50, |w| w.write_string(&**&self.role))?; }
         for s in &self.roles { w.write_with_tag(98, |w| w.write_string(&**s))?; }
         if let Some(ref s) = self.hostname { w.write_with_tag(58, |w| w.write_string(&**s))?; }
         if let Some(ref s) = self.principal { w.write_with_tag(66, |w| w.write_string(&**s))?; }
@@ -999,7 +999,7 @@ impl<'a> MessageWrite for Command<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Http<'a> {
     pub port: u32,
-    pub path: Option<Cow<'a, str>>,
+    pub path: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Http<'a> {
@@ -1008,7 +1008,7 @@ impl<'a> MessageRead<'a> for Http<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.port = r.read_uint32(bytes)?,
-                Ok(18) => msg.path = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.path = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -1180,9 +1180,9 @@ use super::*;
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct HTTPCheckInfo<'a> {
     pub protocol: mesos::v1::mod_NetworkInfo::Protocol,
-    pub scheme: Option<Cow<'a, str>>,
+    pub scheme: Option<&'a str>,
     pub port: u32,
-    pub path: Option<Cow<'a, str>>,
+    pub path: Option<&'a str>,
     pub statuses: Vec<u32>,
 }
 
@@ -1192,9 +1192,9 @@ impl<'a> MessageRead<'a> for HTTPCheckInfo<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(40) => msg.protocol = r.read_enum(bytes)?,
-                Ok(26) => msg.scheme = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.scheme = Some(r.read_string(bytes)?),
                 Ok(8) => msg.port = r.read_uint32(bytes)?,
-                Ok(18) => msg.path = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.path = Some(r.read_string(bytes)?),
                 Ok(32) => msg.statuses.push(r.read_uint32(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -1335,9 +1335,9 @@ pub struct CommandInfo<'a> {
     pub uris: Vec<mesos::v1::mod_CommandInfo::URI<'a>>,
     pub environment: Option<mesos::v1::Environment<'a>>,
     pub shell: bool,
-    pub value: Option<Cow<'a, str>>,
-    pub arguments: Vec<Cow<'a, str>>,
-    pub user: Option<Cow<'a, str>>,
+    pub value: Option<&'a str>,
+    pub arguments: Vec<&'a str>,
+    pub user: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for CommandInfo<'a> {
@@ -1351,9 +1351,9 @@ impl<'a> MessageRead<'a> for CommandInfo<'a> {
                 Ok(10) => msg.uris.push(r.read_message::<mesos::v1::mod_CommandInfo::URI>(bytes)?),
                 Ok(18) => msg.environment = Some(r.read_message::<mesos::v1::Environment>(bytes)?),
                 Ok(48) => msg.shell = r.read_bool(bytes)?,
-                Ok(26) => msg.value = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(58) => msg.arguments.push(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(42) => msg.user = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.value = Some(r.read_string(bytes)?),
+                Ok(58) => msg.arguments.push(r.read_string(bytes)?),
+                Ok(42) => msg.user = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -1391,11 +1391,11 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct URI<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
     pub executable: Option<bool>,
     pub extract: bool,
     pub cache: Option<bool>,
-    pub output_file: Option<Cow<'a, str>>,
+    pub output_file: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for URI<'a> {
@@ -1406,11 +1406,11 @@ impl<'a> MessageRead<'a> for URI<'a> {
         };
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(16) => msg.executable = Some(r.read_bool(bytes)?),
                 Ok(24) => msg.extract = r.read_bool(bytes)?,
                 Ok(32) => msg.cache = Some(r.read_bool(bytes)?),
-                Ok(42) => msg.output_file = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(42) => msg.output_file = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -1449,7 +1449,7 @@ pub struct ExecutorInfo<'a> {
     pub command: Option<mesos::v1::CommandInfo<'a>>,
     pub container: Option<mesos::v1::ContainerInfo<'a>>,
     pub resources: Vec<mesos::v1::Resource<'a>>,
-    pub name: Option<Cow<'a, str>>,
+    pub name: Option<&'a str>,
     pub data: Option<Cow<'a, [u8]>>,
     pub discovery: Option<mesos::v1::DiscoveryInfo<'a>>,
     pub shutdown_grace_period: Option<mesos::v1::DurationInfo>,
@@ -1467,7 +1467,7 @@ impl<'a> MessageRead<'a> for ExecutorInfo<'a> {
                 Ok(58) => msg.command = Some(r.read_message::<mesos::v1::CommandInfo>(bytes)?),
                 Ok(90) => msg.container = Some(r.read_message::<mesos::v1::ContainerInfo>(bytes)?),
                 Ok(42) => msg.resources.push(r.read_message::<mesos::v1::Resource>(bytes)?),
-                Ok(74) => msg.name = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(74) => msg.name = Some(r.read_string(bytes)?),
                 Ok(34) => msg.data = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(98) => msg.discovery = Some(r.read_message::<mesos::v1::DiscoveryInfo>(bytes)?),
                 Ok(106) => msg.shutdown_grace_period = Some(r.read_message::<mesos::v1::DurationInfo>(bytes)?),
@@ -1629,7 +1629,7 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct RegionInfo<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
 }
 
 impl<'a> MessageRead<'a> for RegionInfo<'a> {
@@ -1637,7 +1637,7 @@ impl<'a> MessageRead<'a> for RegionInfo<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -1660,7 +1660,7 @@ impl<'a> MessageWrite for RegionInfo<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ZoneInfo<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
 }
 
 impl<'a> MessageRead<'a> for ZoneInfo<'a> {
@@ -1668,7 +1668,7 @@ impl<'a> MessageRead<'a> for ZoneInfo<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -1695,12 +1695,12 @@ impl<'a> MessageWrite for ZoneInfo<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct MasterInfo<'a> {
-    pub id: Cow<'a, str>,
+    pub id: &'a str,
     pub ip: u32,
     pub port: u32,
-    pub pid: Option<Cow<'a, str>>,
-    pub hostname: Option<Cow<'a, str>>,
-    pub version: Option<Cow<'a, str>>,
+    pub pid: Option<&'a str>,
+    pub hostname: Option<&'a str>,
+    pub version: Option<&'a str>,
     pub address: Option<mesos::v1::Address<'a>>,
     pub domain: Option<mesos::v1::DomainInfo<'a>>,
     pub capabilities: Vec<mesos::v1::mod_MasterInfo::Capability>,
@@ -1714,12 +1714,12 @@ impl<'a> MessageRead<'a> for MasterInfo<'a> {
         };
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.id = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.id = r.read_string(bytes)?,
                 Ok(16) => msg.ip = r.read_uint32(bytes)?,
                 Ok(24) => msg.port = r.read_uint32(bytes)?,
-                Ok(34) => msg.pid = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(42) => msg.hostname = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(50) => msg.version = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(34) => msg.pid = Some(r.read_string(bytes)?),
+                Ok(42) => msg.hostname = Some(r.read_string(bytes)?),
+                Ok(50) => msg.version = Some(r.read_string(bytes)?),
                 Ok(58) => msg.address = Some(r.read_message::<mesos::v1::Address>(bytes)?),
                 Ok(66) => msg.domain = Some(r.read_message::<mesos::v1::DomainInfo>(bytes)?),
                 Ok(74) => msg.capabilities.push(r.read_message::<mesos::v1::mod_MasterInfo::Capability>(bytes)?),
@@ -1835,7 +1835,7 @@ impl<'a> From<&'a str> for Type {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct AgentInfo<'a> {
-    pub hostname: Cow<'a, str>,
+    pub hostname: &'a str,
     pub port: i32,
     pub resources: Vec<mesos::v1::Resource<'a>>,
     pub attributes: Vec<mesos::v1::Attribute<'a>>,
@@ -1851,7 +1851,7 @@ impl<'a> MessageRead<'a> for AgentInfo<'a> {
         };
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.hostname = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.hostname = r.read_string(bytes)?,
                 Ok(64) => msg.port = r.read_int32(bytes)?,
                 Ok(26) => msg.resources.push(r.read_message::<mesos::v1::Resource>(bytes)?),
                 Ok(42) => msg.attributes.push(r.read_message::<mesos::v1::Attribute>(bytes)?),
@@ -2058,8 +2058,8 @@ impl<'a> From<&'a str> for Service {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct CSIPluginInfo<'a> {
-    pub type_pb: Cow<'a, str>,
-    pub name: Cow<'a, str>,
+    pub type_pb: &'a str,
+    pub name: &'a str,
     pub containers: Vec<mesos::v1::CSIPluginContainerInfo<'a>>,
 }
 
@@ -2068,8 +2068,8 @@ impl<'a> MessageRead<'a> for CSIPluginInfo<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.type_pb = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.type_pb = r.read_string(bytes)?,
+                Ok(18) => msg.name = r.read_string(bytes)?,
                 Ok(26) => msg.containers.push(r.read_message::<mesos::v1::CSIPluginContainerInfo>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -2099,8 +2099,8 @@ impl<'a> MessageWrite for CSIPluginInfo<'a> {
 pub struct ResourceProviderInfo<'a> {
     pub id: Option<mesos::v1::ResourceProviderID<'a>>,
     pub attributes: Vec<mesos::v1::Attribute<'a>>,
-    pub type_pb: Cow<'a, str>,
-    pub name: Cow<'a, str>,
+    pub type_pb: &'a str,
+    pub name: &'a str,
     pub default_reservations: Vec<mesos::v1::mod_Resource::ReservationInfo<'a>>,
     pub storage: Option<mesos::v1::mod_ResourceProviderInfo::Storage<'a>>,
 }
@@ -2112,8 +2112,8 @@ impl<'a> MessageRead<'a> for ResourceProviderInfo<'a> {
             match r.next_tag(bytes) {
                 Ok(10) => msg.id = Some(r.read_message::<mesos::v1::ResourceProviderID>(bytes)?),
                 Ok(18) => msg.attributes.push(r.read_message::<mesos::v1::Attribute>(bytes)?),
-                Ok(26) => msg.type_pb = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(34) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(26) => msg.type_pb = r.read_string(bytes)?,
+                Ok(34) => msg.name = r.read_string(bytes)?,
                 Ok(42) => msg.default_reservations.push(r.read_message::<mesos::v1::mod_Resource::ReservationInfo>(bytes)?),
                 Ok(50) => msg.storage = Some(r.read_message::<mesos::v1::mod_ResourceProviderInfo::Storage>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -2334,7 +2334,7 @@ impl MessageWrite for Ranges {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Set<'a> {
-    pub item: Vec<Cow<'a, str>>,
+    pub item: Vec<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Set<'a> {
@@ -2342,7 +2342,7 @@ impl<'a> MessageRead<'a> for Set<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.item.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.item.push(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -2365,7 +2365,7 @@ impl<'a> MessageWrite for Set<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Text<'a> {
-    pub value: Cow<'a, str>,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for Text<'a> {
@@ -2373,7 +2373,7 @@ impl<'a> MessageRead<'a> for Text<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -2436,7 +2436,7 @@ impl<'a> From<&'a str> for Type {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Attribute<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub type_pb: mesos::v1::mod_Value::Type,
     pub scalar: Option<mesos::v1::mod_Value::Scalar>,
     pub ranges: Option<mesos::v1::mod_Value::Ranges>,
@@ -2449,7 +2449,7 @@ impl<'a> MessageRead<'a> for Attribute<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(16) => msg.type_pb = r.read_enum(bytes)?,
                 Ok(26) => msg.scalar = Some(r.read_message::<mesos::v1::mod_Value::Scalar>(bytes)?),
                 Ok(34) => msg.ranges = Some(r.read_message::<mesos::v1::mod_Value::Ranges>(bytes)?),
@@ -2488,12 +2488,12 @@ impl<'a> MessageWrite for Attribute<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Resource<'a> {
     pub provider_id: Option<mesos::v1::ResourceProviderID<'a>>,
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub type_pb: mesos::v1::mod_Value::Type,
     pub scalar: Option<mesos::v1::mod_Value::Scalar>,
     pub ranges: Option<mesos::v1::mod_Value::Ranges>,
     pub set: Option<mesos::v1::mod_Value::Set<'a>>,
-    pub role: Cow<'a, str>,
+    pub role: &'a str,
     pub allocation_info: Option<mesos::v1::mod_Resource::AllocationInfo<'a>>,
     pub reservation: Option<mesos::v1::mod_Resource::ReservationInfo<'a>>,
     pub reservations: Vec<mesos::v1::mod_Resource::ReservationInfo<'a>>,
@@ -2505,18 +2505,18 @@ pub struct Resource<'a> {
 impl<'a> MessageRead<'a> for Resource<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Resource {
-            role: Cow::Borrowed("*", deprecated=true),
+            role: &'a str::"*", deprecated=true,
             ..Self::default()
         };
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(98) => msg.provider_id = Some(r.read_message::<mesos::v1::ResourceProviderID>(bytes)?),
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(16) => msg.type_pb = r.read_enum(bytes)?,
                 Ok(26) => msg.scalar = Some(r.read_message::<mesos::v1::mod_Value::Scalar>(bytes)?),
                 Ok(34) => msg.ranges = Some(r.read_message::<mesos::v1::mod_Value::Ranges>(bytes)?),
                 Ok(42) => msg.set = Some(r.read_message::<mesos::v1::mod_Value::Set>(bytes)?),
-                Ok(50) => msg.role = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(50) => msg.role = r.read_string(bytes)?,
                 Ok(90) => msg.allocation_info = Some(r.read_message::<mesos::v1::mod_Resource::AllocationInfo>(bytes)?),
                 Ok(66) => msg.reservation = Some(r.read_message::<mesos::v1::mod_Resource::ReservationInfo>(bytes)?),
                 Ok(106) => msg.reservations.push(r.read_message::<mesos::v1::mod_Resource::ReservationInfo>(bytes)?),
@@ -2540,7 +2540,7 @@ impl<'a> MessageWrite for Resource<'a> {
         + self.scalar.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.ranges.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.set.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
-        + if self.role == Cow::Borrowed("*", deprecated=true) { 0 } else { 1 + sizeof_len((&self.role).len()) }
+        + if self.role == &'a str::"*", deprecated=true { 0 } else { 1 + sizeof_len((&self.role).len()) }
         + self.allocation_info.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.reservation.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.reservations.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
@@ -2556,7 +2556,7 @@ impl<'a> MessageWrite for Resource<'a> {
         if let Some(ref s) = self.scalar { w.write_with_tag(26, |w| w.write_message(s))?; }
         if let Some(ref s) = self.ranges { w.write_with_tag(34, |w| w.write_message(s))?; }
         if let Some(ref s) = self.set { w.write_with_tag(42, |w| w.write_message(s))?; }
-        if self.role != Cow::Borrowed("*", deprecated=true) { w.write_with_tag(50, |w| w.write_string(&**&self.role))?; }
+        if self.role != &'a str::"*", deprecated=true { w.write_with_tag(50, |w| w.write_string(&**&self.role))?; }
         if let Some(ref s) = self.allocation_info { w.write_with_tag(90, |w| w.write_message(s))?; }
         if let Some(ref s) = self.reservation { w.write_with_tag(66, |w| w.write_message(s))?; }
         for s in &self.reservations { w.write_with_tag(106, |w| w.write_message(s))?; }
@@ -2574,7 +2574,7 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct AllocationInfo<'a> {
-    pub role: Option<Cow<'a, str>>,
+    pub role: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for AllocationInfo<'a> {
@@ -2582,7 +2582,7 @@ impl<'a> MessageRead<'a> for AllocationInfo<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.role = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.role = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -2606,8 +2606,8 @@ impl<'a> MessageWrite for AllocationInfo<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ReservationInfo<'a> {
     pub type_pb: Option<mesos::v1::mod_Resource::mod_ReservationInfo::Type>,
-    pub role: Option<Cow<'a, str>>,
-    pub principal: Option<Cow<'a, str>>,
+    pub role: Option<&'a str>,
+    pub principal: Option<&'a str>,
     pub labels: Option<mesos::v1::Labels<'a>>,
 }
 
@@ -2617,8 +2617,8 @@ impl<'a> MessageRead<'a> for ReservationInfo<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(32) => msg.type_pb = Some(r.read_enum(bytes)?),
-                Ok(26) => msg.role = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(10) => msg.principal = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.role = Some(r.read_string(bytes)?),
+                Ok(10) => msg.principal = Some(r.read_string(bytes)?),
                 Ok(18) => msg.labels = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -2732,8 +2732,8 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Persistence<'a> {
-    pub id: Cow<'a, str>,
-    pub principal: Option<Cow<'a, str>>,
+    pub id: &'a str,
+    pub principal: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Persistence<'a> {
@@ -2741,8 +2741,8 @@ impl<'a> MessageRead<'a> for Persistence<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.id = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.principal = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.id = r.read_string(bytes)?,
+                Ok(18) => msg.principal = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -2770,9 +2770,9 @@ pub struct Source<'a> {
     pub type_pb: mesos::v1::mod_Resource::mod_DiskInfo::mod_Source::Type,
     pub path: Option<mesos::v1::mod_Resource::mod_DiskInfo::mod_Source::Path<'a>>,
     pub mount: Option<mesos::v1::mod_Resource::mod_DiskInfo::mod_Source::Mount<'a>>,
-    pub id: Option<Cow<'a, str>>,
+    pub id: Option<&'a str>,
     pub metadata: Option<mesos::v1::Labels<'a>>,
-    pub profile: Option<Cow<'a, str>>,
+    pub profile: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Source<'a> {
@@ -2783,9 +2783,9 @@ impl<'a> MessageRead<'a> for Source<'a> {
                 Ok(8) => msg.type_pb = r.read_enum(bytes)?,
                 Ok(18) => msg.path = Some(r.read_message::<mesos::v1::mod_Resource::mod_DiskInfo::mod_Source::Path>(bytes)?),
                 Ok(26) => msg.mount = Some(r.read_message::<mesos::v1::mod_Resource::mod_DiskInfo::mod_Source::Mount>(bytes)?),
-                Ok(34) => msg.id = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(34) => msg.id = Some(r.read_string(bytes)?),
                 Ok(42) => msg.metadata = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
-                Ok(50) => msg.profile = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(50) => msg.profile = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -2823,7 +2823,7 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Path<'a> {
-    pub root: Option<Cow<'a, str>>,
+    pub root: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Path<'a> {
@@ -2831,7 +2831,7 @@ impl<'a> MessageRead<'a> for Path<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.root = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.root = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -2854,7 +2854,7 @@ impl<'a> MessageWrite for Path<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Mount<'a> {
-    pub root: Option<Cow<'a, str>>,
+    pub root: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Mount<'a> {
@@ -2862,7 +2862,7 @@ impl<'a> MessageRead<'a> for Mount<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.root = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.root = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -2956,7 +2956,7 @@ impl MessageWrite for SharedInfo { }
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TrafficControlStatistics<'a> {
-    pub id: Cow<'a, str>,
+    pub id: &'a str,
     pub backlog: Option<u64>,
     pub bytes: Option<u64>,
     pub drops: Option<u64>,
@@ -2973,7 +2973,7 @@ impl<'a> MessageRead<'a> for TrafficControlStatistics<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.id = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.id = r.read_string(bytes)?,
                 Ok(16) => msg.backlog = Some(r.read_uint64(bytes)?),
                 Ok(24) => msg.bytes = Some(r.read_uint64(bytes)?),
                 Ok(32) => msg.drops = Some(r.read_uint64(bytes)?),
@@ -3787,7 +3787,7 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Task<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub id: mesos::v1::TaskID<'a>,
     pub resources: Vec<mesos::v1::Resource<'a>>,
     pub labels: Option<mesos::v1::Labels<'a>>,
@@ -3798,7 +3798,7 @@ impl<'a> MessageRead<'a> for Task<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(18) => msg.id = r.read_message::<mesos::v1::TaskID>(bytes)?,
                 Ok(26) => msg.resources.push(r.read_message::<mesos::v1::Resource>(bytes)?),
                 Ok(34) => msg.labels = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
@@ -4111,7 +4111,7 @@ pub struct Offer<'a> {
     pub id: mesos::v1::OfferID<'a>,
     pub framework_id: mesos::v1::FrameworkID<'a>,
     pub agent_id: mesos::v1::AgentID<'a>,
-    pub hostname: Cow<'a, str>,
+    pub hostname: &'a str,
     pub url: Option<mesos::v1::URL<'a>>,
     pub domain: Option<mesos::v1::DomainInfo<'a>>,
     pub resources: Vec<mesos::v1::Resource<'a>>,
@@ -4129,7 +4129,7 @@ impl<'a> MessageRead<'a> for Offer<'a> {
                 Ok(10) => msg.id = r.read_message::<mesos::v1::OfferID>(bytes)?,
                 Ok(18) => msg.framework_id = r.read_message::<mesos::v1::FrameworkID>(bytes)?,
                 Ok(26) => msg.agent_id = r.read_message::<mesos::v1::AgentID>(bytes)?,
-                Ok(34) => msg.hostname = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(34) => msg.hostname = r.read_string(bytes)?,
                 Ok(66) => msg.url = Some(r.read_message::<mesos::v1::URL>(bytes)?),
                 Ok(90) => msg.domain = Some(r.read_message::<mesos::v1::DomainInfo>(bytes)?),
                 Ok(42) => msg.resources.push(r.read_message::<mesos::v1::Resource>(bytes)?),
@@ -4702,7 +4702,7 @@ impl<'a> MessageWrite for InverseOffer<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TaskInfo<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub task_id: mesos::v1::TaskID<'a>,
     pub agent_id: mesos::v1::AgentID<'a>,
     pub resources: Vec<mesos::v1::Resource<'a>>,
@@ -4723,7 +4723,7 @@ impl<'a> MessageRead<'a> for TaskInfo<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(18) => msg.task_id = r.read_message::<mesos::v1::TaskID>(bytes)?,
                 Ok(26) => msg.agent_id = r.read_message::<mesos::v1::AgentID>(bytes)?,
                 Ok(34) => msg.resources.push(r.read_message::<mesos::v1::Resource>(bytes)?),
@@ -4816,7 +4816,7 @@ impl<'a> MessageWrite for TaskGroupInfo<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Task<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub task_id: mesos::v1::TaskID<'a>,
     pub framework_id: mesos::v1::FrameworkID<'a>,
     pub executor_id: Option<mesos::v1::ExecutorID<'a>>,
@@ -4829,7 +4829,7 @@ pub struct Task<'a> {
     pub labels: Option<mesos::v1::Labels<'a>>,
     pub discovery: Option<mesos::v1::DiscoveryInfo<'a>>,
     pub container: Option<mesos::v1::ContainerInfo<'a>>,
-    pub user: Option<Cow<'a, str>>,
+    pub user: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Task<'a> {
@@ -4837,7 +4837,7 @@ impl<'a> MessageRead<'a> for Task<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(18) => msg.task_id = r.read_message::<mesos::v1::TaskID>(bytes)?,
                 Ok(26) => msg.framework_id = r.read_message::<mesos::v1::FrameworkID>(bytes)?,
                 Ok(34) => msg.executor_id = Some(r.read_message::<mesos::v1::ExecutorID>(bytes)?),
@@ -4850,7 +4850,7 @@ impl<'a> MessageRead<'a> for Task<'a> {
                 Ok(90) => msg.labels = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
                 Ok(98) => msg.discovery = Some(r.read_message::<mesos::v1::DiscoveryInfo>(bytes)?),
                 Ok(106) => msg.container = Some(r.read_message::<mesos::v1::ContainerInfo>(bytes)?),
-                Ok(114) => msg.user = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(114) => msg.user = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -5014,7 +5014,7 @@ impl<'a> MessageWrite for Operation<'a> {
 pub struct OperationStatus<'a> {
     pub operation_id: Option<mesos::v1::OperationID<'a>>,
     pub state: mesos::v1::OperationState,
-    pub message: Option<Cow<'a, str>>,
+    pub message: Option<&'a str>,
     pub converted_resources: Vec<mesos::v1::Resource<'a>>,
     pub uuid: Option<mesos::v1::UUID<'a>>,
 }
@@ -5026,7 +5026,7 @@ impl<'a> MessageRead<'a> for OperationStatus<'a> {
             match r.next_tag(bytes) {
                 Ok(10) => msg.operation_id = Some(r.read_message::<mesos::v1::OperationID>(bytes)?),
                 Ok(16) => msg.state = r.read_enum(bytes)?,
-                Ok(26) => msg.message = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.message = Some(r.read_string(bytes)?),
                 Ok(34) => msg.converted_resources.push(r.read_message::<mesos::v1::Resource>(bytes)?),
                 Ok(42) => msg.uuid = Some(r.read_message::<mesos::v1::UUID>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -5203,7 +5203,7 @@ impl MessageWrite for Tcp {
 pub struct TaskStatus<'a> {
     pub task_id: mesos::v1::TaskID<'a>,
     pub state: mesos::v1::TaskState,
-    pub message: Option<Cow<'a, str>>,
+    pub message: Option<&'a str>,
     pub source: Option<mesos::v1::mod_TaskStatus::Source>,
     pub reason: Option<mesos::v1::mod_TaskStatus::Reason>,
     pub data: Option<Cow<'a, [u8]>>,
@@ -5226,7 +5226,7 @@ impl<'a> MessageRead<'a> for TaskStatus<'a> {
             match r.next_tag(bytes) {
                 Ok(10) => msg.task_id = r.read_message::<mesos::v1::TaskID>(bytes)?,
                 Ok(16) => msg.state = r.read_enum(bytes)?,
-                Ok(34) => msg.message = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(34) => msg.message = Some(r.read_string(bytes)?),
                 Ok(72) => msg.source = Some(r.read_enum(bytes)?),
                 Ok(80) => msg.reason = Some(r.read_enum(bytes)?),
                 Ok(26) => msg.data = Some(r.read_bytes(bytes).map(Cow::Borrowed)?),
@@ -5530,9 +5530,9 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Variable<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub type_pb: mesos::v1::mod_Environment::mod_Variable::Type,
-    pub value: Option<Cow<'a, str>>,
+    pub value: Option<&'a str>,
     pub secret: Option<mesos::v1::Secret<'a>>,
 }
 
@@ -5544,9 +5544,9 @@ impl<'a> MessageRead<'a> for Variable<'a> {
         };
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(24) => msg.type_pb = r.read_enum(bytes)?,
-                Ok(18) => msg.value = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.value = Some(r.read_string(bytes)?),
                 Ok(34) => msg.secret = Some(r.read_message::<mesos::v1::Secret>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -5618,8 +5618,8 @@ impl<'a> From<&'a str> for Type {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Parameter<'a> {
-    pub key: Cow<'a, str>,
-    pub value: Cow<'a, str>,
+    pub key: &'a str,
+    pub value: &'a str,
 }
 
 impl<'a> MessageRead<'a> for Parameter<'a> {
@@ -5627,8 +5627,8 @@ impl<'a> MessageRead<'a> for Parameter<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.key = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.value = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.key = r.read_string(bytes)?,
+                Ok(18) => msg.value = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -5684,8 +5684,8 @@ impl<'a> MessageWrite for Parameters<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Credential<'a> {
-    pub principal: Cow<'a, str>,
-    pub secret: Option<Cow<'a, str>>,
+    pub principal: &'a str,
+    pub secret: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Credential<'a> {
@@ -5693,8 +5693,8 @@ impl<'a> MessageRead<'a> for Credential<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.principal = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.secret = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.principal = r.read_string(bytes)?,
+                Ok(18) => msg.secret = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -5794,8 +5794,8 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Reference<'a> {
-    pub name: Cow<'a, str>,
-    pub key: Option<Cow<'a, str>>,
+    pub name: &'a str,
+    pub key: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Reference<'a> {
@@ -5803,8 +5803,8 @@ impl<'a> MessageRead<'a> for Reference<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.key = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.name = r.read_string(bytes)?,
+                Ok(18) => msg.key = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -5898,7 +5898,7 @@ impl<'a> From<&'a str> for Type {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct RateLimit<'a> {
     pub qps: Option<f64>,
-    pub principal: Cow<'a, str>,
+    pub principal: &'a str,
     pub capacity: Option<u64>,
 }
 
@@ -5908,7 +5908,7 @@ impl<'a> MessageRead<'a> for RateLimit<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(9) => msg.qps = Some(r.read_double(bytes)?),
-                Ok(18) => msg.principal = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(18) => msg.principal = r.read_string(bytes)?,
                 Ok(24) => msg.capacity = Some(r.read_uint64(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -6026,8 +6026,8 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Appc<'a> {
-    pub name: Cow<'a, str>,
-    pub id: Option<Cow<'a, str>>,
+    pub name: &'a str,
+    pub id: Option<&'a str>,
     pub labels: Option<mesos::v1::Labels<'a>>,
 }
 
@@ -6036,8 +6036,8 @@ impl<'a> MessageRead<'a> for Appc<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.id = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.name = r.read_string(bytes)?,
+                Ok(18) => msg.id = Some(r.read_string(bytes)?),
                 Ok(26) => msg.labels = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -6065,7 +6065,7 @@ impl<'a> MessageWrite for Appc<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Docker<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub config: Option<mesos::v1::Secret<'a>>,
 }
 
@@ -6074,7 +6074,7 @@ impl<'a> MessageRead<'a> for Docker<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(26) => msg.config = Some(r.read_message::<mesos::v1::Secret>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -6206,8 +6206,8 @@ impl<'a> From<&'a str> for Mode {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Volume<'a> {
     pub mode: mesos::v1::mod_Volume::Mode,
-    pub container_path: Cow<'a, str>,
-    pub host_path: Option<Cow<'a, str>>,
+    pub container_path: &'a str,
+    pub host_path: Option<&'a str>,
     pub image: Option<mesos::v1::Image<'a>>,
     pub source: Option<mesos::v1::mod_Volume::Source<'a>>,
 }
@@ -6218,8 +6218,8 @@ impl<'a> MessageRead<'a> for Volume<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(24) => msg.mode = r.read_enum(bytes)?,
-                Ok(10) => msg.container_path = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.host_path = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.container_path = r.read_string(bytes)?,
+                Ok(18) => msg.host_path = Some(r.read_string(bytes)?),
                 Ok(34) => msg.image = Some(r.read_message::<mesos::v1::Image>(bytes)?),
                 Ok(42) => msg.source = Some(r.read_message::<mesos::v1::mod_Volume::Source>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -6308,8 +6308,8 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct DockerVolume<'a> {
-    pub driver: Option<Cow<'a, str>>,
-    pub name: Cow<'a, str>,
+    pub driver: Option<&'a str>,
+    pub name: &'a str,
     pub driver_options: Option<mesos::v1::Parameters<'a>>,
 }
 
@@ -6318,8 +6318,8 @@ impl<'a> MessageRead<'a> for DockerVolume<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.driver = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(18) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.driver = Some(r.read_string(bytes)?),
+                Ok(18) => msg.name = r.read_string(bytes)?,
                 Ok(26) => msg.driver_options = Some(r.read_message::<mesos::v1::Parameters>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -6347,7 +6347,7 @@ impl<'a> MessageWrite for DockerVolume<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct HostPath<'a> {
-    pub path: Cow<'a, str>,
+    pub path: &'a str,
     pub mount_propagation: Option<mesos::v1::MountPropagation>,
 }
 
@@ -6356,7 +6356,7 @@ impl<'a> MessageRead<'a> for HostPath<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.path = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.path = r.read_string(bytes)?,
                 Ok(18) => msg.mount_propagation = Some(r.read_message::<mesos::v1::MountPropagation>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -6383,7 +6383,7 @@ impl<'a> MessageWrite for HostPath<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct SandboxPath<'a> {
     pub type_pb: Option<mesos::v1::mod_Volume::mod_Source::Type>,
-    pub path: Cow<'a, str>,
+    pub path: &'a str,
 }
 
 impl<'a> MessageRead<'a> for SandboxPath<'a> {
@@ -6392,7 +6392,7 @@ impl<'a> MessageRead<'a> for SandboxPath<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.type_pb = Some(r.read_enum(bytes)?),
-                Ok(18) => msg.path = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(18) => msg.path = r.read_string(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -6535,8 +6535,8 @@ impl<'a> From<&'a str> for Mode {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct NetworkInfo<'a> {
     pub ip_addresses: Vec<mesos::v1::mod_NetworkInfo::IPAddress<'a>>,
-    pub name: Option<Cow<'a, str>>,
-    pub groups: Vec<Cow<'a, str>>,
+    pub name: Option<&'a str>,
+    pub groups: Vec<&'a str>,
     pub labels: Option<mesos::v1::Labels<'a>>,
     pub port_mappings: Vec<mesos::v1::mod_NetworkInfo::PortMapping<'a>>,
 }
@@ -6547,8 +6547,8 @@ impl<'a> MessageRead<'a> for NetworkInfo<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(42) => msg.ip_addresses.push(r.read_message::<mesos::v1::mod_NetworkInfo::IPAddress>(bytes)?),
-                Ok(50) => msg.name = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(26) => msg.groups.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(50) => msg.name = Some(r.read_string(bytes)?),
+                Ok(26) => msg.groups.push(r.read_string(bytes)?),
                 Ok(34) => msg.labels = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
                 Ok(58) => msg.port_mappings.push(r.read_message::<mesos::v1::mod_NetworkInfo::PortMapping>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -6587,7 +6587,7 @@ use super::*;
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct IPAddress<'a> {
     pub protocol: mesos::v1::mod_NetworkInfo::Protocol,
-    pub ip_address: Option<Cow<'a, str>>,
+    pub ip_address: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for IPAddress<'a> {
@@ -6596,7 +6596,7 @@ impl<'a> MessageRead<'a> for IPAddress<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.protocol = r.read_enum(bytes)?,
-                Ok(18) => msg.ip_address = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.ip_address = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -6623,7 +6623,7 @@ impl<'a> MessageWrite for IPAddress<'a> {
 pub struct PortMapping<'a> {
     pub host_port: u32,
     pub container_port: u32,
-    pub protocol: Option<Cow<'a, str>>,
+    pub protocol: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for PortMapping<'a> {
@@ -6633,7 +6633,7 @@ impl<'a> MessageRead<'a> for PortMapping<'a> {
             match r.next_tag(bytes) {
                 Ok(8) => msg.host_port = r.read_uint32(bytes)?,
                 Ok(16) => msg.container_port = r.read_uint32(bytes)?,
-                Ok(26) => msg.protocol = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.protocol = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -7144,7 +7144,7 @@ impl MessageWrite for WindowSize {
 pub struct ContainerInfo<'a> {
     pub type_pb: mesos::v1::mod_ContainerInfo::Type,
     pub volumes: Vec<mesos::v1::Volume<'a>>,
-    pub hostname: Option<Cow<'a, str>>,
+    pub hostname: Option<&'a str>,
     pub docker: Option<mesos::v1::mod_ContainerInfo::DockerInfo<'a>>,
     pub mesos: Option<mesos::v1::mod_ContainerInfo::MesosInfo<'a>>,
     pub network_infos: Vec<mesos::v1::NetworkInfo<'a>>,
@@ -7160,7 +7160,7 @@ impl<'a> MessageRead<'a> for ContainerInfo<'a> {
             match r.next_tag(bytes) {
                 Ok(8) => msg.type_pb = r.read_enum(bytes)?,
                 Ok(18) => msg.volumes.push(r.read_message::<mesos::v1::Volume>(bytes)?),
-                Ok(34) => msg.hostname = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(34) => msg.hostname = Some(r.read_string(bytes)?),
                 Ok(26) => msg.docker = Some(r.read_message::<mesos::v1::mod_ContainerInfo::DockerInfo>(bytes)?),
                 Ok(42) => msg.mesos = Some(r.read_message::<mesos::v1::mod_ContainerInfo::MesosInfo>(bytes)?),
                 Ok(58) => msg.network_infos.push(r.read_message::<mesos::v1::NetworkInfo>(bytes)?),
@@ -7210,7 +7210,7 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct DockerInfo<'a> {
-    pub image: Cow<'a, str>,
+    pub image: &'a str,
     pub network: mesos::v1::mod_ContainerInfo::mod_DockerInfo::Network,
     pub port_mappings: Vec<mesos::v1::mod_ContainerInfo::mod_DockerInfo::PortMapping<'a>>,
     pub privileged: bool,
@@ -7223,7 +7223,7 @@ impl<'a> MessageRead<'a> for DockerInfo<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.image = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.image = r.read_string(bytes)?,
                 Ok(16) => msg.network = r.read_enum(bytes)?,
                 Ok(26) => msg.port_mappings.push(r.read_message::<mesos::v1::mod_ContainerInfo::mod_DockerInfo::PortMapping>(bytes)?),
                 Ok(32) => msg.privileged = r.read_bool(bytes)?,
@@ -7268,7 +7268,7 @@ use super::*;
 pub struct PortMapping<'a> {
     pub host_port: u32,
     pub container_port: u32,
-    pub protocol: Option<Cow<'a, str>>,
+    pub protocol: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for PortMapping<'a> {
@@ -7278,7 +7278,7 @@ impl<'a> MessageRead<'a> for PortMapping<'a> {
             match r.next_tag(bytes) {
                 Ok(8) => msg.host_port = r.read_uint32(bytes)?,
                 Ok(16) => msg.container_port = r.read_uint32(bytes)?,
-                Ok(26) => msg.protocol = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.protocol = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -7826,8 +7826,8 @@ impl<'a> MessageWrite for Labels<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Label<'a> {
-    pub key: Cow<'a, str>,
-    pub value: Option<Cow<'a, str>>,
+    pub key: &'a str,
+    pub value: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Label<'a> {
@@ -7835,8 +7835,8 @@ impl<'a> MessageRead<'a> for Label<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.key = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.value = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.key = r.read_string(bytes)?,
+                Ok(18) => msg.value = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -7862,8 +7862,8 @@ impl<'a> MessageWrite for Label<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Port<'a> {
     pub number: u32,
-    pub name: Option<Cow<'a, str>>,
-    pub protocol: Option<Cow<'a, str>>,
+    pub name: Option<&'a str>,
+    pub protocol: Option<&'a str>,
     pub visibility: Option<mesos::v1::mod_DiscoveryInfo::Visibility>,
     pub labels: Option<mesos::v1::Labels<'a>>,
 }
@@ -7874,8 +7874,8 @@ impl<'a> MessageRead<'a> for Port<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.number = r.read_uint32(bytes)?,
-                Ok(18) => msg.name = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(26) => msg.protocol = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.name = Some(r.read_string(bytes)?),
+                Ok(26) => msg.protocol = Some(r.read_string(bytes)?),
                 Ok(32) => msg.visibility = Some(r.read_enum(bytes)?),
                 Ok(42) => msg.labels = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -7940,10 +7940,10 @@ impl<'a> MessageWrite for Ports<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct DiscoveryInfo<'a> {
     pub visibility: mesos::v1::mod_DiscoveryInfo::Visibility,
-    pub name: Option<Cow<'a, str>>,
-    pub environment: Option<Cow<'a, str>>,
-    pub location: Option<Cow<'a, str>>,
-    pub version: Option<Cow<'a, str>>,
+    pub name: Option<&'a str>,
+    pub environment: Option<&'a str>,
+    pub location: Option<&'a str>,
+    pub version: Option<&'a str>,
     pub ports: Option<mesos::v1::Ports<'a>>,
     pub labels: Option<mesos::v1::Labels<'a>>,
 }
@@ -7954,10 +7954,10 @@ impl<'a> MessageRead<'a> for DiscoveryInfo<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(8) => msg.visibility = r.read_enum(bytes)?,
-                Ok(18) => msg.name = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(26) => msg.environment = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(34) => msg.location = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(42) => msg.version = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.name = Some(r.read_string(bytes)?),
+                Ok(26) => msg.environment = Some(r.read_string(bytes)?),
+                Ok(34) => msg.location = Some(r.read_string(bytes)?),
+                Ok(42) => msg.version = Some(r.read_string(bytes)?),
                 Ok(50) => msg.ports = Some(r.read_message::<mesos::v1::Ports>(bytes)?),
                 Ok(58) => msg.labels = Some(r.read_message::<mesos::v1::Labels>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -8035,7 +8035,7 @@ impl<'a> From<&'a str> for Visibility {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct WeightInfo<'a> {
     pub weight: f64,
-    pub role: Option<Cow<'a, str>>,
+    pub role: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for WeightInfo<'a> {
@@ -8044,7 +8044,7 @@ impl<'a> MessageRead<'a> for WeightInfo<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(9) => msg.weight = r.read_double(bytes)?,
-                Ok(18) => msg.role = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(18) => msg.role = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -8069,13 +8069,13 @@ impl<'a> MessageWrite for WeightInfo<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct VersionInfo<'a> {
-    pub version: Cow<'a, str>,
-    pub build_date: Option<Cow<'a, str>>,
+    pub version: &'a str,
+    pub build_date: Option<&'a str>,
     pub build_time: Option<f64>,
-    pub build_user: Option<Cow<'a, str>>,
-    pub git_sha: Option<Cow<'a, str>>,
-    pub git_branch: Option<Cow<'a, str>>,
-    pub git_tag: Option<Cow<'a, str>>,
+    pub build_user: Option<&'a str>,
+    pub git_sha: Option<&'a str>,
+    pub git_branch: Option<&'a str>,
+    pub git_tag: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for VersionInfo<'a> {
@@ -8083,13 +8083,13 @@ impl<'a> MessageRead<'a> for VersionInfo<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.version = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.build_date = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.version = r.read_string(bytes)?,
+                Ok(18) => msg.build_date = Some(r.read_string(bytes)?),
                 Ok(25) => msg.build_time = Some(r.read_double(bytes)?),
-                Ok(34) => msg.build_user = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(42) => msg.git_sha = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(50) => msg.git_branch = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(58) => msg.git_tag = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(34) => msg.build_user = Some(r.read_string(bytes)?),
+                Ok(42) => msg.git_sha = Some(r.read_string(bytes)?),
+                Ok(50) => msg.git_branch = Some(r.read_string(bytes)?),
+                Ok(58) => msg.git_tag = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -8124,8 +8124,8 @@ impl<'a> MessageWrite for VersionInfo<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Flag<'a> {
-    pub name: Cow<'a, str>,
-    pub value: Option<Cow<'a, str>>,
+    pub name: &'a str,
+    pub value: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for Flag<'a> {
@@ -8133,8 +8133,8 @@ impl<'a> MessageRead<'a> for Flag<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
-                Ok(18) => msg.value = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.name = r.read_string(bytes)?,
+                Ok(18) => msg.value = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -8159,7 +8159,7 @@ impl<'a> MessageWrite for Flag<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Role<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub weight: f64,
     pub frameworks: Vec<mesos::v1::FrameworkID<'a>>,
     pub resources: Vec<mesos::v1::Resource<'a>>,
@@ -8170,7 +8170,7 @@ impl<'a> MessageRead<'a> for Role<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(17) => msg.weight = r.read_double(bytes)?,
                 Ok(26) => msg.frameworks.push(r.read_message::<mesos::v1::FrameworkID>(bytes)?),
                 Ok(34) => msg.resources.push(r.read_message::<mesos::v1::Resource>(bytes)?),
@@ -8202,7 +8202,7 @@ impl<'a> MessageWrite for Role<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Metric<'a> {
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub value: Option<f64>,
 }
 
@@ -8211,7 +8211,7 @@ impl<'a> MessageRead<'a> for Metric<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(17) => msg.value = Some(r.read_double(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -8237,13 +8237,13 @@ impl<'a> MessageWrite for Metric<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct FileInfo<'a> {
-    pub path: Cow<'a, str>,
+    pub path: &'a str,
     pub nlink: Option<i32>,
     pub size: Option<u64>,
     pub mtime: Option<mesos::v1::TimeInfo>,
     pub mode: Option<u32>,
-    pub uid: Option<Cow<'a, str>>,
-    pub gid: Option<Cow<'a, str>>,
+    pub uid: Option<&'a str>,
+    pub gid: Option<&'a str>,
 }
 
 impl<'a> MessageRead<'a> for FileInfo<'a> {
@@ -8251,13 +8251,13 @@ impl<'a> MessageRead<'a> for FileInfo<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.path = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.path = r.read_string(bytes)?,
                 Ok(16) => msg.nlink = Some(r.read_int32(bytes)?),
                 Ok(24) => msg.size = Some(r.read_uint64(bytes)?),
                 Ok(34) => msg.mtime = Some(r.read_message::<mesos::v1::TimeInfo>(bytes)?),
                 Ok(40) => msg.mode = Some(r.read_uint32(bytes)?),
-                Ok(50) => msg.uid = Some(r.read_string(bytes).map(Cow::Borrowed)?),
-                Ok(58) => msg.gid = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(50) => msg.uid = Some(r.read_string(bytes)?),
+                Ok(58) => msg.gid = Some(r.read_string(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -8292,7 +8292,7 @@ impl<'a> MessageWrite for FileInfo<'a> {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Device<'a> {
-    pub path: Option<Cow<'a, str>>,
+    pub path: Option<&'a str>,
     pub number: Option<mesos::v1::mod_Device::Number>,
 }
 
@@ -8301,7 +8301,7 @@ impl<'a> MessageRead<'a> for Device<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.path = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.path = Some(r.read_string(bytes)?),
                 Ok(18) => msg.number = Some(r.read_message::<mesos::v1::mod_Device::Number>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),

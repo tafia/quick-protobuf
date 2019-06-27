@@ -77,7 +77,7 @@ impl MessageWrite for MessageForOneof {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestOneof<'a> {
-    pub s: Option<Cow<'a, str>>,
+    pub s: Option<&'a str>,
     pub one: mod_TestOneof::OneOfone<'a>,
 }
 
@@ -86,7 +86,7 @@ impl<'a> MessageRead<'a> for TestOneof<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(234) => msg.s = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(234) => msg.s = Some(r.read_string(bytes)?),
                 Ok(9) => msg.one = mod_TestOneof::OneOfone::double_field(r.read_double(bytes)?),
                 Ok(21) => msg.one = mod_TestOneof::OneOfone::float_field(r.read_float(bytes)?),
                 Ok(24) => msg.one = mod_TestOneof::OneOfone::int32_field(r.read_int32(bytes)?),
@@ -100,7 +100,7 @@ impl<'a> MessageRead<'a> for TestOneof<'a> {
                 Ok(93) => msg.one = mod_TestOneof::OneOfone::sfixed32_field(r.read_sfixed32(bytes)?),
                 Ok(97) => msg.one = mod_TestOneof::OneOfone::sfixed64_field(r.read_sfixed64(bytes)?),
                 Ok(104) => msg.one = mod_TestOneof::OneOfone::bool_field(r.read_bool(bytes)?),
-                Ok(114) => msg.one = mod_TestOneof::OneOfone::string_field(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(114) => msg.one = mod_TestOneof::OneOfone::string_field(r.read_string(bytes)?),
                 Ok(122) => msg.one = mod_TestOneof::OneOfone::bytes_field(r.read_bytes(bytes).map(Cow::Borrowed)?),
                 Ok(128) => msg.one = mod_TestOneof::OneOfone::enum_field(r.read_enum(bytes)?),
                 Ok(138) => msg.one = mod_TestOneof::OneOfone::message_field(r.read_message::<MessageForOneof>(bytes)?),
@@ -180,7 +180,7 @@ pub enum OneOfone<'a> {
     sfixed32_field(i32),
     sfixed64_field(i64),
     bool_field(bool),
-    string_field(Cow<'a, str>),
+    string_field(&'a str),
     bytes_field(Cow<'a, [u8]>),
     enum_field(EnumForOneof),
     message_field(MessageForOneof),

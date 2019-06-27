@@ -52,7 +52,7 @@ use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Value<'a> {
-    pub string_value: Option<Cow<'a, str>>,
+    pub string_value: Option<&'a str>,
     pub float_value: Option<f32>,
     pub double_value: Option<f64>,
     pub int_value: Option<i64>,
@@ -66,7 +66,7 @@ impl<'a> MessageRead<'a> for Value<'a> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.string_value = Some(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(10) => msg.string_value = Some(r.read_string(bytes)?),
                 Ok(21) => msg.float_value = Some(r.read_float(bytes)?),
                 Ok(25) => msg.double_value = Some(r.read_double(bytes)?),
                 Ok(32) => msg.int_value = Some(r.read_int64(bytes)?),
@@ -151,9 +151,9 @@ impl MessageWrite for Feature {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Layer<'a> {
     pub version: u32,
-    pub name: Cow<'a, str>,
+    pub name: &'a str,
     pub features: Vec<vector_tile::mod_Tile::Feature>,
-    pub keys: Vec<Cow<'a, str>>,
+    pub keys: Vec<&'a str>,
     pub values: Vec<vector_tile::mod_Tile::Value<'a>>,
     pub extent: u32,
 }
@@ -168,9 +168,9 @@ impl<'a> MessageRead<'a> for Layer<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(120) => msg.version = r.read_uint32(bytes)?,
-                Ok(10) => msg.name = r.read_string(bytes).map(Cow::Borrowed)?,
+                Ok(10) => msg.name = r.read_string(bytes)?,
                 Ok(18) => msg.features.push(r.read_message::<vector_tile::mod_Tile::Feature>(bytes)?),
-                Ok(26) => msg.keys.push(r.read_string(bytes).map(Cow::Borrowed)?),
+                Ok(26) => msg.keys.push(r.read_string(bytes)?),
                 Ok(34) => msg.values.push(r.read_message::<vector_tile::mod_Tile::Value>(bytes)?),
                 Ok(40) => msg.extent = r.read_uint32(bytes)?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
