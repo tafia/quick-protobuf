@@ -363,7 +363,9 @@ impl FieldType {
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
 
-            FieldType::BytesCow | FieldType::String_ | FieldType::Bytes_ => format!("sizeof_len(({}).len())", s),
+            FieldType::BytesCow | FieldType::String_ | FieldType::Bytes_ => {
+                format!("sizeof_len(({}).len())", s)
+            }
 
             FieldType::Message(_) => format!("sizeof_len(({}).get_size())", s),
 

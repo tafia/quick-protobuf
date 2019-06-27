@@ -39,9 +39,7 @@ fn main() {
         f_nested_enum: data_types::mod_BazMessage::mod_Nested::NestedEnum::Baz,
 
         // a map!
-        f_map: vec![("foo", 1), ("bar", 2)]
-            .into_iter()
-            .collect(),
+        f_map: vec![("foo", 1), ("bar", 2)].into_iter().collect(),
 
         // a oneof value
         test_oneof: OneOftest_oneof::f1(2),

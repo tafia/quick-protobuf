@@ -10,9 +10,7 @@ fn ignore_non_primitive_packed() {
         address: Some(Address {
             city: Some(City::LONDON),
         }),
-        names: "Mr John Doe"
-            .split_whitespace()
-            .collect(),
+        names: "Mr John Doe".split_whitespace().collect(),
     };
 
     let mut person_bytes = Vec::new();

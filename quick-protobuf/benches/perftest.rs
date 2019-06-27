@@ -178,9 +178,7 @@ perfbench!(
 );
 
 fn generate_strings() -> Vec<TestStrings<'static>> {
-    let mut s = "hello world from quick-protobuf!!!"
-        .split(' ')
-        .cycle();
+    let mut s = "hello world from quick-protobuf!!!".split(' ').cycle();
     (1..100)
         .map(|_| TestStrings {
             s1: s.by_ref().next(),
@@ -240,11 +238,7 @@ fn generate_map() -> Vec<TestMap<'static>> {
     let mut s = "hello world from quick-protobuf!!!".split(' ').cycle();
     (1..30)
         .map(|_| TestMap {
-            value: s
-                .by_ref()
-                .take(500)
-                .map(|s| (s, s.len() as u32))
-                .collect(),
+            value: s.by_ref().take(500).map(|s| (s, s.len() as u32)).collect(),
         })
         .collect()
 }
