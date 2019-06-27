@@ -180,8 +180,7 @@ perfbench!(
 fn generate_strings() -> Vec<TestStrings<'static>> {
     let mut s = "hello world from quick-protobuf!!!"
         .split(' ')
-        .cycle()
-        .map(|s| Cow::Borrowed(s));
+        .cycle();
     (1..100)
         .map(|_| TestStrings {
             s1: s.by_ref().next(),
@@ -244,7 +243,7 @@ fn generate_map() -> Vec<TestMap<'static>> {
             value: s
                 .by_ref()
                 .take(500)
-                .map(|s| (Cow::Owned(s.to_string()), s.len() as u32))
+                .map(|s| (s, s.len() as u32))
                 .collect(),
         })
         .collect()
