@@ -87,7 +87,7 @@ impl<'a> MessageRead<'a> for TestDefaultValues<'a> {
             sfixed32_field: 11i32,
             sfixed64_field: 12i64,
             bool_field: true,
-            string_field: &'a str::"abc\n22",
+            string_field: "abc\n22",
             bytes_field: Cow::Borrowed(b"cde\n33"),
             enum_field: test_default_values::EnumForDefaultValue::TWO,
             ..Self::default()
@@ -135,7 +135,7 @@ impl<'a> MessageWrite for TestDefaultValues<'a> {
         + if self.sfixed32_field == 11i32 { 0 } else { 1 + 4 }
         + if self.sfixed64_field == 12i64 { 0 } else { 1 + 8 }
         + if self.bool_field == true { 0 } else { 1 + sizeof_varint(*(&self.bool_field) as u64) }
-        + if self.string_field == &'a str::"abc\n22" { 0 } else { 1 + sizeof_len((&self.string_field).len()) }
+        + if self.string_field == "abc\n22" { 0 } else { 1 + sizeof_len((&self.string_field).len()) }
         + if self.bytes_field == Cow::Borrowed(b"cde\n33") { 0 } else { 1 + sizeof_len((&self.bytes_field).len()) }
         + if self.enum_field == test_default_values::EnumForDefaultValue::TWO { 0 } else { 2 + sizeof_varint(*(&self.enum_field) as u64) }
         + self.enum_field_without_default.as_ref().map_or(0, |m| 2 + sizeof_varint(*(m) as u64))
@@ -155,7 +155,7 @@ impl<'a> MessageWrite for TestDefaultValues<'a> {
         if self.sfixed32_field != 11i32 { w.write_with_tag(93, |w| w.write_sfixed32(*&self.sfixed32_field))?; }
         if self.sfixed64_field != 12i64 { w.write_with_tag(97, |w| w.write_sfixed64(*&self.sfixed64_field))?; }
         if self.bool_field != true { w.write_with_tag(104, |w| w.write_bool(*&self.bool_field))?; }
-        if self.string_field != &'a str::"abc\n22" { w.write_with_tag(114, |w| w.write_string(&**&self.string_field))?; }
+        if self.string_field != "abc\n22" { w.write_with_tag(114, |w| w.write_string(&**&self.string_field))?; }
         if self.bytes_field != Cow::Borrowed(b"cde\n33") { w.write_with_tag(122, |w| w.write_bytes(&**&self.bytes_field))?; }
         if self.enum_field != test_default_values::EnumForDefaultValue::TWO { w.write_with_tag(128, |w| w.write_enum(*&self.enum_field as i32))?; }
         if let Some(ref s) = self.enum_field_without_default { w.write_with_tag(136, |w| w.write_enum(*s as i32))?; }

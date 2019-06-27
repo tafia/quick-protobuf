@@ -746,7 +746,7 @@ impl<'a> MessageRead<'a> for FrameworkInfo<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = FrameworkInfo {
             failover_timeout: 0.0f64,
-            role: &'a str::"*", deprecated=true,
+            role: "*", deprecated=true,
             ..Self::default()
         };
         while !r.is_eof() {
@@ -779,7 +779,7 @@ impl<'a> MessageWrite for FrameworkInfo<'a> {
         + self.id.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + if self.failover_timeout == 0.0f64 { 0 } else { 1 + 8 }
         + if self.checkpoint == false { 0 } else { 1 + sizeof_varint(*(&self.checkpoint) as u64) }
-        + if self.role == &'a str::"*", deprecated=true { 0 } else { 1 + sizeof_len((&self.role).len()) }
+        + if self.role == "*", deprecated=true { 0 } else { 1 + sizeof_len((&self.role).len()) }
         + self.roles.iter().map(|s| 1 + sizeof_len((s).len())).sum::<usize>()
         + self.hostname.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
         + self.principal.as_ref().map_or(0, |m| 1 + sizeof_len((m).len()))
@@ -794,7 +794,7 @@ impl<'a> MessageWrite for FrameworkInfo<'a> {
         if let Some(ref s) = self.id { w.write_with_tag(26, |w| w.write_message(s))?; }
         if self.failover_timeout != 0.0f64 { w.write_with_tag(33, |w| w.write_double(*&self.failover_timeout))?; }
         if self.checkpoint != false { w.write_with_tag(40, |w| w.write_bool(*&self.checkpoint))?; }
-        if self.role != &'a str::"*", deprecated=true { w.write_with_tag(50, |w| w.write_string(&**&self.role))?; }
+        if self.role != "*", deprecated=true { w.write_with_tag(50, |w| w.write_string(&**&self.role))?; }
         for s in &self.roles { w.write_with_tag(98, |w| w.write_string(&**s))?; }
         if let Some(ref s) = self.hostname { w.write_with_tag(58, |w| w.write_string(&**s))?; }
         if let Some(ref s) = self.principal { w.write_with_tag(66, |w| w.write_string(&**s))?; }
@@ -2500,7 +2500,7 @@ pub struct Resource<'a> {
 impl<'a> MessageRead<'a> for Resource<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Resource {
-            role: &'a str::"*", deprecated=true,
+            role: "*", deprecated=true,
             ..Self::default()
         };
         while !r.is_eof() {
@@ -2535,7 +2535,7 @@ impl<'a> MessageWrite for Resource<'a> {
         + self.scalar.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.ranges.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.set.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
-        + if self.role == &'a str::"*", deprecated=true { 0 } else { 1 + sizeof_len((&self.role).len()) }
+        + if self.role == "*", deprecated=true { 0 } else { 1 + sizeof_len((&self.role).len()) }
         + self.allocation_info.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.reservation.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + self.reservations.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
@@ -2551,7 +2551,7 @@ impl<'a> MessageWrite for Resource<'a> {
         if let Some(ref s) = self.scalar { w.write_with_tag(26, |w| w.write_message(s))?; }
         if let Some(ref s) = self.ranges { w.write_with_tag(34, |w| w.write_message(s))?; }
         if let Some(ref s) = self.set { w.write_with_tag(42, |w| w.write_message(s))?; }
-        if self.role != &'a str::"*", deprecated=true { w.write_with_tag(50, |w| w.write_string(&**&self.role))?; }
+        if self.role != "*", deprecated=true { w.write_with_tag(50, |w| w.write_string(&**&self.role))?; }
         if let Some(ref s) = self.allocation_info { w.write_with_tag(90, |w| w.write_message(s))?; }
         if let Some(ref s) = self.reservation { w.write_with_tag(66, |w| w.write_message(s))?; }
         for s in &self.reservations { w.write_with_tag(106, |w| w.write_message(s))?; }

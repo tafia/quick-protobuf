@@ -449,6 +449,7 @@ impl Field {
                     _ => format!("{}f64", *d),
                 },
                 "Cow<'a, [u8]>" => format!("Cow::Borrowed(b{})", d),
+                "&'a str" => format!("{}", d),
                 "String" => format!("String::from({})", d),
                 "Bytes" => format!(r#"b{}"#, d),
                 "Vec<u8>" => format!("b{}.to_vec()", d),

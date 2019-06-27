@@ -3,7 +3,6 @@ pub mod person;
 
 use self::person::{Address, City, Person, PersonPacked};
 use quick_protobuf::{BytesReader, Writer};
-use std::borrow::Cow;
 
 #[test]
 fn ignore_non_primitive_packed() {
@@ -13,7 +12,6 @@ fn ignore_non_primitive_packed() {
         }),
         names: "Mr John Doe"
             .split_whitespace()
-            .map(|n| Cow::Borrowed(n))
             .collect(),
     };
 
