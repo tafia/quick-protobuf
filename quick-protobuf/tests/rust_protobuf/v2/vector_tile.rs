@@ -47,7 +47,6 @@ impl<'a> MessageWrite for Tile<'a> {
 
 pub mod mod_Tile {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]

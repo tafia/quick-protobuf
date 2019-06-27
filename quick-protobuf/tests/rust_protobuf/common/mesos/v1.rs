@@ -962,7 +962,6 @@ impl<'a> MessageWrite for CheckInfo<'a> {
 
 pub mod mod_CheckInfo {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -1174,7 +1173,6 @@ impl<'a> MessageWrite for HealthCheck<'a> {
 
 pub mod mod_HealthCheck {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -1386,7 +1384,6 @@ impl<'a> MessageWrite for CommandInfo<'a> {
 
 pub mod mod_CommandInfo {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -1624,7 +1621,6 @@ impl<'a> MessageWrite for FaultDomain<'a> {
 
 pub mod mod_FaultDomain {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -2232,7 +2228,6 @@ impl<'a> MessageWrite for Value<'a> {
 
 pub mod mod_Value {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -2569,7 +2564,6 @@ impl<'a> MessageWrite for Resource<'a> {
 
 pub mod mod_Resource {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -2727,7 +2721,6 @@ impl<'a> MessageWrite for DiskInfo<'a> {
 
 pub mod mod_DiskInfo {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -2818,7 +2811,6 @@ impl<'a> MessageWrite for Source<'a> {
 
 pub mod mod_Source {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -3782,7 +3774,6 @@ impl<'a> MessageWrite for Executor<'a> {
 
 pub mod mod_Executor {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -5525,7 +5516,6 @@ impl<'a> MessageWrite for Environment<'a> {
 
 pub mod mod_Environment {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -6021,7 +6011,6 @@ impl<'a> MessageWrite for Image<'a> {
 
 pub mod mod_Image {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -6303,7 +6292,6 @@ impl<'a> MessageWrite for Source<'a> {
 
 pub mod mod_Source {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -6581,7 +6569,6 @@ impl<'a> MessageWrite for NetworkInfo<'a> {
 
 pub mod mod_NetworkInfo {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -7205,7 +7192,6 @@ impl<'a> MessageWrite for ContainerInfo<'a> {
 
 pub mod mod_ContainerInfo {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
@@ -7261,7 +7247,6 @@ impl<'a> MessageWrite for DockerInfo<'a> {
 
 pub mod mod_DockerInfo {
 
-use std::borrow::Cow;
 use super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]

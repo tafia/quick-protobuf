@@ -113,7 +113,6 @@ pub enum FieldType {
     Fixed64,
     Sfixed64,
     Double,
-    StringCow,
     BytesCow,
     String_,
     Bytes_,
@@ -130,7 +129,6 @@ impl FieldType {
         match *self {
             FieldType::Message(_)
             | FieldType::Map(_, _)
-            | FieldType::StringCow
             | FieldType::BytesCow
             | FieldType::String_
             | FieldType::Bytes_ => false,
@@ -140,7 +138,7 @@ impl FieldType {
 
     fn has_cow(&self) -> bool {
         match *self {
-            FieldType::BytesCow | FieldType::StringCow => true,
+            FieldType::BytesCow => true,
             FieldType::Map(ref k, ref v) => k.has_cow() || v.has_cow(),
             _ => false,
         }
@@ -180,10 +178,9 @@ impl FieldType {
             | FieldType::Bool
             | FieldType::Enum(_) => 0,
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => 1,
-            FieldType::StringCow
-            | FieldType::BytesCow
-            | FieldType::String_
+            FieldType::BytesCow
             | FieldType::Bytes_
+            | FieldType::String_
             | FieldType::Message(_)
             | FieldType::Map(_, _) => 2,
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => 5,
@@ -209,7 +206,6 @@ impl FieldType {
             FieldType::Double => "double",
             FieldType::String_ => "string",
             FieldType::Bytes_ => "bytes",
-            FieldType::StringCow => "string",
             FieldType::BytesCow => "bytes",
             FieldType::Message(_) => "message",
             FieldType::Map(_, _) => "map",
@@ -239,9 +235,8 @@ impl FieldType {
             FieldType::Fixed64 => Some("0u64"),
             FieldType::Sfixed64 => Some("0i64"),
             FieldType::Double => Some("0f64"),
-            FieldType::StringCow => Some("\"\""),
+            FieldType::String_ => Some("\"\""),
             FieldType::BytesCow => Some("Cow::Borrowed(b\"\")"),
-            FieldType::String_ => Some("String::default()"),
             FieldType::Bytes_ => Some("vec![]"),
             FieldType::Enum(ref e) => {
                 let e = e.get_enum(desc);
@@ -268,14 +263,13 @@ impl FieldType {
         ignore: &mut Vec<MessageIndex>,
     ) -> bool {
         match *self {
-            FieldType::StringCow | FieldType::BytesCow => true, // Cow<[u8]>
+            FieldType::String_ | FieldType::BytesCow => true, // Cow<[u8]>
             FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc, ignore),
             FieldType::Fixed64
             | FieldType::Sfixed64
             | FieldType::Double
             | FieldType::Fixed32
             | FieldType::Sfixed32
-            | FieldType::String_
             | FieldType::Bytes_
             | FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref key, ref value) => {
@@ -293,9 +287,8 @@ impl FieldType {
             FieldType::Uint64 | FieldType::Fixed64 => "u64".to_string(),
             FieldType::Double => "f64".to_string(),
             FieldType::Float => "f32".to_string(),
-            FieldType::StringCow => "&'a str".to_string(),
+            FieldType::String_ => "&'a str".to_string(),
             FieldType::BytesCow => "Cow<'a, [u8]>".to_string(),
-            FieldType::String_ => "String".to_string(),
             FieldType::Bytes_ => "Vec<u8>".to_string(),
             FieldType::Bool => "bool".to_string(),
             FieldType::Enum(ref e) => {
@@ -338,15 +331,10 @@ impl FieldType {
                 let cow = format!("{}.map(Cow::Borrowed)?", m);
                 (m, cow)
             }
-            FieldType::StringCow => {
+            FieldType::String_ => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
                 let cow = format!("{}?", m);
                 (m, cow)
-            }
-            FieldType::String_ => {
-                let m = format!("r.read_{}(bytes)", self.proto_type());
-                let vec = format!("{}?.to_owned()", m);
-                (m, vec)
             }
             FieldType::Bytes_ => {
                 let m = format!("r.read_{}(bytes)", self.proto_type());
@@ -375,9 +363,7 @@ impl FieldType {
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
 
-            FieldType::StringCow | FieldType::BytesCow => format!("sizeof_len(({}).len())", s),
-
-            FieldType::String_ | FieldType::Bytes_ => format!("sizeof_len(({}).len())", s),
+            FieldType::BytesCow | FieldType::String_ | FieldType::Bytes_ => format!("sizeof_len(({}).len())", s),
 
             FieldType::Message(_) => format!("sizeof_len(({}).get_size())", s),
 
@@ -406,7 +392,6 @@ impl FieldType {
             | FieldType::Sfixed32
             | FieldType::Float => format!("write_{}(*{})", self.proto_type(), s),
 
-            FieldType::StringCow => format!("write_string(&**{})", s),
             FieldType::BytesCow => format!("write_bytes(&**{})", s),
             FieldType::String_ => format!("write_string(&**{})", s),
             FieldType::Bytes_ => format!("write_bytes(&**{})", s),
@@ -463,7 +448,6 @@ impl Field {
                     "nan" => "::std::f64::NAN".to_string(),
                     _ => format!("{}f64", *d),
                 },
-                "Cow<'a, str>" => format!("Cow::Borrowed({})", d),
                 "Cow<'a, [u8]>" => format!("Cow::Borrowed(b{})", d),
                 "String" => format!("String::from({})", d),
                 "Bytes" => format!(r#"b{}"#, d),
@@ -1587,7 +1571,6 @@ impl FileDescriptor {
         desc.break_cycles(config.error_cycle)?;
         desc.sanity_checks()?;
         if config.dont_use_cow {
-            desc.convert_field_types(&FieldType::StringCow, &FieldType::String_);
             desc.convert_field_types(&FieldType::BytesCow, &FieldType::Bytes_);
         }
         desc.set_defaults()?;
