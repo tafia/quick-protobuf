@@ -106,11 +106,11 @@ impl<'a> MessageRead<'a> for Test2<'a> {
 impl<'a> MessageWrite for Test2<'a> {
     fn get_size(&self) -> usize {
         0
-        + if self.b == Cow::Borrowed("") { 0 } else { 1 + sizeof_len((&self.b).len()) }
+        + if self.b == "" { 0 } else { 1 + sizeof_len((&self.b).len()) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if self.b != Cow::Borrowed("") { w.write_with_tag(18, |w| w.write_string(&**&self.b))?; }
+        if self.b != "" { w.write_with_tag(18, |w| w.write_string(&**&self.b))?; }
         Ok(())
     }
 }
@@ -362,11 +362,11 @@ impl<'a> MessageRead<'a> for TestDefaultInstanceField<'a> {
 impl<'a> MessageWrite for TestDefaultInstanceField<'a> {
     fn get_size(&self) -> usize {
         0
-        + if self.s == Cow::Borrowed("") { 0 } else { 1 + sizeof_len((&self.s).len()) }
+        + if self.s == "" { 0 } else { 1 + sizeof_len((&self.s).len()) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if self.s != Cow::Borrowed("") { w.write_with_tag(10, |w| w.write_string(&**&self.s))?; }
+        if self.s != "" { w.write_with_tag(10, |w| w.write_string(&**&self.s))?; }
         Ok(())
     }
 }
@@ -498,7 +498,7 @@ impl<'a> MessageWrite for TestTypesSingular<'a> {
         + if self.sfixed32_field == 0i32 { 0 } else { 1 + 4 }
         + if self.sfixed64_field == 0i64 { 0 } else { 1 + 8 }
         + if self.bool_field == false { 0 } else { 1 + sizeof_varint(*(&self.bool_field) as u64) }
-        + if self.string_field == Cow::Borrowed("") { 0 } else { 1 + sizeof_len((&self.string_field).len()) }
+        + if self.string_field == "" { 0 } else { 1 + sizeof_len((&self.string_field).len()) }
         + if self.bytes_field == Cow::Borrowed(b"") { 0 } else { 1 + sizeof_len((&self.bytes_field).len()) }
         + if self.enum_field == basic::TestEnumDescriptor::UNKNOWN { 0 } else { 2 + sizeof_varint(*(&self.enum_field) as u64) }
     }
@@ -517,7 +517,7 @@ impl<'a> MessageWrite for TestTypesSingular<'a> {
         if self.sfixed32_field != 0i32 { w.write_with_tag(93, |w| w.write_sfixed32(*&self.sfixed32_field))?; }
         if self.sfixed64_field != 0i64 { w.write_with_tag(97, |w| w.write_sfixed64(*&self.sfixed64_field))?; }
         if self.bool_field != false { w.write_with_tag(104, |w| w.write_bool(*&self.bool_field))?; }
-        if self.string_field != Cow::Borrowed("") { w.write_with_tag(114, |w| w.write_string(&**&self.string_field))?; }
+        if self.string_field != "" { w.write_with_tag(114, |w| w.write_string(&**&self.string_field))?; }
         if self.bytes_field != Cow::Borrowed(b"") { w.write_with_tag(122, |w| w.write_bytes(&**&self.bytes_field))?; }
         if self.enum_field != basic::TestEnumDescriptor::UNKNOWN { w.write_with_tag(128, |w| w.write_enum(*&self.enum_field as i32))?; }
         Ok(())

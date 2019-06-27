@@ -118,7 +118,7 @@ impl<'a> MessageRead<'a> for TestOneof<'a> {
 impl<'a> MessageWrite for TestOneof<'a> {
     fn get_size(&self) -> usize {
         0
-        + if self.s == Cow::Borrowed("") { 0 } else { 2 + sizeof_len((&self.s).len()) }
+        + if self.s == "" { 0 } else { 2 + sizeof_len((&self.s).len()) }
         + match self.one {
             mod_TestOneof::OneOfone::double_field(_) => 1 + 8,
             mod_TestOneof::OneOfone::float_field(_) => 1 + 4,
@@ -141,7 +141,7 @@ impl<'a> MessageWrite for TestOneof<'a> {
     }    }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
-        if self.s != Cow::Borrowed("") { w.write_with_tag(234, |w| w.write_string(&**&self.s))?; }
+        if self.s != "" { w.write_with_tag(234, |w| w.write_string(&**&self.s))?; }
         match self.one {            mod_TestOneof::OneOfone::double_field(ref m) => { w.write_with_tag(9, |w| w.write_double(*m))? },
             mod_TestOneof::OneOfone::float_field(ref m) => { w.write_with_tag(21, |w| w.write_float(*m))? },
             mod_TestOneof::OneOfone::int32_field(ref m) => { w.write_with_tag(24, |w| w.write_int32(*m))? },
