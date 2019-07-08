@@ -8,11 +8,14 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.8.1
+- feat: avoid Cow::Borrow when comparing `&str`
+
 ## pb-rs 0.8.0
 
-- Added the ability to use custom RPC generation code
-- Added the ability to modify custom derives such as derive-new
-- (Large change) Added the dont_use_cow method [v2 and v3 tested] which replaces lifetimes 
+- feat: Added the ability to use custom RPC generation code
+- feat: Added the ability to modify custom derives such as derive-new
+- feat: (Large change) Added the `dont_use_cow` method [v2 and v3 tested] which replaces lifetimes 
 and Cow with regular strings and vectors. This will decrease performance - and will 
 eventually be replaced with a whitelist for specific structures instead of a boolean.
 This is meant for the structure to fully own the data it has.
@@ -25,12 +28,12 @@ This is meant for the structure to fully own the data it has.
 - feat: break cycles on optional messages only, and required one if user chooses to
 
 ## quick-protobuf 0.6.3
-- feat: add serialize_into_vec and deserialize_from_slice helper functions
+- feat: add `serialize_into_vec` and `deserialize_from_slice` helper functions
 
 ## pb-rs 0.4.1
 - fix: fix some nested messages not recognised (#90)
 - test: add new mesos.proto test
-- refactor: stop using find_enum and find_message, have MessageIndex and EnumIndex instead
+- refactor: stop using `find_enum` and `find_message`, have MessageIndex and EnumIndex instead
 
 ## pb-rs 0.4.0
 - fix: ignore packed for non primitive fields
