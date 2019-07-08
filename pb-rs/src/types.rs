@@ -239,7 +239,7 @@ impl FieldType {
             FieldType::Fixed64 => Some("0u64"),
             FieldType::Sfixed64 => Some("0i64"),
             FieldType::Double => Some("0f64"),
-            FieldType::StringCow => Some("Cow::Borrowed(\"\")"),
+            FieldType::StringCow => Some("\"\""),
             FieldType::BytesCow => Some("Cow::Borrowed(b\"\")"),
             FieldType::String_ => Some("String::default()"),
             FieldType::Bytes_ => Some("vec![]"),

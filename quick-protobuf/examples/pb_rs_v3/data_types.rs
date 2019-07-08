@@ -181,7 +181,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + if self.f_double == 0f64 { 0 } else { 1 + 8 }
         + if self.f_float == 0f32 { 0 } else { 1 + 4 }
         + if self.f_bytes == Cow::Borrowed(b"") { 0 } else { 1 + sizeof_len((&self.f_bytes).len()) }
-        + if self.f_string == Cow::Borrowed("") { 0 } else { 2 + sizeof_len((&self.f_string).len()) }
+        + if self.f_string == "" { 0 } else { 2 + sizeof_len((&self.f_string).len()) }
         + self.f_self_message.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_bar_message.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + if self.f_repeated_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_int32.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
@@ -217,7 +217,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if self.f_double != 0f64 { w.write_with_tag(105, |w| w.write_double(*&self.f_double))?; }
         if self.f_float != 0f32 { w.write_with_tag(117, |w| w.write_float(*&self.f_float))?; }
         if self.f_bytes != Cow::Borrowed(b"") { w.write_with_tag(122, |w| w.write_bytes(&**&self.f_bytes))?; }
-        if self.f_string != Cow::Borrowed("") { w.write_with_tag(130, |w| w.write_string(&**&self.f_string))?; }
+        if self.f_string != "" { w.write_with_tag(130, |w| w.write_string(&**&self.f_string))?; }
         if let Some(ref s) = self.f_self_message { w.write_with_tag(138, |w| w.write_message(&**s))?; }
         if let Some(ref s) = self.f_bar_message { w.write_with_tag(146, |w| w.write_message(s))?; }
         w.write_packed_with_tag(154, &self.f_repeated_int32, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
@@ -286,13 +286,13 @@ impl<'a> MessageWrite for BazMessage<'a> {
         0
         + self.nested.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + if self.b_int64 == 0i64 { 0 } else { 1 + sizeof_varint(*(&self.b_int64) as u64) }
-        + if self.b_string == Cow::Borrowed("") { 0 } else { 1 + sizeof_len((&self.b_string).len()) }
+        + if self.b_string == "" { 0 } else { 1 + sizeof_len((&self.b_string).len()) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.nested { w.write_with_tag(10, |w| w.write_message(s))?; }
         if self.b_int64 != 0i64 { w.write_with_tag(16, |w| w.write_int64(*&self.b_int64))?; }
-        if self.b_string != Cow::Borrowed("") { w.write_with_tag(26, |w| w.write_string(&**&self.b_string))?; }
+        if self.b_string != "" { w.write_with_tag(26, |w| w.write_string(&**&self.b_string))?; }
         Ok(())
     }
 }
