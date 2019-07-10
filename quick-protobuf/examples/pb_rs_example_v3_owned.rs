@@ -2,19 +2,19 @@ extern crate quick_protobuf;
 #[macro_use]
 extern crate rental;
 
-mod rentals {
-    include!("pb_rs_v3/rental/mod.rs");
+mod owned {
+    include!("pb_rs_v3/owned/mod.rs");
 }
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
 
-use crate::rentals::data_types::mod_FooMessage::OneOftest_oneof;
-use crate::rentals::data_types::{self, BazMessage, FooMessage, FooMessageRental};
+use crate::owned::data_types::mod_FooMessage::OneOftest_oneof;
+use crate::owned::data_types::{self, BazMessage, FooMessage, FooMessageOwned};
 
 // Imported fields contain package a.b, which is translated into
 // mod_a::mod_b rust module
-use crate::rentals::a::b::ImportedMessage;
+use crate::owned::a::b::ImportedMessage;
 
 use quick_protobuf::{MessageWrite, Writer};
 
@@ -76,8 +76,8 @@ fn main() {
     }
     println!("Message written successfully! bytes={:?}", &out);
 
-    let read_message_rental = FooMessageRental::try_from(out).unwrap();
-    let read_message = read_message_rental.suffix();
+    let read_message_owned = FooMessageOwned::try_from(out).unwrap();
+    let read_message = read_message_owned.suffix();
 
     assert_eq!(&message, read_message);
     println!("Message read back and everything matches!");

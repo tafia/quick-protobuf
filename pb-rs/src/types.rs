@@ -834,9 +834,9 @@ impl Message {
         writeln!(w, "")?;
         self.write_impl_message_write(w, desc, config)?;
 
-        if desc.rentals && self.has_lifetime(desc, &mut Vec::new()) {
-            writeln!(w, "")?;
-            self.write_impl_rentals(w)?;
+        if desc.owned && self.has_lifetime(desc, &mut Vec::new()) {
+            writeln!(w)?;
+            self.write_impl_owned(w)?;
         }
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
@@ -1026,23 +1026,23 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_rentals<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_impl_owned<W: Write>(&self, w: &mut W) -> Result<()> {
         write!(w,
             r#"
             rental! {{
-                mod mod_{name}Rental {{
+                mod mod_{name}Owned {{
                     use super::*;
 
                     #[rental(covariant, debug)]
-                    pub struct {name}Rental {{
+                    pub struct {name}Owned {{
                         buf: Vec<u8>,
                         proto: {name}<'buf>,
                     }}
                 }}
             }}
-            pub use self::mod_{name}Rental::{name}Rental;
+            pub use self::mod_{name}Owned::{name}Owned;
 
-            impl TryFrom<Vec<u8>> for {name}Rental {{
+            impl TryFrom<Vec<u8>> for {name}Owned {{
                 type Error=quick_protobuf::Error;
 
                 fn try_from(buf: Vec<u8>) -> Result<Self> {{
@@ -1055,7 +1055,7 @@ impl Message {
             }}
 
             #[cfg(feature = "test_helpers")]
-            impl<'a> From<{name}<'a>> for {name}Rental {{
+            impl<'a> From<{name}<'a>> for {name}Owned {{
                 fn from(proto: {name}) -> Self {{
                     use quick_protobuf::{{MessageWrite, Writer}};
 
@@ -1601,7 +1601,7 @@ pub struct Config {
     pub custom_struct_derive: Vec<String>,
     pub custom_rpc_generator: RpcGeneratorFunction,
     pub custom_includes: Vec<String>,
-    pub rentals: bool,
+    pub owned: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1613,7 +1613,7 @@ pub struct FileDescriptor {
     pub enums: Vec<Enumerator>,
     pub module: String,
     pub rpc_services: Vec<RpcService>,
-    pub rentals: bool,
+    pub owned: bool,
 }
 
 impl FileDescriptor {
@@ -1626,7 +1626,7 @@ impl FileDescriptor {
 
     pub fn write_proto(config: &Config) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&config.in_file, &config.import_search_path)?;
-        desc.rentals = config.rentals;
+        desc.owned = config.owned;
 
         if desc.messages.is_empty() && desc.enums.is_empty() {
             // There could had been unsupported structures, so bail early
@@ -2117,7 +2117,7 @@ impl FileDescriptor {
             "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
         )?;
 
-        if self.rentals {
+        if self.owned {
             writeln!(w, "use std::convert::TryFrom;")?;
         }
 

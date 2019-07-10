@@ -182,7 +182,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
         + if self.f_double == 0f64 { 0 } else { 1 + 8 }
         + if self.f_float == 0f32 { 0 } else { 1 + 4 }
         + if self.f_bytes == Cow::Borrowed(b"") { 0 } else { 1 + sizeof_len((&self.f_bytes).len()) }
-        + if self.f_string == Cow::Borrowed("") { 0 } else { 2 + sizeof_len((&self.f_string).len()) }
+        + if self.f_string == "" { 0 } else { 2 + sizeof_len((&self.f_string).len()) }
         + self.f_self_message.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + self.f_bar_message.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
         + if self.f_repeated_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_int32.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
@@ -218,7 +218,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if self.f_double != 0f64 { w.write_with_tag(105, |w| w.write_double(*&self.f_double))?; }
         if self.f_float != 0f32 { w.write_with_tag(117, |w| w.write_float(*&self.f_float))?; }
         if self.f_bytes != Cow::Borrowed(b"") { w.write_with_tag(122, |w| w.write_bytes(&**&self.f_bytes))?; }
-        if self.f_string != Cow::Borrowed("") { w.write_with_tag(130, |w| w.write_string(&**&self.f_string))?; }
+        if self.f_string != "" { w.write_with_tag(130, |w| w.write_string(&**&self.f_string))?; }
         if let Some(ref s) = self.f_self_message { w.write_with_tag(138, |w| w.write_message(&**s))?; }
         if let Some(ref s) = self.f_bar_message { w.write_with_tag(146, |w| w.write_message(s))?; }
         w.write_packed_with_tag(154, &self.f_repeated_int32, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
@@ -241,34 +241,32 @@ impl<'a> MessageWrite for FooMessage<'a> {
 
 
             rental! {
-                mod mod_FooMessageRental {
+                mod mod_FooMessageOwned {
                     use super::*;
 
                     #[rental(covariant, debug)]
-                    pub struct FooMessageRental {
+                    pub struct FooMessageOwned {
                         buf: Vec<u8>,
                         proto: FooMessage<'buf>,
                     }
                 }
             }
-            pub use self::mod_FooMessageRental::FooMessageRental;
+            pub use self::mod_FooMessageOwned::FooMessageOwned;
 
-            impl TryFrom<Vec<u8>> for FooMessageRental {
+            impl TryFrom<Vec<u8>> for FooMessageOwned {
                 type Error=quick_protobuf::Error;
 
                 fn try_from(buf: Vec<u8>) -> Result<Self> {
                     Self::try_new_or_drop(buf, |buf| {
                         let mut reader = BytesReader::from_bytes(&buf);
-                        //debug!("parsing FooMessage={:?}", buf);
                         let proto = FooMessage::from_reader(&mut reader, &buf);
-                        //debug!("parsed FooMessage={:?}", proto);
                         proto
                     })
                 }
             }
 
             #[cfg(feature = "test_helpers")]
-            impl<'a> From<FooMessage<'a>> for FooMessageRental {
+            impl<'a> From<FooMessage<'a>> for FooMessageOwned {
                 fn from(proto: FooMessage) -> Self {
                     use quick_protobuf::{MessageWrite, Writer};
 
@@ -276,10 +274,8 @@ impl<'a> MessageWrite for FooMessage<'a> {
                     let mut writer = Writer::new(&mut buf);
                     proto.write_message(&mut writer).expect("bad proto serialization");
                     Self::new(buf, |buf| {
-                        //debug!("parsing FooMessage={:?},  buf);
                         let mut reader = BytesReader::from_bytes(&buf);
                         let proto = FooMessage::from_reader(&mut reader, &buf).expect("bad proto deserialization");
-                        //debug!("parsed FooMessage={:?}", proto);
                         proto
                     })
                 }
@@ -333,47 +329,45 @@ impl<'a> MessageWrite for BazMessage<'a> {
         0
         + self.nested.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
         + if self.b_int64 == 0i64 { 0 } else { 1 + sizeof_varint(*(&self.b_int64) as u64) }
-        + if self.b_string == Cow::Borrowed("") { 0 } else { 1 + sizeof_len((&self.b_string).len()) }
+        + if self.b_string == "" { 0 } else { 1 + sizeof_len((&self.b_string).len()) }
     }
 
     fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.nested { w.write_with_tag(10, |w| w.write_message(s))?; }
         if self.b_int64 != 0i64 { w.write_with_tag(16, |w| w.write_int64(*&self.b_int64))?; }
-        if self.b_string != Cow::Borrowed("") { w.write_with_tag(26, |w| w.write_string(&**&self.b_string))?; }
+        if self.b_string != "" { w.write_with_tag(26, |w| w.write_string(&**&self.b_string))?; }
         Ok(())
     }
 }
 
 
             rental! {
-                mod mod_BazMessageRental {
+                mod mod_BazMessageOwned {
                     use super::*;
 
                     #[rental(covariant, debug)]
-                    pub struct BazMessageRental {
+                    pub struct BazMessageOwned {
                         buf: Vec<u8>,
                         proto: BazMessage<'buf>,
                     }
                 }
             }
-            pub use self::mod_BazMessageRental::BazMessageRental;
+            pub use self::mod_BazMessageOwned::BazMessageOwned;
 
-            impl TryFrom<Vec<u8>> for BazMessageRental {
+            impl TryFrom<Vec<u8>> for BazMessageOwned {
                 type Error=quick_protobuf::Error;
 
                 fn try_from(buf: Vec<u8>) -> Result<Self> {
                     Self::try_new_or_drop(buf, |buf| {
                         let mut reader = BytesReader::from_bytes(&buf);
-                        //debug!("parsing BazMessage={:?}", buf);
                         let proto = BazMessage::from_reader(&mut reader, &buf);
-                        //debug!("parsed BazMessage={:?}", proto);
                         proto
                     })
                 }
             }
 
             #[cfg(feature = "test_helpers")]
-            impl<'a> From<BazMessage<'a>> for BazMessageRental {
+            impl<'a> From<BazMessage<'a>> for BazMessageOwned {
                 fn from(proto: BazMessage) -> Self {
                     use quick_protobuf::{MessageWrite, Writer};
 
@@ -381,10 +375,8 @@ impl<'a> MessageWrite for BazMessage<'a> {
                     let mut writer = Writer::new(&mut buf);
                     proto.write_message(&mut writer).expect("bad proto serialization");
                     Self::new(buf, |buf| {
-                        //debug!("parsing BazMessage={:?},  buf);
                         let mut reader = BytesReader::from_bytes(&buf);
                         let proto = BazMessage::from_reader(&mut reader, &buf).expect("bad proto deserialization");
-                        //debug!("parsed BazMessage={:?}", proto);
                         proto
                     })
                 }
