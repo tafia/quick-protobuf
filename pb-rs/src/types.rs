@@ -1031,7 +1031,7 @@ impl Message {
             r#"
             rental! {{
                 mod mod_{name}Owned {{
-                    use super::*;
+                    use super::{name};
 
                     #[rental(covariant, debug)]
                     pub struct {name}Owned {{
