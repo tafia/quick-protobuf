@@ -789,6 +789,10 @@ impl Message {
             };
             f.typ = new_type;
         }
+
+        for message in &mut self.messages {
+            message.convert_field_types(from, to);
+        }
     }
 
     fn has_lifetime(&self, desc: &FileDescriptor, ignore: &mut Vec<MessageIndex>) -> bool {
