@@ -81,6 +81,11 @@ fn run() -> Result<(), ::failure::Error> {
                 .long("dont_use_cow")
                 .short("D")
                 .help("Don't use Cow for String and Byte types"),
+        ).arg(
+            Arg::with_name("OWNED")
+                .long("owned")
+                .required(false)
+                .help("Generate Owned structs when the proto stuct has a lifetime"),
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -105,7 +110,8 @@ fn run() -> Result<(), ::failure::Error> {
     .error_cycle(matches.is_present("CYCLE"))
     .headers(!matches.is_present("NO_HEADERS"))
     .dont_use_cow(matches.is_present("DONT_USE_COW"))
-    .custom_struct_derive(custom_struct_derive);
+    .custom_struct_derive(custom_struct_derive)
+    .owned(matches.is_present("OWNED"));
 
     FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
 }

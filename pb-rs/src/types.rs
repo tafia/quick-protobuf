@@ -838,6 +838,11 @@ impl Message {
         writeln!(w, "")?;
         self.write_impl_message_write(w, desc, config)?;
 
+        if desc.owned && self.has_lifetime(desc, &mut Vec::new()) {
+            writeln!(w)?;
+            self.write_impl_owned(w)?;
+        }
+
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
             writeln!(w, "")?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
@@ -1022,6 +1027,97 @@ impl Message {
         writeln!(w, "")?;
         self.write_write_message(w, desc)?;
         writeln!(w, "}}")?;
+        Ok(())
+    }
+
+    fn write_impl_owned<W: Write>(&self, w: &mut W) -> Result<()> {
+        write!(
+            w,
+            r#"
+            #[derive(Debug)]
+            struct {name}OwnedInner {{
+                buf: Vec<u8>,
+                proto: {name}<'static>,
+                _pin: std::marker::PhantomPinned,
+            }}
+
+            impl {name}OwnedInner {{
+                fn new(buf: Vec<u8>) -> Result<std::pin::Pin<Box<Self>>> {{
+                    let inner = Self {{
+                        buf,
+                        proto: unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }},
+                        _pin: std::marker::PhantomPinned,
+                    }};
+                    let mut pinned = Box::pin(inner);
+
+                    let mut reader = BytesReader::from_bytes(&pinned.buf);
+                    let proto = {name}::from_reader(&mut reader, &pinned.buf)?;
+
+                    unsafe {{
+                        let proto = std::mem::transmute::<_, {name}<'static>>(proto);
+                        pinned.as_mut().get_unchecked_mut().proto = proto;
+                    }}
+                    Ok(pinned)
+                }}
+            }}
+
+            pub struct {name}Owned {{
+                inner: std::pin::Pin<Box<{name}OwnedInner>>,
+            }}
+
+            #[allow(dead_code)]
+            impl {name}Owned {{
+                pub fn buf(&self) -> &[u8] {{
+                    &self.inner.buf
+                }}
+
+                pub fn proto(&self) -> &{name} {{
+                    &self.inner.proto
+                }}
+            }}
+
+            impl std::fmt::Debug for {name}Owned {{
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
+                    self.inner.proto.fmt(f)
+                }}
+            }}
+
+            impl Deref for {name}Owned {{
+                type Target = {name}<'static>;
+
+                fn deref(&self) -> &Self::Target {{
+                    &self.inner.proto
+                }}
+            }}
+
+            impl DerefMut for {name}Owned {{
+                fn deref_mut(&mut self) -> &mut Self::Target {{
+                    unsafe {{ &mut self.inner.as_mut().get_unchecked_mut().proto }}
+                }}
+            }}
+
+            impl TryFrom<Vec<u8>> for {name}Owned {{
+                type Error=quick_protobuf::Error;
+
+                fn try_from(buf: Vec<u8>) -> Result<Self> {{
+                    Ok(Self {{ inner: {name}OwnedInner::new(buf)? }})
+                }}
+            }}
+
+            #[cfg(feature = "test_helpers")]
+            impl<'a> From<{name}<'a>> for {name}Owned {{
+                fn from(proto: {name}) -> Self {{
+                    use quick_protobuf::{{MessageWrite, Writer}};
+
+                    let mut buf = Vec::new();
+                    let mut writer = Writer::new(&mut buf);
+                    proto.write_message(&mut writer).expect("bad proto serialization");
+                    Self {{ inner: {name}OwnedInner::new(buf).unwrap() }}
+                }}
+            }}
+            "#,
+            name = self.name
+        )?;
         Ok(())
     }
 
@@ -1553,6 +1649,7 @@ pub struct Config {
     pub custom_struct_derive: Vec<String>,
     pub custom_rpc_generator: RpcGeneratorFunction,
     pub custom_includes: Vec<String>,
+    pub owned: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -1564,6 +1661,7 @@ pub struct FileDescriptor {
     pub enums: Vec<Enumerator>,
     pub module: String,
     pub rpc_services: Vec<RpcService>,
+    pub owned: bool,
 }
 
 impl FileDescriptor {
@@ -1576,6 +1674,7 @@ impl FileDescriptor {
 
     pub fn write_proto(config: &Config) -> Result<()> {
         let mut desc = FileDescriptor::read_proto(&config.in_file, &config.import_search_path)?;
+        desc.owned = config.owned;
 
         if desc.messages.is_empty() && desc.enums.is_empty() {
             // There could had been unsupported structures, so bail early
@@ -2065,6 +2164,18 @@ impl FileDescriptor {
             w,
             "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
         )?;
+
+        if self.owned {
+            write!(
+                w,
+                "\
+                 use std::convert::TryFrom;\n\
+                 use std::ops::Deref;\n\
+                 use std::ops::DerefMut;\n\
+                 "
+            )?;
+        }
+
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
         for include in &config.custom_includes {
             writeln!(w, "{}", include)?;

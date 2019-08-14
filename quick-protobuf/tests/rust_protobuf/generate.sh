@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Test harness for generating files under tests/rust_protobuf/v[23]
 # and expecting them either to succeed or fail for some known reason.

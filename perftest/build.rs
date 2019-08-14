@@ -60,6 +60,7 @@ fn main() {
         custom_struct_derive: vec![],
         custom_rpc_generator: Box::new(|rpc, writer| generate_rpc_test(rpc, writer)),
         custom_includes: Vec::new(),
+        owned: false,
     };
     FileDescriptor::write_proto(&config).unwrap();
 
