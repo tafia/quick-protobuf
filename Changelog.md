@@ -8,6 +8,10 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.8.2
+- feat: add optional Owned variant when generating Messages (relies on `Pin`)
+- fix: propagate `dont_use_cow` to all messages
+
 ## pb-rs 0.8.1
 - feat: avoid Cow::Borrow when comparing `&str`
 
