@@ -14,6 +14,12 @@ edition = "2018"
 byteorder = "1.2.4"
 failure = "0.1.1"
 failure_derive = "0.1.1"
+arrayvec = {version = "0.4.11", optional = true }
 
 [dev-dependencies]
 lazy_static = "0.2.10"
+arrayvec = "0.4.11"
+
+[features]
+default = ["with_arrayvec"]
+with_arrayvec = ["arrayvec"]

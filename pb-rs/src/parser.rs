@@ -265,6 +265,12 @@ named!(
                     .find(|&&(k, _)| k == "deprecated")
                     .map_or(false, |&(_, v)| str::FromStr::from_str(v)
                         .expect("Cannot parse Deprecated value")),
+                gen_arrayvec: key_vals
+                    .iter()
+                    .find(|&&(k, _)| k == "rust_gen_arrayvec")
+                    .map(|&(_, v)| v
+                        .parse::<u32>()
+                        .expect("Cannot parse rust_gen_arrayvec value")),
             })
     )
 );
