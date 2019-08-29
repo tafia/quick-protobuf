@@ -9,7 +9,7 @@ use nom::{digit, hex_digit, multispace};
 
 fn is_word(b: u8) -> bool {
     match b {
-        b'a'...b'z' | b'A'...b'Z' | b'0'...b'9' | b'_' | b'.' => true,
+        b'a'..=b'z' | b'A'..=b'Z' | b'0'..=b'9' | b'_' | b'.' => true,
         _ => false,
     }
 }
