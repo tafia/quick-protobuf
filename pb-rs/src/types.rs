@@ -1307,7 +1307,7 @@ impl RpcService {
     }
 }
 
-pub type RpcGeneratorFunction = Box<Fn(&RpcService, &mut Write) -> Result<()>>;
+pub type RpcGeneratorFunction = Box<dyn Fn(&RpcService, &mut dyn Write) -> Result<()>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct Enumerator {
