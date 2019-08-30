@@ -7,8 +7,11 @@
 //!
 //! It is advised, for convenience to directly work with a `Reader`.
 
+#[cfg(feature = "std")]
 use std::fs::File;
-use std::io::{self, Read};
+#[cfg(feature = "std")]
+use std::io::Read;
+#[cfg(feature = "std")]
 use std::path::Path;
 
 #[cfg(feature = "with_arrayvec")]
@@ -343,7 +346,7 @@ impl BytesReader {
     #[inline]
     pub fn read_string<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a str> {
         self.read_len_varint(bytes, |r, b| {
-            ::std::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into())
+            ::core::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into())
         })
     }
 
@@ -351,6 +354,7 @@ impl BytesReader {
     ///
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
+    #[cfg(feature = "std")]
     #[inline]
     pub fn read_packed<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<Vec<M>>
     where
@@ -395,9 +399,9 @@ impl BytesReader {
         if self.len() < len {
             return Err(Error::UnexpectedEndOfBuffer);
         }
-        let n = len / ::std::mem::size_of::<M>();
+        let n = len / ::core::mem::size_of::<M>();
         let slice = unsafe {
-            ::std::slice::from_raw_parts(
+            ::core::slice::from_raw_parts(
                 bytes.get_unchecked(self.start) as *const u8 as *const M,
                 n,
             )
@@ -440,8 +444,8 @@ impl BytesReader {
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<K>,
         G: FnMut(&mut BytesReader, &'a [u8]) -> Result<V>,
-        K: ::std::fmt::Debug + Default,
-        V: ::std::fmt::Debug + Default,
+        K: ::core::fmt::Debug + Default,
+        V: ::core::fmt::Debug + Default,
     {
         self.read_len_varint(bytes, |r, bytes| {
             let mut k = K::default();
@@ -547,11 +551,13 @@ impl BytesReader {
 ///     println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
 /// }
 /// ```
+#[cfg(feature = "std")]
 pub struct Reader {
     buffer: Vec<u8>,
     inner: BytesReader,
 }
 
+#[cfg(feature = "std")]
 impl Reader {
     /// Creates a new `Reader`
     pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {

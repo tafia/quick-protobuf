@@ -1,0 +1,11 @@
+[package]
+name = "no-std-example"
+version = "0.1.0"
+authors = ["Russell Mull <russell@auxon.io>"]
+edition = "2018"
+
+[dependencies]
+quick-protobuf = { path = "..", default-features = false, features = ["with_arrayvec"] }
+arrayvec = { version = "0.4.11", default-features = false }
+
+[workspace]

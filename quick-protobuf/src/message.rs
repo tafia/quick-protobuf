@@ -2,8 +2,11 @@
 //!
 //! Creates the struct and implements a reader
 
+#[cfg(feature = "std")]
 use std::fs::File;
-use std::io::{BufWriter, Write};
+#[cfg(feature = "std")]
+use std::io::BufWriter;
+#[cfg(feature = "std")]
 use std::path::Path;
 
 use crate::errors::Result;
@@ -23,6 +26,7 @@ pub trait MessageWrite: Sized {
     }
 
     /// Writes self into a file
+    #[cfg(feature = "std")]
     fn write_file<P: AsRef<Path>>(&self, p: P) -> Result<()> {
         let file = BufWriter::new(File::create(p)?);
         let mut writer = Writer::new(file);

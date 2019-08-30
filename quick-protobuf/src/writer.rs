@@ -1,11 +1,11 @@
 //! A module to manage protobuf serialization
 
-use std::io::Write;
-
 use crate::errors::{Error, Result};
 use crate::message::MessageWrite;
 
 use byteorder::{ByteOrder, LittleEndian as LE};
+
+#[cfg(feature = "std")]
 use byteorder::WriteBytesExt;
 
 /// A struct to write protobuf messages
@@ -204,8 +204,8 @@ impl<W: WriterBackend> Writer<W> {
     /// all data at once
     #[inline]
     pub fn write_packed_fixed<M>(&mut self, v: &[M]) -> Result<()> {
-        let len = v.len() * ::std::mem::size_of::<M>();
-        let bytes = unsafe { ::std::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
+        let len = v.len() * ::core::mem::size_of::<M>();
+        let bytes = unsafe { ::core::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
         self.write_bytes(bytes)
     }
 
@@ -263,8 +263,8 @@ impl<W: WriterBackend> Writer<W> {
         }
 
         self.write_tag(tag)?;
-        let len = ::std::mem::size_of::<M>() * v.len();
-        let bytes = unsafe { ::std::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
+        let len = ::core::mem::size_of::<M>() * v.len();
+        let bytes = unsafe { ::core::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
         self.write_bytes(bytes)
     }
 
@@ -283,7 +283,7 @@ impl<W: WriterBackend> Writer<W> {
         self.write_tag(tag)?;
         let len = v.len() * item_size;
         let bytes =
-            unsafe { ::std::slice::from_raw_parts(v as *const [M] as *const M as *const u8, len) };
+            unsafe { ::core::slice::from_raw_parts(v as *const [M] as *const M as *const u8, len) };
         self.write_bytes(bytes)
     }
 
@@ -309,6 +309,7 @@ impl<W: WriterBackend> Writer<W> {
 }
 
 /// Serialize a `MessageWrite` into a `Vec`
+#[cfg(feature = "std")]
 pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
     let len = message.get_size();
     let mut v = Vec::with_capacity(len + crate::sizeofs::sizeof_len(len));
@@ -463,6 +464,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
     }
 }
 
+#[cfg(feature = "std")]
 impl<W: std::io::Write> WriterBackend for W {
     #[inline(always)]
     fn pb_write_u8(&mut self, x: u8) -> Result<()> {
