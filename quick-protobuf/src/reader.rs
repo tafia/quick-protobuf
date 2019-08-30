@@ -94,12 +94,7 @@ impl BytesReader {
     /// Reads the next byte
     #[inline(always)]
     pub fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
-        let b = bytes.get(self.start).ok_or_else::<Error, _>(|| {
-            Error::Io(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Cannot read next bytes",
-            ))
-        })?;
+        let b = bytes.get(self.start).ok_or(Error::UnexpectedEndOfBuffer)?;
         self.start += 1;
         Ok(*b)
     }
@@ -398,10 +393,7 @@ impl BytesReader {
     pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a [u8]) -> Result<&'a [M]> {
         let len = self.read_varint32(bytes)? as usize;
         if self.len() < len {
-            return Err(Error::Io(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Cannot read fixed packed field",
-            )));
+            return Err(Error::UnexpectedEndOfBuffer);
         }
         let n = len / ::std::mem::size_of::<M>();
         let slice = unsafe {

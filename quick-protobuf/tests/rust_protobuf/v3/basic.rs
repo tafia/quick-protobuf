@@ -9,9 +9,8 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use std::io::Write;
 use std::borrow::Cow;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -78,7 +77,7 @@ impl MessageWrite for Test1 {
         + if self.a == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.a) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.a != 0i32 { w.write_with_tag(8, |w| w.write_int32(*&self.a))?; }
         Ok(())
     }
@@ -109,7 +108,7 @@ impl<'a> MessageWrite for Test2<'a> {
         + if self.b == "" { 0 } else { 1 + sizeof_len((&self.b).len()) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.b != "" { w.write_with_tag(18, |w| w.write_string(&**&self.b))?; }
         Ok(())
     }
@@ -140,7 +139,7 @@ impl MessageWrite for Test3 {
         + self.c.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.c { w.write_with_tag(26, |w| w.write_message(s))?; }
         Ok(())
     }
@@ -171,7 +170,7 @@ impl MessageWrite for Test4 {
         + if self.d.is_empty() { 0 } else { 1 + sizeof_len(self.d.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_packed_with_tag(34, &self.d, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
         Ok(())
     }
@@ -205,7 +204,7 @@ impl MessageWrite for TestPackedUnpacked {
         + if self.packed.is_empty() { 0 } else { 1 + sizeof_len(self.packed.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         for s in &self.unpacked { w.write_with_tag(32, |w| w.write_int32(*s))?; }
         w.write_packed_with_tag(42, &self.packed, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
         Ok(())
@@ -237,7 +236,7 @@ impl MessageWrite for TestEmpty {
         + if self.foo == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.foo) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.foo != 0i32 { w.write_with_tag(80, |w| w.write_int32(*&self.foo))?; }
         Ok(())
     }
@@ -268,7 +267,7 @@ impl MessageWrite for Test {
         + if self.b == false { 0 } else { 1 + sizeof_varint(*(&self.b) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.b != false { w.write_with_tag(40, |w| w.write_bool(*&self.b))?; }
         Ok(())
     }
@@ -299,7 +298,7 @@ impl MessageWrite for TestUnknownFields {
         + if self.a == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.a) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.a != 0i32 { w.write_with_tag(8, |w| w.write_int32(*&self.a))?; }
         Ok(())
     }
@@ -333,7 +332,7 @@ impl MessageWrite for TestSelfReference {
         + self.r2.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.r1 { w.write_with_tag(10, |w| w.write_message(&**s))?; }
         if let Some(ref s) = self.r2 { w.write_with_tag(18, |w| w.write_message(&**s))?; }
         Ok(())
@@ -365,7 +364,7 @@ impl<'a> MessageWrite for TestDefaultInstanceField<'a> {
         + if self.s == "" { 0 } else { 1 + sizeof_len((&self.s).len()) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.s != "" { w.write_with_tag(10, |w| w.write_string(&**&self.s))?; }
         Ok(())
     }
@@ -396,7 +395,7 @@ impl<'a> MessageWrite for TestDefaultInstance<'a> {
         + self.field.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.field { w.write_with_tag(10, |w| w.write_message(s))?; }
         Ok(())
     }
@@ -427,7 +426,7 @@ impl MessageWrite for TestDescriptor {
         + if self.stuff == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.stuff) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.stuff != 0i32 { w.write_with_tag(80, |w| w.write_int32(*&self.stuff))?; }
         Ok(())
     }
@@ -503,7 +502,7 @@ impl<'a> MessageWrite for TestTypesSingular<'a> {
         + if self.enum_field == basic::TestEnumDescriptor::UNKNOWN { 0 } else { 2 + sizeof_varint(*(&self.enum_field) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.double_field != 0f64 { w.write_with_tag(9, |w| w.write_double(*&self.double_field))?; }
         if self.float_field != 0f32 { w.write_with_tag(21, |w| w.write_float(*&self.float_field))?; }
         if self.int32_field != 0i32 { w.write_with_tag(24, |w| w.write_int32(*&self.int32_field))?; }
@@ -594,7 +593,7 @@ impl<'a> MessageWrite for TestTypesRepeated<'a> {
         + self.enum_field.iter().map(|s| 2 + sizeof_varint(*(s) as u64)).sum::<usize>()
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         for s in &self.double_field { w.write_with_tag(9, |w| w.write_double(*s))?; }
         for s in &self.float_field { w.write_with_tag(21, |w| w.write_float(*s))?; }
         for s in &self.int32_field { w.write_with_tag(24, |w| w.write_int32(*s))?; }
@@ -679,7 +678,7 @@ impl MessageWrite for TestTypesRepeatedArrayVec {
         + if self.enum_field.is_empty() { 0 } else { 1 + sizeof_len(self.enum_field.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_packed_fixed_with_tag(10, &self.double_field)?;
         w.write_packed_fixed_with_tag(18, &self.float_field)?;
         w.write_packed_with_tag(26, &self.int32_field, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
@@ -768,7 +767,7 @@ impl<'a> MessageWrite for TestTypesRepeatedPacked<'a> {
         + if self.enum_field.is_empty() { 0 } else { 2 + sizeof_len(self.enum_field.iter().map(|s| sizeof_varint(*(s) as u64)).sum::<usize>()) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_packed_fixed_with_tag(10, &self.double_field)?;
         w.write_packed_fixed_with_tag(18, &self.float_field)?;
         w.write_packed_with_tag(26, &self.int32_field, |w, m| w.write_int32(*m), &|m| sizeof_varint(*(m) as u64))?;
@@ -826,7 +825,7 @@ impl<'a> MessageWrite for TestTruncated<'a> {
         + if self.ints.is_empty() { 0 } else { 1 + sizeof_len(self.ints.len() * 4) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_packed_fixed_with_tag(18, &self.ints)?;
         Ok(())
     }
@@ -860,7 +859,7 @@ impl MessageWrite for TestBugSint {
         + if self.s64 == 0i64 { 0 } else { 1 + sizeof_sint64(*(&self.s64)) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.s32 != 0i32 { w.write_with_tag(8, |w| w.write_sint32(*&self.s32))?; }
         if self.s64 != 0i64 { w.write_with_tag(16, |w| w.write_sint64(*&self.s64))?; }
         Ok(())

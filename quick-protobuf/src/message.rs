@@ -8,12 +8,12 @@ use std::path::Path;
 
 use crate::errors::Result;
 use crate::reader::BytesReader;
-use crate::writer::Writer;
+use crate::writer::{Writer, WriterBackend};
 
 /// A trait to handle deserialization based on parsed `Field`s
 pub trait MessageWrite: Sized {
     /// Writes `Self` into W writer
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, _: &mut Writer<W>) -> Result<()> {
         Ok(())
     }
 

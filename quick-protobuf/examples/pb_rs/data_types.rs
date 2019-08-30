@@ -9,10 +9,9 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -73,7 +72,7 @@ impl MessageWrite for BarMessage {
         + 1 + sizeof_varint(*(&self.b_required_int32) as u64)
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_with_tag(8, |w| w.write_int32(*&self.b_required_int32))?;
         Ok(())
     }
@@ -195,7 +194,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
             mod_FooMessage::OneOftest_oneof::None => 0,
     }    }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.f_int32 { w.write_with_tag(8, |w| w.write_int32(*s))?; }
         if let Some(ref s) = self.f_int64 { w.write_with_tag(16, |w| w.write_int64(*s))?; }
         if let Some(ref s) = self.f_uint32 { w.write_with_tag(24, |w| w.write_uint32(*s))?; }
@@ -275,7 +274,7 @@ impl MessageWrite for BazMessage {
         + self.nested.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.nested { w.write_with_tag(10, |w| w.write_message(s))?; }
         Ok(())
     }
@@ -310,7 +309,7 @@ impl MessageWrite for Nested {
         + 1 + sizeof_len((&self.f_nested).get_size())
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_with_tag(10, |w| w.write_message(&self.f_nested))?;
         Ok(())
     }
@@ -345,7 +344,7 @@ impl MessageWrite for NestedMessage {
         + 1 + sizeof_varint(*(&self.f_nested) as u64)
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         w.write_with_tag(8, |w| w.write_int32(*&self.f_nested))?;
         Ok(())
     }

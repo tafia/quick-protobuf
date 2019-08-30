@@ -28,6 +28,14 @@ pub enum Error {
     /// Unexpected map tag
     #[fail(display = "Unexpected map tag: '{}', expecting 1 or 2", _0)]
     Map(u8),
+
+    /// Out of data when reading from or writing to a byte buffer
+    #[fail(display = "Unexpected end of buffer")]
+    UnexpectedEndOfBuffer,
+
+    /// The supplied output buffer is not large enough to serialize the message
+    #[fail(display = "Output buffer too small")]
+    OutputBufferTooSmall,
 }
 
 /// A wrapper for `Result<T, Error>`

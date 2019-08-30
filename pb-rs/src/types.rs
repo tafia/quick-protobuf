@@ -1158,7 +1158,7 @@ impl Message {
     fn write_write_message<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(
             w,
-            "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{"
+            "    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {{"
         )?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w, desc)?;
@@ -2168,7 +2168,6 @@ impl FileDescriptor {
             )?;
             return Ok(());
         }
-        writeln!(w, "use std::io::Write;")?;
         if self
             .messages
             .iter()
@@ -2185,7 +2184,7 @@ impl FileDescriptor {
         }
         writeln!(
             w,
-            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
+            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
         )?;
 
         if self.owned {
