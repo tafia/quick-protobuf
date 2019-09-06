@@ -1,6 +1,6 @@
 #!/bin/env bash
 
-set -e
+set -eu -o pipefail
 
 (
     cd quick-protobuf/tests/rust_protobuf
@@ -14,14 +14,13 @@ proto_sets=(
     quick-protobuf/benches/perftest_data/*.proto
     quick-protobuf/examples/pb_rs/*.proto
     quick-protobuf/examples/pb_rs_v3/*.proto
-    quick-protobuf/no-std-example/src/*.proto
     quick-protobuf/tests/packed_primitives/*.proto
     quick-protobuf/tests/rust_protobuf/common/*.proto
 )
 
 for ps in "${proto_sets[@]}"; do
     for proto in $ps; do
-        cargo +stable run -p pb-rs "${base_dir}"/$proto
+        cargo +stable run -p pb-rs "${base_dir}"/"${proto}"
     done
 done
 
