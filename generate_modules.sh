@@ -20,7 +20,7 @@ proto_sets=(
 
 for ps in "${proto_sets[@]}"; do
     for proto in $ps; do
-        cargo +stable run -p pb-rs "${base_dir}"/"${proto}"
+        cargo run -p pb-rs "${base_dir}"/"${proto}"
     done
 done
 
@@ -29,7 +29,7 @@ rm -rf quick-protobuf/examples/pb_rs_v3/owned
 mkdir -p quick-protobuf/examples/pb_rs_v3/owned
 for proto in quick-protobuf/examples/pb_rs_v3/*.proto; do
     (
-        cargo +stable run -p pb-rs "${base_dir}"/"${proto}" \
+        cargo run -p pb-rs "${base_dir}"/"${proto}" \
               --owned \
               --output_directory "${base_dir}"/quick-protobuf/examples/pb_rs_v3/owned
     )
