@@ -14,7 +14,7 @@ message EmbeddedMessage {
 
 message NoStdMessage {
   fixed32 num = 1;
-  repeated fixed32 nums = 2 [rust_gen_arrayvec = 16];
+  repeated fixed32 nums = 2 [(rust_max_length)=16];
   EmbeddedMessage message = 3;
-  repeated EmbeddedMessage messages = 4 [rust_gen_arrayvec = 16];
+  repeated EmbeddedMessage messages = 4 [(rust_max_length)=16];
 }

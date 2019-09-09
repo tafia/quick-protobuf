@@ -264,7 +264,7 @@ impl FieldType {
     fn has_lifetime(
         &self,
         desc: &FileDescriptor,
-        gen_arrayvec: bool,
+        max_length: bool,
         packed: bool,
         ignore: &mut Vec<MessageIndex>,
     ) -> bool {
@@ -278,7 +278,7 @@ impl FieldType {
             | FieldType::Sfixed32
             | FieldType::String_
             | FieldType::Bytes_
-            | FieldType::Float => !gen_arrayvec && packed, // Cow<[M]>
+            | FieldType::Float => !max_length && packed, // Cow<[M]>
             FieldType::Map(ref key, ref value) => {
                 key.has_lifetime(desc, false, false, ignore)
                     || value.has_lifetime(desc, false, false, ignore)
@@ -434,12 +434,12 @@ pub struct Field {
     pub packed: Option<bool>,
     pub boxed: bool,
     pub deprecated: bool,
-    pub gen_arrayvec: Option<u32>,
+    pub max_length: Option<u32>,
 }
 
 impl Field {
-    fn gen_arrayvec(&self) -> bool {
-        self.gen_arrayvec.is_some()
+    fn max_length(&self) -> bool {
+        self.max_length.is_some()
     }
 
     fn packed(&self) -> bool {
@@ -502,11 +502,11 @@ impl Field {
             {
                 writeln!(w, "Option<{}>,", rust_type)?
             }
-            Frequency::Repeated if self.gen_arrayvec.is_some() => writeln!(
+            Frequency::Repeated if self.max_length.is_some() => writeln!(
                 w,
                 "arrayvec::ArrayVec<[{}; {}]>,",
                 rust_type,
-                self.gen_arrayvec.unwrap()
+                self.max_length.unwrap()
             )?,
             Frequency::Repeated
                 if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow =>
@@ -553,7 +553,7 @@ impl Field {
             Frequency::Required | Frequency::Optional => {
                 writeln!(w, "msg.{} = {},", name, val_cow)?
             }
-            Frequency::Repeated if self.packed() && self.gen_arrayvec.is_some() => {
+            Frequency::Repeated if self.packed() && self.max_length.is_some() => {
                 writeln!(
                     w,
                     "msg.{} = r.read_packed_arrayvec(bytes, |r, bytes| Ok({}))?,",
@@ -822,7 +822,7 @@ impl Message {
         ignore.push(self.index.clone());
         let res = self.all_fields().any(|f| {
             f.typ
-                .has_lifetime(desc, f.gen_arrayvec(), f.packed(), ignore)
+                .has_lifetime(desc, f.max_length(), f.packed(), ignore)
         });
         ignore.pop();
         res
@@ -1458,7 +1458,7 @@ impl OneOf {
         self.fields.iter().any(|f| {
             !f.deprecated
                 && f.typ
-                    .has_lifetime(desc, f.gen_arrayvec(), f.packed(), &mut Vec::new())
+                    .has_lifetime(desc, f.max_length(), f.packed(), &mut Vec::new())
         })
     }
 
