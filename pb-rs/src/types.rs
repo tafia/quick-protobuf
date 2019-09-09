@@ -10,10 +10,10 @@ use crate::parser::file_descriptor;
 
 fn sizeof_varint(v: u32) -> usize {
     match v {
-        0x0...0x7F => 1,
-        0x80...0x3FFF => 2,
-        0x4000...0x1FFFFF => 3,
-        0x200000...0xFFFFFFF => 4,
+        0x0..=0x7F => 1,
+        0x80..=0x3FFF => 2,
+        0x4000..=0x1FFFFF => 3,
+        0x200000..=0xFFFFFFF => 4,
         _ => 5,
     }
 }
@@ -1307,7 +1307,7 @@ impl RpcService {
     }
 }
 
-pub type RpcGeneratorFunction = Box<Fn(&RpcService, &mut Write) -> Result<()>>;
+pub type RpcGeneratorFunction = Box<dyn Fn(&RpcService, &mut dyn Write) -> Result<()>>;
 
 #[derive(Debug, Clone, Default)]
 pub struct Enumerator {
