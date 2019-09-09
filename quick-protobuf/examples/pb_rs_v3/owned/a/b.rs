@@ -5,7 +5,7 @@
 #![allow(non_camel_case_types)]
 #![allow(unused_imports)]
 #![allow(unknown_lints)]
-#![allow(clippy)]
+#![allow(clippy::all)]
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
