@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eu -o pipefail
+set -eux -o pipefail
 
 (
     cd quick-protobuf/tests/rust_protobuf
@@ -9,31 +9,29 @@ set -eu -o pipefail
 
 base_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
+rm -r quick-protobuf/examples/pb_rs/*.rs quick-protobuf/examples/pb_rs/a
+rm -r quick-protobuf/examples/pb_rs_v3/*.rs quick-protobuf/examples/pb_rs_v3/a
+
 proto_sets=(
-    perftest/src/*.proto
-    quick-protobuf/benches/perftest_data/*.proto
-    quick-protobuf/examples/pb_rs/*.proto
-    quick-protobuf/examples/pb_rs_v3/*.proto
-    quick-protobuf/tests/packed_primitives/*.proto
-    quick-protobuf/tests/rust_protobuf/common/*.proto
+    perftest/src
+    quick-protobuf/benches/perftest_data
+    quick-protobuf/examples/pb_rs
+    quick-protobuf/examples/pb_rs_v3
+    quick-protobuf/tests/packed_primitives
+    quick-protobuf/tests/rust_protobuf/common
 )
 
 for ps in "${proto_sets[@]}"; do
-    for proto in $ps; do
-        cargo run -p pb-rs "${base_dir}"/"${proto}"
-    done
+  cargo run -p pb-rs -- -I "$ps" -d "$ps" "$ps"/*.proto
 done
 
 
 rm -rf quick-protobuf/examples/pb_rs_v3/owned
 mkdir -p quick-protobuf/examples/pb_rs_v3/owned
-for proto in quick-protobuf/examples/pb_rs_v3/*.proto; do
-    (
-        cargo run -p pb-rs "${base_dir}"/"${proto}" \
-              --owned \
-              --output_directory "${base_dir}"/quick-protobuf/examples/pb_rs_v3/owned
-    )
-done
+cargo run -p pb-rs quick-protobuf/examples/pb_rs_v3/*.proto \
+  -I quick-protobuf/examples/pb_rs_v3 \
+  --owned \
+  --output_directory quick-protobuf/examples/pb_rs_v3/owned
 
 
 # cd ../examples/codegen

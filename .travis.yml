@@ -13,6 +13,6 @@ before_script:
 
 script:
   - cargo build -p pb-rs -p quick-protobuf
-  - if [[ $(rustup show active-toolchain) == stable* ]]; then cargo fmt -ppb-rs -pquick-protobuf -- --check; fi;
   - ./run_test.sh
+  - if [[ $(rustup show active-toolchain) == stable* ]]; then cargo fmt -ppb-rs -pquick-protobuf -- --check; fi;
   - if [[ $(rustup show active-toolchain) == nightly* ]]; then cargo bench -p quick-protobuf; fi;
