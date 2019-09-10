@@ -19,6 +19,7 @@ proto_sets=(
     quick-protobuf/examples/pb_rs_v3
     quick-protobuf/tests/packed_primitives
     quick-protobuf/tests/rust_protobuf/common
+    quick-protobuf/no-std-example/src
 )
 
 for ps in "${proto_sets[@]}"; do

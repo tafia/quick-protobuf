@@ -149,11 +149,17 @@ named!(
 );
 
 named!(
+    option_key<&str>,
+    alt_complete!(delimited!(tag!("("), word_ref, tag!(")"))
+                  | word_ref)
+);
+
+named!(
     key_val<(&str, &str)>,
     do_parse!(
         tag!("[")
             >> many0!(br)
-            >> key: word_ref
+            >> key: option_key
             >> many0!(br)
             >> tag!("=")
             >> many0!(br)
@@ -265,6 +271,12 @@ named!(
                     .find(|&&(k, _)| k == "deprecated")
                     .map_or(false, |&(_, v)| str::FromStr::from_str(v)
                         .expect("Cannot parse Deprecated value")),
+                max_length: key_vals
+                    .iter()
+                    .find(|&&(k, _)| k == "rust_max_length")
+                    .map(|&(_, v)| v
+                        .parse::<u32>()
+                        .expect("Cannot parse rust_max_length value")),
             })
     )
 );
@@ -665,6 +677,18 @@ mod test {
             }
             other => panic!("Could not parse RPC Function Declaration: {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_option_key_plain() {
+        let s = option_key("test".as_bytes()).unwrap().1;
+        assert_eq!("test", s);
+    }
+
+    #[test]
+    fn test_option_key_parens() {
+        let s = option_key("(test)".as_bytes()).unwrap().1;
+        assert_eq!("test", s);
     }
 
 }

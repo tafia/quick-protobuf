@@ -7,9 +7,15 @@
 //!
 //! It is advised, for convenience to directly work with a `Reader`.
 
+#[cfg(feature = "std")]
 use std::fs::File;
-use std::io::{self, Read};
+#[cfg(feature = "std")]
+use std::io::Read;
+#[cfg(feature = "std")]
 use std::path::Path;
+
+#[cfg(feature = "with_arrayvec")]
+use arrayvec::{self, ArrayVec};
 
 use crate::errors::{Error, Result};
 use crate::message::MessageRead;
@@ -91,12 +97,7 @@ impl BytesReader {
     /// Reads the next byte
     #[inline(always)]
     pub fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
-        let b = bytes.get(self.start).ok_or_else::<Error, _>(|| {
-            Error::Io(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Cannot read next bytes",
-            ))
-        })?;
+        let b = bytes.get(self.start).ok_or(Error::UnexpectedEndOfBuffer)?;
         self.start += 1;
         Ok(*b)
     }
@@ -345,7 +346,7 @@ impl BytesReader {
     #[inline]
     pub fn read_string<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a str> {
         self.read_len_varint(bytes, |r, b| {
-            ::std::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into())
+            ::core::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into())
         })
     }
 
@@ -353,6 +354,7 @@ impl BytesReader {
     ///
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
+    #[cfg(feature = "std")]
     #[inline]
     pub fn read_packed<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<Vec<M>>
     where
@@ -360,6 +362,26 @@ impl BytesReader {
     {
         self.read_len_varint(bytes, |r, b| {
             let mut v = Vec::new();
+            while !r.is_eof() {
+                v.push(read(r, b)?);
+            }
+            Ok(v)
+        })
+    }
+
+    /// Reads packed repeated field (ArrayVec<A>)
+    #[cfg(feature = "with_arrayvec")]
+    pub fn read_packed_arrayvec<'a, A, F>(
+        &mut self,
+        bytes: &'a [u8],
+        mut read: F,
+    ) -> Result<ArrayVec<A>>
+    where
+        A: arrayvec::Array,
+        F: FnMut(&mut BytesReader, &'a [u8]) -> Result<<A as arrayvec::Array>::Item>,
+    {
+        self.read_len_varint(bytes, |r, b| {
+            let mut v = arrayvec::ArrayVec::<A>::new();
             while !r.is_eof() {
                 v.push(read(r, b)?);
             }
@@ -375,14 +397,11 @@ impl BytesReader {
     pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a [u8]) -> Result<&'a [M]> {
         let len = self.read_varint32(bytes)? as usize;
         if self.len() < len {
-            return Err(Error::Io(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Cannot read fixed packed field",
-            )));
+            return Err(Error::UnexpectedEndOfBuffer);
         }
-        let n = len / ::std::mem::size_of::<M>();
+        let n = len / ::core::mem::size_of::<M>();
         let slice = unsafe {
-            ::std::slice::from_raw_parts(
+            ::core::slice::from_raw_parts(
                 bytes.get_unchecked(self.start) as *const u8 as *const M,
                 n,
             )
@@ -425,8 +444,8 @@ impl BytesReader {
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<K>,
         G: FnMut(&mut BytesReader, &'a [u8]) -> Result<V>,
-        K: ::std::fmt::Debug + Default,
-        V: ::std::fmt::Debug + Default,
+        K: ::core::fmt::Debug + Default,
+        V: ::core::fmt::Debug + Default,
     {
         self.read_len_varint(bytes, |r, bytes| {
             let mut k = K::default();
@@ -532,11 +551,13 @@ impl BytesReader {
 ///     println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
 /// }
 /// ```
+#[cfg(feature = "std")]
 pub struct Reader {
     buffer: Vec<u8>,
     inner: BytesReader,
 }
 
+#[cfg(feature = "std")]
 impl Reader {
     /// Creates a new `Reader`
     pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {

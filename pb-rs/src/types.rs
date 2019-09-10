@@ -264,6 +264,7 @@ impl FieldType {
     fn has_lifetime(
         &self,
         desc: &FileDescriptor,
+        max_length: bool,
         packed: bool,
         ignore: &mut Vec<MessageIndex>,
     ) -> bool {
@@ -277,9 +278,10 @@ impl FieldType {
             | FieldType::Sfixed32
             | FieldType::String_
             | FieldType::Bytes_
-            | FieldType::Float => packed, // Cow<[M]>
+            | FieldType::Float => !max_length && packed, // Cow<[M]>
             FieldType::Map(ref key, ref value) => {
-                key.has_lifetime(desc, false, ignore) || value.has_lifetime(desc, false, ignore)
+                key.has_lifetime(desc, false, false, ignore)
+                    || value.has_lifetime(desc, false, false, ignore)
             }
             _ => false,
         }
@@ -432,9 +434,14 @@ pub struct Field {
     pub packed: Option<bool>,
     pub boxed: bool,
     pub deprecated: bool,
+    pub max_length: Option<u32>,
 }
 
 impl Field {
+    fn max_length(&self) -> bool {
+        self.max_length.is_some()
+    }
+
     fn packed(&self) -> bool {
         self.packed.unwrap_or(false)
     }
@@ -495,6 +502,12 @@ impl Field {
             {
                 writeln!(w, "Option<{}>,", rust_type)?
             }
+            Frequency::Repeated if self.max_length.is_some() => writeln!(
+                w,
+                "arrayvec::ArrayVec<[{}; {}]>,",
+                rust_type,
+                self.max_length.unwrap()
+            )?,
             Frequency::Repeated
                 if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow =>
             {
@@ -539,6 +552,13 @@ impl Field {
             }
             Frequency::Required | Frequency::Optional => {
                 writeln!(w, "msg.{} = {},", name, val_cow)?
+            }
+            Frequency::Repeated if self.packed() && self.max_length.is_some() => {
+                writeln!(
+                    w,
+                    "msg.{} = r.read_packed_arrayvec(bytes, |r, bytes| Ok({}))?,",
+                    name, val
+                )?;
             }
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
                 writeln!(w, "msg.{} = r.read_packed_fixed(bytes)?.into(),", name)?;
@@ -800,9 +820,10 @@ impl Message {
             return false;
         }
         ignore.push(self.index.clone());
-        let res = self
-            .all_fields()
-            .any(|f| f.typ.has_lifetime(desc, f.packed(), ignore));
+        let res = self.all_fields().any(|f| {
+            f.typ
+                .has_lifetime(desc, f.max_length(), f.packed(), ignore)
+        });
         ignore.pop();
         res
     }
@@ -1137,7 +1158,7 @@ impl Message {
     fn write_write_message<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(
             w,
-            "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{"
+            "    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {{"
         )?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w, desc)?;
@@ -1434,9 +1455,11 @@ pub struct OneOf {
 
 impl OneOf {
     fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
-        self.fields
-            .iter()
-            .any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed(), &mut Vec::new()))
+        self.fields.iter().any(|f| {
+            !f.deprecated
+                && f.typ
+                    .has_lifetime(desc, f.max_length(), f.packed(), &mut Vec::new())
+        })
     }
 
     fn set_package(&mut self, package: &str, module: &str) {
@@ -2145,7 +2168,6 @@ impl FileDescriptor {
             )?;
             return Ok(());
         }
-        writeln!(w, "use std::io::Write;")?;
         if self
             .messages
             .iter()
@@ -2162,7 +2184,7 @@ impl FileDescriptor {
         }
         writeln!(
             w,
-            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
+            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
         )?;
 
         if self.owned {

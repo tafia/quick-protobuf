@@ -99,6 +99,23 @@ message TestTypesRepeated {
     repeated TestEnumDescriptor enum_field = 16 [packed=false];
 }
 
+message TestTypesRepeatedArrayVec {
+    repeated double double_field = 1 [(rust_max_length)=10];
+    repeated float float_field = 2 [(rust_max_length)=10];
+    repeated int32 int32_field = 3 [(rust_max_length)=10];
+    repeated int64 int64_field = 4 [(rust_max_length)=10];
+    repeated uint32 uint32_field = 5 [(rust_max_length)=10];
+    repeated uint64 uint64_field = 6 [(rust_max_length)=10];
+    repeated sint32 sint32_field = 7 [(rust_max_length)=10];
+    repeated sint64 sint64_field = 8 [(rust_max_length)=10];
+    repeated fixed32 fixed32_field = 9 [(rust_max_length)=10];
+    repeated fixed64 fixed64_field = 10 [(rust_max_length)=10];
+    repeated sfixed32 sfixed32_field = 11 [(rust_max_length)=10];
+    repeated sfixed64 sfixed64_field = 12 [(rust_max_length)=10];
+    repeated bool bool_field = 13 [(rust_max_length)=10];
+    repeated TestEnumDescriptor enum_field = 14 [(rust_max_length)=10];
+}
+
 message TestTypesRepeatedPacked {
     repeated double double_field = 1 [packed=true];
     repeated float float_field = 2 [packed=true];

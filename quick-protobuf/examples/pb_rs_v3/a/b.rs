@@ -9,8 +9,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use std::io::Write;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
 use quick_protobuf::sizeofs::*;
 use super::super::*;
 
@@ -39,7 +38,7 @@ impl MessageWrite for ImportedMessage {
         + if self.i == false { 0 } else { 1 + sizeof_varint(*(&self.i) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.i != false { w.write_with_tag(8, |w| w.write_bool(*&self.i))?; }
         Ok(())
     }
