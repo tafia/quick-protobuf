@@ -356,7 +356,6 @@ impl BytesReader {
     ///
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
-    #[cfg(feature = "std")]
     #[inline]
     pub fn read_packed<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<Vec<M>>
     where
@@ -533,13 +532,11 @@ impl BytesReader {
 ///     println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
 /// }
 /// ```
-#[cfg(feature = "std")]
 pub struct Reader {
     buffer: Vec<u8>,
     inner: BytesReader,
 }
 
-#[cfg(feature = "std")]
 impl Reader {
     /// Creates a new `Reader`
     pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {
@@ -553,6 +550,7 @@ impl Reader {
     }
 
     /// Creates a new `Reader` out of a file path
+    #[cfg(feature = "std")]
     pub fn from_file<P: AsRef<Path>>(src: P) -> Result<Reader> {
         let len = src.as_ref().metadata().unwrap().len() as usize;
         let f = File::open(src)?;
