@@ -539,6 +539,7 @@ pub struct Reader {
 
 impl Reader {
     /// Creates a new `Reader`
+    #[cfg(feature = "std")]
     pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {
         let mut buf = Vec::with_capacity(capacity);
         unsafe {
