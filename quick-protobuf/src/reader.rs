@@ -14,8 +14,10 @@ use std::io::Read;
 #[cfg(feature = "std")]
 use std::path::Path;
 
-#[cfg(feature = "with_arrayvec")]
-use arrayvec::{self, ArrayVec};
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 use crate::errors::{Error, Result};
 use crate::message::MessageRead;
@@ -362,26 +364,6 @@ impl BytesReader {
     {
         self.read_len_varint(bytes, |r, b| {
             let mut v = Vec::new();
-            while !r.is_eof() {
-                v.push(read(r, b)?);
-            }
-            Ok(v)
-        })
-    }
-
-    /// Reads packed repeated field (ArrayVec<A>)
-    #[cfg(feature = "with_arrayvec")]
-    pub fn read_packed_arrayvec<'a, A, F>(
-        &mut self,
-        bytes: &'a [u8],
-        mut read: F,
-    ) -> Result<ArrayVec<A>>
-    where
-        A: arrayvec::Array,
-        F: FnMut(&mut BytesReader, &'a [u8]) -> Result<<A as arrayvec::Array>::Item>,
-    {
-        self.read_len_varint(bytes, |r, b| {
-            let mut v = arrayvec::ArrayVec::<A>::new();
             while !r.is_eof() {
                 v.push(read(r, b)?);
             }

@@ -7,7 +7,7 @@ build = "build.rs"
 
 [dependencies]
 protobuf = "2.0.4"
-quick-protobuf = { path = "../quick-protobuf", default-features = false, features = ["with_arrayvec"] }
+quick-protobuf = { path = "../quick-protobuf", default-features = false }
 time = "0.1.40"
 rand = "0.5.5"
 prost = "0.4.0"

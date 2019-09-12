@@ -14,12 +14,10 @@ edition = "2018"
 byteorder = { version = "1.2.4", default-features = false }
 failure = { version = "0.1.1", default-features = false }
 failure_derive = "0.1.1"
-arrayvec = { version = "0.4.11", optional = true, default-features = false }
 
 [dev-dependencies]
 lazy_static = "0.2.10"
 
 [features]
-default = ["std", "with_arrayvec"]
+default = ["std"]
 std = ["byteorder/std", "failure/std"]
-with_arrayvec = ["arrayvec"]

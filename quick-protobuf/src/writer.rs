@@ -8,6 +8,12 @@ use byteorder::{ByteOrder, LittleEndian as LE};
 #[cfg(feature = "std")]
 use byteorder::WriteBytesExt;
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
+
 /// A struct to write protobuf messages
 ///
 /// # Examples
@@ -309,7 +315,6 @@ impl<W: WriterBackend> Writer<W> {
 }
 
 /// Serialize a `MessageWrite` into a `Vec`
-#[cfg(feature = "std")]
 pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
     let len = message.get_size();
     let mut v = Vec::with_capacity(len + crate::sizeofs::sizeof_len(len));
