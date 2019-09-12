@@ -68,6 +68,7 @@ pub struct ConfigBuilder {
     dont_use_cow: bool,
     custom_struct_derive: Vec<String>,
     owned: bool,
+    nostd: bool,
 }
 
 impl ConfigBuilder {
@@ -168,6 +169,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Generate no_std compliant code
+    pub fn nostd(mut self, val: bool) -> Self {
+        self.nostd = val;
+        self
+    }
+    
     /// Build Config from this ConfigBuilder
     pub fn build(self) -> Vec<Config> {
         self.in_files
@@ -196,6 +203,7 @@ impl ConfigBuilder {
                     custom_rpc_generator: Box::new(|_, _| Ok(())),
                     custom_includes: Vec::new(),
                     owned: self.owned,
+                    nostd: self.nostd,
                 }
             })
             .collect()

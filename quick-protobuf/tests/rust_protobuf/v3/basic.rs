@@ -615,42 +615,42 @@ impl<'a> MessageWrite for TestTypesRepeated<'a> {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct TestTypesRepeatedArrayVec {
-    pub double_field: arrayvec::ArrayVec<[f64; 10]>,
-    pub float_field: arrayvec::ArrayVec<[f32; 10]>,
-    pub int32_field: arrayvec::ArrayVec<[i32; 10]>,
-    pub int64_field: arrayvec::ArrayVec<[i64; 10]>,
-    pub uint32_field: arrayvec::ArrayVec<[u32; 10]>,
-    pub uint64_field: arrayvec::ArrayVec<[u64; 10]>,
-    pub sint32_field: arrayvec::ArrayVec<[i32; 10]>,
-    pub sint64_field: arrayvec::ArrayVec<[i64; 10]>,
-    pub fixed32_field: arrayvec::ArrayVec<[u32; 10]>,
-    pub fixed64_field: arrayvec::ArrayVec<[u64; 10]>,
-    pub sfixed32_field: arrayvec::ArrayVec<[i32; 10]>,
-    pub sfixed64_field: arrayvec::ArrayVec<[i64; 10]>,
-    pub bool_field: arrayvec::ArrayVec<[bool; 10]>,
-    pub enum_field: arrayvec::ArrayVec<[basic::TestEnumDescriptor; 10]>,
+pub struct TestTypesRepeatedArrayVec<'a> {
+    pub double_field: Cow<'a, [f64]>,
+    pub float_field: Cow<'a, [f32]>,
+    pub int32_field: Vec<i32>,
+    pub int64_field: Vec<i64>,
+    pub uint32_field: Vec<u32>,
+    pub uint64_field: Vec<u64>,
+    pub sint32_field: Vec<i32>,
+    pub sint64_field: Vec<i64>,
+    pub fixed32_field: Cow<'a, [u32]>,
+    pub fixed64_field: Cow<'a, [u64]>,
+    pub sfixed32_field: Cow<'a, [i32]>,
+    pub sfixed64_field: Cow<'a, [i64]>,
+    pub bool_field: Vec<bool>,
+    pub enum_field: Vec<basic::TestEnumDescriptor>,
 }
 
-impl<'a> MessageRead<'a> for TestTypesRepeatedArrayVec {
+impl<'a> MessageRead<'a> for TestTypesRepeatedArrayVec<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
-                Ok(10) => msg.double_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_double(bytes)?))?,
-                Ok(18) => msg.float_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_float(bytes)?))?,
-                Ok(26) => msg.int32_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_int32(bytes)?))?,
-                Ok(34) => msg.int64_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_int64(bytes)?))?,
-                Ok(42) => msg.uint32_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_uint32(bytes)?))?,
-                Ok(50) => msg.uint64_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_uint64(bytes)?))?,
-                Ok(58) => msg.sint32_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_sint32(bytes)?))?,
-                Ok(66) => msg.sint64_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_sint64(bytes)?))?,
-                Ok(74) => msg.fixed32_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_fixed32(bytes)?))?,
-                Ok(82) => msg.fixed64_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_fixed64(bytes)?))?,
-                Ok(90) => msg.sfixed32_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_sfixed32(bytes)?))?,
-                Ok(98) => msg.sfixed64_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_sfixed64(bytes)?))?,
-                Ok(106) => msg.bool_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_bool(bytes)?))?,
-                Ok(114) => msg.enum_field = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_enum(bytes)?))?,
+                Ok(10) => msg.double_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(18) => msg.float_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(26) => msg.int32_field = r.read_packed(bytes, |r, bytes| Ok(r.read_int32(bytes)?))?,
+                Ok(34) => msg.int64_field = r.read_packed(bytes, |r, bytes| Ok(r.read_int64(bytes)?))?,
+                Ok(42) => msg.uint32_field = r.read_packed(bytes, |r, bytes| Ok(r.read_uint32(bytes)?))?,
+                Ok(50) => msg.uint64_field = r.read_packed(bytes, |r, bytes| Ok(r.read_uint64(bytes)?))?,
+                Ok(58) => msg.sint32_field = r.read_packed(bytes, |r, bytes| Ok(r.read_sint32(bytes)?))?,
+                Ok(66) => msg.sint64_field = r.read_packed(bytes, |r, bytes| Ok(r.read_sint64(bytes)?))?,
+                Ok(74) => msg.fixed32_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(82) => msg.fixed64_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(90) => msg.sfixed32_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(98) => msg.sfixed64_field = r.read_packed_fixed(bytes)?.into(),
+                Ok(106) => msg.bool_field = r.read_packed(bytes, |r, bytes| Ok(r.read_bool(bytes)?))?,
+                Ok(114) => msg.enum_field = r.read_packed(bytes, |r, bytes| Ok(r.read_enum(bytes)?))?,
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
             }
@@ -659,7 +659,7 @@ impl<'a> MessageRead<'a> for TestTypesRepeatedArrayVec {
     }
 }
 
-impl MessageWrite for TestTypesRepeatedArrayVec {
+impl<'a> MessageWrite for TestTypesRepeatedArrayVec<'a> {
     fn get_size(&self) -> usize {
         0
         + if self.double_field.is_empty() { 0 } else { 1 + sizeof_len(self.double_field.len() * 8) }

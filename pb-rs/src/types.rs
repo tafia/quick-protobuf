@@ -1650,6 +1650,7 @@ pub struct Config {
     pub custom_rpc_generator: RpcGeneratorFunction,
     pub custom_includes: Vec<String>,
     pub owned: bool,
+    pub nostd: bool,
 }
 
 #[derive(Debug, Default, Clone)]

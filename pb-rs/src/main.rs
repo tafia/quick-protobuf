@@ -86,6 +86,11 @@ fn run() -> Result<(), ::failure::Error> {
                 .long("owned")
                 .required(false)
                 .help("Generate Owned structs when the proto stuct has a lifetime"),
+        ).arg(
+            Arg::with_name("NOSTD")
+                .long("nostd")
+                .required(false)
+                .help("Generate no_std compliant code"),
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -111,7 +116,8 @@ fn run() -> Result<(), ::failure::Error> {
     .headers(!matches.is_present("NO_HEADERS"))
     .dont_use_cow(matches.is_present("DONT_USE_COW"))
     .custom_struct_derive(custom_struct_derive)
-    .owned(matches.is_present("OWNED"));
+    .owned(matches.is_present("OWNED"))
+    .nostd(matches.is_present("NOSTD"));
 
     FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
 }
