@@ -847,19 +847,32 @@ impl Message {
             writeln!(w, "")?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w, "")?;
+            if config.nostd {
+                writeln!(w, "extern crate alloc;")?;
+                writeln!(w, "use alloc::vec::Vec;")?;
+            }
             if self
                 .messages
                 .iter()
                 .any(|m| m.all_fields().any(|f| f.typ.has_cow()))
             {
-                writeln!(w, "use std::borrow::Cow;")?;
+                if config.nostd {
+                    writeln!(w, "use alloc::borrow::Cow;")?;
+                } else {
+                    writeln!(w, "use std::borrow::Cow;")?;
+                }
             }
             if self
                 .messages
                 .iter()
                 .any(|m| m.all_fields().any(|f| f.typ.is_map()))
             {
-                writeln!(w, "use std::collections::HashMap;")?;
+                if config.nostd {
+                    writeln!(w, "use alloc::collections::BTreeHashMap;")?;
+                    writeln!(w, "pub type HashMap = BTreeHashMap;")?;
+                } else {
+                    writeln!(w, "use std::collections::HashMap;")?;
+                }
             }
             if !self.messages.is_empty() || !self.oneofs.is_empty() {
                 writeln!(w, "use super::*;")?;
@@ -2146,19 +2159,34 @@ impl FileDescriptor {
             )?;
             return Ok(());
         }
+        
+        if config.nostd {
+            writeln!(w, "extern crate alloc;")?;
+            writeln!(w, "use alloc::vec::Vec;")?;
+        }
+        
         if self
             .messages
             .iter()
             .any(|m| m.all_fields().any(|f| f.typ.has_cow()))
         {
-            writeln!(w, "use std::borrow::Cow;")?;
+            if config.nostd {
+                writeln!(w, "use alloc::borrow::Cow;")?;
+            } else {
+                writeln!(w, "use std::borrow::Cow;")?;
+            }
         }
         if self
             .messages
             .iter()
             .any(|m| m.all_fields().any(|f| f.typ.is_map()))
         {
-            writeln!(w, "use std::collections::HashMap;")?;
+            if config.nostd {
+                writeln!(w, "use alloc::collections::BTreeHashMap;")?;
+                writeln!(w, "pub type HashMap = BTreeHashMap;")?;
+            } else {
+                writeln!(w, "use std::collections::HashMap;")?;
+            }
         }
         writeln!(
             w,
