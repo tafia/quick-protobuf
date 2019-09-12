@@ -315,6 +315,7 @@ impl<W: WriterBackend> Writer<W> {
 }
 
 /// Serialize a `MessageWrite` into a `Vec`
+#[cfg(feature = "std")]
 pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
     let len = message.get_size();
     let mut v = Vec::with_capacity(len + crate::sizeofs::sizeof_len(len));
