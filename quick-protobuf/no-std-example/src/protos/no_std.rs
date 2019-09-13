@@ -9,6 +9,8 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
+extern crate alloc;
+use alloc::vec::Vec;
 use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
 use quick_protobuf::sizeofs::*;
 use super::super::*;
@@ -81,20 +83,20 @@ impl MessageWrite for EmbeddedMessage {
 }
 
 #[derive(Debug, Default, PartialEq, Clone)]
-pub struct NoStdMessage {
+pub struct NoStdMessage<'a> {
     pub num: u32,
-    pub nums: arrayvec::ArrayVec<[u32; 16]>,
+    pub nums: Cow<'a, [u32]>,
     pub message: Option<protos::no_std::EmbeddedMessage>,
-    pub messages: arrayvec::ArrayVec<[protos::no_std::EmbeddedMessage; 16]>,
+    pub messages: Vec<protos::no_std::EmbeddedMessage>,
 }
 
-impl<'a> MessageRead<'a> for NoStdMessage {
+impl<'a> MessageRead<'a> for NoStdMessage<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(13) => msg.num = r.read_fixed32(bytes)?,
-                Ok(18) => msg.nums = r.read_packed_arrayvec(bytes, |r, bytes| Ok(r.read_fixed32(bytes)?))?,
+                Ok(18) => msg.nums = r.read_packed_fixed(bytes)?.into(),
                 Ok(26) => msg.message = Some(r.read_message::<protos::no_std::EmbeddedMessage>(bytes)?),
                 Ok(34) => msg.messages.push(r.read_message::<protos::no_std::EmbeddedMessage>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
@@ -105,7 +107,7 @@ impl<'a> MessageRead<'a> for NoStdMessage {
     }
 }
 
-impl MessageWrite for NoStdMessage {
+impl<'a> MessageWrite for NoStdMessage<'a> {
     fn get_size(&self) -> usize {
         0
         + if self.num == 0u32 { 0 } else { 1 + 4 }
