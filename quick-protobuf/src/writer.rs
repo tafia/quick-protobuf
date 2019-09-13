@@ -8,12 +8,6 @@ use byteorder::{ByteOrder, LittleEndian as LE};
 #[cfg(feature = "std")]
 use byteorder::WriteBytesExt;
 
-#[cfg(not(feature = "std"))]
-extern crate alloc;
-#[cfg(not(feature = "std"))]
-use alloc::vec::Vec;
-
-
 /// A struct to write protobuf messages
 ///
 /// # Examples
