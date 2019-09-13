@@ -174,7 +174,7 @@ impl ConfigBuilder {
         self.nostd = val;
         self
     }
-    
+
     /// Build Config from this ConfigBuilder
     pub fn build(self) -> Vec<Config> {
         self.in_files

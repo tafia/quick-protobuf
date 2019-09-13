@@ -851,11 +851,10 @@ impl Message {
                 writeln!(w, "extern crate alloc;")?;
                 writeln!(w, "use alloc::vec::Vec;")?;
             }
-            if self
-                .messages
-                .iter()
-                .any(|m| m.all_fields().any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size()))))
-            {
+            if self.messages.iter().any(|m| {
+                m.all_fields()
+                    .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
+            }) {
                 if config.nostd {
                     writeln!(w, "use alloc::borrow::Cow;")?;
                 } else {
@@ -2159,17 +2158,16 @@ impl FileDescriptor {
             )?;
             return Ok(());
         }
-        
+
         if config.nostd {
             writeln!(w, "extern crate alloc;")?;
             writeln!(w, "use alloc::vec::Vec;")?;
         }
-        
-        if self
-            .messages
-            .iter()
-            .any(|m| m.all_fields().any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size()))))
-        {
+
+        if self.messages.iter().any(|m| {
+            m.all_fields()
+                .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
+        }) {
             if config.nostd {
                 writeln!(w, "use alloc::borrow::Cow;")?;
             } else {
