@@ -854,7 +854,7 @@ impl Message {
             if self
                 .messages
                 .iter()
-                .any(|m| m.all_fields().any(|f| f.typ.has_cow()))
+                .any(|m| m.all_fields().any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size()))))
             {
                 if config.nostd {
                     writeln!(w, "use alloc::borrow::Cow;")?;
@@ -2168,7 +2168,7 @@ impl FileDescriptor {
         if self
             .messages
             .iter()
-            .any(|m| m.all_fields().any(|f| f.typ.has_cow()))
+            .any(|m| m.all_fields().any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size()))))
         {
             if config.nostd {
                 writeln!(w, "use alloc::borrow::Cow;")?;
