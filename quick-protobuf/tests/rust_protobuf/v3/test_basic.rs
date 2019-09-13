@@ -123,47 +123,6 @@ fn test_types_repeated() {
     message.enum_field = vec![TestEnumDescriptor::BLUE, TestEnumDescriptor::GREEN];
     test_serialize_deserialize_length_delimited!(&message, TestTypesRepeated);
 }
-#[test]
-fn test_types_repeated_arrayvec() {
-    let mut message = TestTypesRepeatedArrayVec::default();
-    message.double_field.push(19f64);
-    message.double_field.push(20f64);
-
-    message.float_field.push(20f32);
-
-    message.int32_field.push(21i32);
-    message.int32_field.push(-22);
-    message.int32_field.push(23);
-
-    message.int64_field.push(22i64);
-
-    message.uint32_field.push(23u32);
-    message.uint32_field.push(23);
-
-    message.uint64_field.push(24u64);
-
-    message.sint32_field.push(25i32);
-
-    message.sint64_field.push(26i64);
-    message.sint64_field.push(-27);
-
-    message.fixed32_field.push(27u32);
-
-    message.fixed64_field.push(28u64);
-
-    message.sfixed32_field.push(29i32);
-    message.sfixed32_field.push(-30);
-
-    message.sfixed64_field.push(30i64);
-
-    message.bool_field.push(true);
-    message.bool_field.push(true);
-
-    message.enum_field.push(TestEnumDescriptor::BLUE);
-    message.enum_field.push(TestEnumDescriptor::GREEN);
-
-    test_serialize_deserialize_length_delimited!(&message, TestTypesRepeatedArrayVec);
-}
 
 #[test]
 fn test_types_repeated_packed() {
