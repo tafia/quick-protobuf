@@ -868,8 +868,8 @@ impl Message {
                 .any(|m| m.all_fields().any(|f| f.typ.is_map()))
             {
                 if config.nostd {
-                    writeln!(w, "use alloc::collections::BTreeHashMap;")?;
-                    writeln!(w, "pub type HashMap = BTreeHashMap;")?;
+                    writeln!(w, "use alloc::collections::BTreeMap;")?;
+                    writeln!(w, "pub type HashMap<K, V> = BTreeMap<K, V>;")?;
                 } else {
                     writeln!(w, "use std::collections::HashMap;")?;
                 }
@@ -2182,8 +2182,8 @@ impl FileDescriptor {
             .any(|m| m.all_fields().any(|f| f.typ.is_map()))
         {
             if config.nostd {
-                writeln!(w, "use alloc::collections::BTreeHashMap;")?;
-                writeln!(w, "pub type HashMap = BTreeHashMap;")?;
+                writeln!(w, "use alloc::collections::BTreeMap;")?;
+                writeln!(w, "pub type HashMap<K, V> = BTreeMap<K, V>;")?;
             } else {
                 writeln!(w, "use std::collections::HashMap;")?;
             }
