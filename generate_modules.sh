@@ -22,7 +22,7 @@ proto_sets=(
 )
 
 nostd_proto_sets=(
-    quick-protobuf/no-std-example/src
+    quick-protobuf/examples/pb_rs_nostd
 )
 
 for ps in "${proto_sets[@]}"; do
