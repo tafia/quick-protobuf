@@ -1,6 +1,7 @@
 #![no_std]
 
 extern crate quick_protobuf;
+extern crate alloc;
 
 mod pb_rs_nostd;
 
