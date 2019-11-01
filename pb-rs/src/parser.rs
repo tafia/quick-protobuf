@@ -291,15 +291,16 @@ named!(
             >> tag!(")")
             >> many0!(br)
             >> alt!(
-                    do_parse!(tuple!(
+                do_parse!(
+                    tuple!(
                         tag!("{"),
                         many0!(br),
                         many0!(alt!(option_ignore | map!(tag!(";"), |_| ()))),
                         many0!(br),
                         tag!("}")
-                    ) >> ()) |
-                    map!(tag!(";"), |_| ())
-                )
+                    ) >> ()
+                ) | map!(tag!(";"), |_| ())
+            )
             >> many0!(br)
             >> (RpcFunctionDeclaration { name, arg, ret })
     )
@@ -683,5 +684,4 @@ mod test {
             other => panic!("Could not parse RPC Function Declaration: {:?}", other),
         }
     }
-
 }
