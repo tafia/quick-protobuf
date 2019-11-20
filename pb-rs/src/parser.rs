@@ -666,5 +666,4 @@ mod test {
             other => panic!("Could not parse RPC Function Declaration: {:?}", other),
         }
     }
-
 }
