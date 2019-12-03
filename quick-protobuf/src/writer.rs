@@ -457,7 +457,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
         if self.buf.len() - self.cursor < buf.len() {
             Err(Error::UnexpectedEndOfBuffer)
         } else {
-            self.buf[self.cursor..].copy_from_slice(buf);
+            self.buf[self.cursor..self.cursor + buf.len()].copy_from_slice(buf);
             self.cursor += buf.len();
             Ok(())
         }
