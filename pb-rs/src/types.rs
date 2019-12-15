@@ -1104,15 +1104,15 @@ impl Message {
                 }}
             }}
 
-            #[cfg(feature = "test_helpers")]
-            impl<'a> From<{name}<'a>> for {name}Owned {{
-                fn from(proto: {name}) -> Self {{
-                    use quick_protobuf::{{MessageWrite, Writer}};
-
-                    let mut buf = Vec::new();
-                    let mut writer = Writer::new(&mut buf);
-                    proto.write_message(&mut writer).expect("bad proto serialization");
-                    Self {{ inner: {name}OwnedInner::new(buf).unwrap() }}
+            impl From<{name}<'static>> for {name}Owned {{
+                fn from(proto: {name}<'static>) -> Self {{
+                    Self {{
+                        inner: Box::pin({name}OwnedInner {{
+                            buf: Vec::new(),
+                            proto,
+                            _pin: std::marker::PhantomPinned,
+                        }})
+                    }}
                 }}
             }}
             "#,
