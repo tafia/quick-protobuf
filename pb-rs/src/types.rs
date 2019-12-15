@@ -1037,7 +1037,7 @@ impl Message {
             #[derive(Debug)]
             struct {name}OwnedInner {{
                 buf: Vec<u8>,
-                proto: {name}<'static>,
+                proto: Option<{name}<'static>>,
                 _pin: std::marker::PhantomPinned,
             }}
 
@@ -1045,7 +1045,7 @@ impl Message {
                 fn new(buf: Vec<u8>) -> Result<std::pin::Pin<Box<Self>>> {{
                     let inner = Self {{
                         buf,
-                        proto: unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }},
+                        proto: None,
                         _pin: std::marker::PhantomPinned,
                     }};
                     let mut pinned = Box::pin(inner);
@@ -1055,7 +1055,7 @@ impl Message {
 
                     unsafe {{
                         let proto = std::mem::transmute::<_, {name}<'static>>(proto);
-                        pinned.as_mut().get_unchecked_mut().proto = proto;
+                        pinned.as_mut().get_unchecked_mut().proto = Some(proto);
                     }}
                     Ok(pinned)
                 }}
@@ -1072,13 +1072,13 @@ impl Message {
                 }}
 
                 pub fn proto(&self) -> &{name} {{
-                    &self.inner.proto
+                    self.inner.proto.as_ref().unwrap()
                 }}
             }}
 
             impl std::fmt::Debug for {name}Owned {{
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
-                    self.inner.proto.fmt(f)
+                    self.inner.proto.as_ref().unwrap().fmt(f)
                 }}
             }}
 
@@ -1086,13 +1086,13 @@ impl Message {
                 type Target = {name}<'static>;
 
                 fn deref(&self) -> &Self::Target {{
-                    &self.inner.proto
+                    self.inner.proto.as_ref().unwrap()
                 }}
             }}
 
             impl DerefMut for {name}Owned {{
                 fn deref_mut(&mut self) -> &mut Self::Target {{
-                    unsafe {{ &mut self.inner.as_mut().get_unchecked_mut().proto }}
+                    unsafe {{ self.inner.as_mut().get_unchecked_mut().proto.as_mut().unwrap() }}
                 }}
             }}
 
@@ -1109,7 +1109,7 @@ impl Message {
                     Self {{
                         inner: Box::pin({name}OwnedInner {{
                             buf: Vec::new(),
-                            proto,
+                            proto: Some(proto),
                             _pin: std::marker::PhantomPinned,
                         }})
                     }}
