@@ -29,7 +29,7 @@ use std::env;
 
 fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
-    let out_file = Path::new(out_dir).join("hello.rs");
+    let out_file = Path::new(&out_dir).join("hello.rs");
 
     let config = Config {
         in_file: PathBuf::from("protos/Hello.proto"),
@@ -41,7 +41,9 @@ fn main() {
         headers: false, // do not generate headers
         dont_use_cow: false, // Don't use Cow<_,_> for Strings and Bytes
         custom_struct_derive: vec![], // Nothing
-        custom_rpc_generator: RpcGeneratorFunction::default(),
+        custom_rpc_generator: pb_rs::types::RpcGeneratorFunction::default(),
+        custom_includes: vec![],
+        owned: true,
     };
 
     FileDescriptor::write_proto(&config).unwrap();
