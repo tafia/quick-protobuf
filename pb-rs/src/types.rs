@@ -1054,7 +1054,7 @@ impl Message {
                     let proto = {name}::from_reader(&mut reader, &pinned.buf)?;
 
                     unsafe {{
-                        let proto = std::mem::transmute::<_, {name}<'static>>(proto);
+                        let proto = std::mem::transmute::<_, {name}<'_>>(proto);
                         pinned.as_mut().get_unchecked_mut().proto = Some(proto);
                     }}
                     Ok(pinned)
@@ -1071,28 +1071,21 @@ impl Message {
                     &self.inner.buf
                 }}
 
-                pub fn proto(&self) -> &{name} {{
-                    self.inner.proto.as_ref().unwrap()
+                pub fn proto<'a>(&'a self) -> &'a {name}<'a> {{
+                    unsafe {{ std::mem::transmute::<&{name}<'static>, &{name}<'a>>(self.inner.proto.as_ref().unwrap()) }}
+                }}
+
+                pub fn proto_mut<'a>(&'a mut self) -> &'a mut {name}<'a> {{
+                    unsafe {{
+                        let proto = self.inner.as_mut().get_unchecked_mut().proto.as_mut().unwrap();
+                        std::mem::transmute::<_, &mut {name}<'a>>(proto)
+                    }}
                 }}
             }}
 
             impl std::fmt::Debug for {name}Owned {{
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
                     self.inner.proto.as_ref().unwrap().fmt(f)
-                }}
-            }}
-
-            impl Deref for {name}Owned {{
-                type Target = {name}<'static>;
-
-                fn deref(&self) -> &Self::Target {{
-                    self.inner.proto.as_ref().unwrap()
-                }}
-            }}
-
-            impl DerefMut for {name}Owned {{
-                fn deref_mut(&mut self) -> &mut Self::Target {{
-                    unsafe {{ self.inner.as_mut().get_unchecked_mut().proto.as_mut().unwrap() }}
                 }}
             }}
 
@@ -2166,14 +2159,7 @@ impl FileDescriptor {
         )?;
 
         if self.owned {
-            write!(
-                w,
-                "\
-                 use std::convert::TryFrom;\n\
-                 use std::ops::Deref;\n\
-                 use std::ops::DerefMut;\n\
-                 "
-            )?;
+            writeln!(w, "use std::convert::TryFrom;")?;
         }
 
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
