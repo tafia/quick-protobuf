@@ -229,7 +229,7 @@ This library is an alternative to the widely used [rust-protobuf](https://github
 #### Pros / Cons
 
 - Pros
-  - [Much faster](quick-protobuf/benches/rust-protobuf), in particular when working with string, bytes and repeated packed fixed size fields (no extra allocation)
+  - [Much faster](perftest), in particular when working with string, bytes and repeated packed fixed size fields (no extra allocation)
   - No need to install `protoc` on your machine
   - No trait objects: faster/simpler parser
   - Very simple generated modules (~10x smaller) so you can easily understand what is happening
