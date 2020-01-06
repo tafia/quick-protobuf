@@ -32,7 +32,7 @@ It provides both:
   - no need to use google `protoc` tool to generate the modules
 - [**quick-protobuf**](quick-protobuf), a protobuf file parser: 
   - this is the crate that you will typically refer to in your library. The generated modules will assume it has been imported.
-  - it acts like an event parser, the logic to convert it into struct is handle by `pb-rs`
+  - it acts like an event parser, the logic to convert it into struct is handled by `pb-rs`
 
 ## Example: protobuf_example project
 
@@ -104,7 +104,7 @@ You can find basic examples in the [examples](examples) directory.
 
 ## Message <-> struct
 
-The best way to check for all kind of generated code is to look for the codegen_example data:
+The best way to check for all kinds of generated code is to look for the codegen_example data:
 - definition: [data_types.proto](quick-protobuf/examples/pb_rs/data_types.proto)
 - generated code: [data_types.rs](quick-protobuf/examples/pb_rs/data_types.rs)
 
@@ -255,7 +255,7 @@ quick-protobuf is particularly good at reading large bytes.
 
 ## Contribution
 
-Any help is welcomed! (Pull requests of course, bug report, missing functionality etc...)
+Any help is welcome! (Pull requests of course, bug reports, missing functionality etc...)
 
 ## Licence
 
