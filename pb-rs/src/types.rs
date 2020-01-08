@@ -897,11 +897,11 @@ impl Message {
             "#[derive({}Debug, Default, PartialEq, Clone)]",
             custom_struct_derive
         )?;
-        
+
         if let Some(repr) = &config.custom_repr {
             writeln!(w, "#[repr({})]", repr)?;
         }
-        
+
         if self.is_unit() {
             writeln!(w, "pub struct {} {{ }}", self.name)?;
             return Ok(());

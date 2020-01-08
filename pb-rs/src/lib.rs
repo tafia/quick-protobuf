@@ -156,13 +156,13 @@ impl ConfigBuilder {
         self.custom_struct_derive = val;
         self
     }
-    
+
     /// Add custom values to `#[repr(...)]` at the beginning of every structure
     pub fn custom_repr(mut self, val: Option<String>) -> Self {
         self.custom_repr = val;
         self
     }
-    
+
     /// Use Cow<_,_> for Strings and Bytes
     pub fn dont_use_cow(mut self, val: bool) -> Self {
         self.dont_use_cow = val;
