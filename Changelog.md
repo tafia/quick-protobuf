@@ -8,6 +8,12 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## quick-protobuf 0.6.4
+- feat: failible get byte
+
+## pb-rs 0.8.3
+- feat: allow rpc with `{ }`
+
 ## pb-rs 0.8.2
 - feat: add optional Owned variant when generating Messages (relies on `Pin`)
 - fix: propagate `dont_use_cow` to all messages
@@ -16,7 +22,6 @@
 - feat: avoid Cow::Borrow when comparing `&str`
 
 ## pb-rs 0.8.0
-
 - feat: Added the ability to use custom RPC generation code
 - feat: Added the ability to modify custom derives such as derive-new
 - feat: (Large change) Added the `dont_use_cow` method [v2 and v3 tested] which replaces lifetimes 

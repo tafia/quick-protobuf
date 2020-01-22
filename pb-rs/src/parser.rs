@@ -275,6 +275,7 @@ named!(
         tag!("rpc")
             >> many1!(br)
             >> name: word
+            >> many0!(br)
             >> tag!("(")
             >> many0!(br)
             >> arg: word
@@ -287,7 +288,19 @@ named!(
             >> many0!(br)
             >> ret: word
             >> many0!(br)
-            >> tag!(");")
+            >> tag!(")")
+            >> many0!(br)
+            >> alt!(
+                do_parse!(
+                    tuple!(
+                        tag!("{"),
+                        many0!(br),
+                        many0!(alt!(option_ignore | map!(tag!(";"), |_| ()))),
+                        many0!(br),
+                        tag!("}")
+                    ) >> ()
+                ) | map!(tag!(";"), |_| ())
+            )
             >> many0!(br)
             >> (RpcFunctionDeclaration { name, arg, ret })
     )
@@ -632,6 +645,7 @@ mod test {
             service RpcService {
                 rpc function0(InStruct0) returns (OutStruct0);
                 rpc function1(InStruct1) returns (OutStruct1);
+                rpc function2  (  InStruct2  ) returns (  OutStruct2  ) {  }
             }
         "#;
 
@@ -641,6 +655,7 @@ mod test {
                 let service = &descriptor.rpc_services.get(0).expect("Service not found!");
                 let func0 = service.functions.get(0).expect("Function 0 not returned!");
                 let func1 = service.functions.get(1).expect("Function 1 not returned!");
+                let func2 = service.functions.get(2).expect("Function 2 not returned!");
                 assert_eq!("RpcService", service.service_name);
                 assert_eq!("function0", func0.name);
                 assert_eq!("InStruct0", func0.arg);
@@ -648,6 +663,9 @@ mod test {
                 assert_eq!("function1", func1.name);
                 assert_eq!("InStruct1", func1.arg);
                 assert_eq!("OutStruct1", func1.ret);
+                assert_eq!("function2", func2.name);
+                assert_eq!("InStruct2", func2.arg);
+                assert_eq!("OutStruct2", func2.ret);
             }
             other => panic!("Could not parse RPC Service: {:?}", other),
         }
@@ -666,5 +684,4 @@ mod test {
             other => panic!("Could not parse RPC Function Declaration: {:?}", other),
         }
     }
-
 }

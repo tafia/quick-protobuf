@@ -261,7 +261,11 @@ impl BytesReader {
     /// Reads fixed64 (little endian u64)
     #[inline]
     fn read_fixed<M, F: Fn(&[u8]) -> M>(&mut self, bytes: &[u8], len: usize, read: F) -> Result<M> {
-        let v = read(&bytes[self.start..self.start + len]);
+        let v = read(
+            &bytes
+                .get(self.start..self.start + len)
+                .ok_or_else(|| Error::UnexpectedEndOfBuffer)?,
+        );
         self.start += len;
         Ok(v)
     }
@@ -341,14 +345,19 @@ impl BytesReader {
     /// Reads bytes (Vec<u8>)
     #[inline]
     pub fn read_bytes<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a [u8]> {
-        self.read_len_varint(bytes, |r, b| Ok(&b[r.start..r.end]))
+        self.read_len_varint(bytes, |r, b| {
+            b.get(r.start..r.end)
+                .ok_or_else(|| Error::UnexpectedEndOfBuffer)
+        })
     }
 
     /// Reads string (String)
     #[inline]
     pub fn read_string<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a str> {
         self.read_len_varint(bytes, |r, b| {
-            ::core::str::from_utf8(&b[r.start..r.end]).map_err(|e| e.into())
+            b.get(r.start..r.end)
+                .ok_or_else(|| Error::UnexpectedEndOfBuffer)
+                .and_then(|x| ::core::str::from_utf8(x).map_err(|e| e.into()))
         })
     }
 
