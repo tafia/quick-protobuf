@@ -91,6 +91,11 @@ fn run() -> Result<(), ::failure::Error> {
                 .long("nostd")
                 .required(false)
                 .help("Generate no_std compliant code"),
+        ).arg(
+            Arg::with_name("HASHBROWN")
+                .long("hashrown")
+                .required(false)
+                .help("Use hashrown for HashMap implementation"),
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -117,7 +122,8 @@ fn run() -> Result<(), ::failure::Error> {
     .dont_use_cow(matches.is_present("DONT_USE_COW"))
     .custom_struct_derive(custom_struct_derive)
     .owned(matches.is_present("OWNED"))
-    .nostd(matches.is_present("NOSTD"));
+    .nostd(matches.is_present("NOSTD"))
+    .hashbrown(matches.is_present("HASHBROWN"));
 
     FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
 }

@@ -312,7 +312,7 @@ impl FieldType {
                 format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
             }
             FieldType::Map(ref key, ref value) => format!(
-                "HashMap<{}, {}>",
+                "KVMap<{}, {}>",
                 key.rust_type(desc)?,
                 value.rust_type(desc)?
             ),
@@ -848,7 +848,6 @@ impl Message {
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w, "")?;
             if config.nostd {
-                writeln!(w, "extern crate alloc;")?;
                 writeln!(w, "use alloc::vec::Vec;")?;
             }
             if self.messages.iter().any(|m| {
@@ -866,11 +865,15 @@ impl Message {
                 .iter()
                 .any(|m| m.all_fields().any(|f| f.typ.is_map()))
             {
-                if config.nostd {
+                if config.hashbrown {
+                    writeln!(w, "use hashbrown::HashMap;")?;
+                    writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
+                } else if config.nostd {
                     writeln!(w, "use alloc::collections::BTreeMap;")?;
-                    writeln!(w, "pub type HashMap<K, V> = BTreeMap<K, V>;")?;
+                    writeln!(w, "type KVMap<K, V> = BTreeMap<K, V>;")?;
                 } else {
                     writeln!(w, "use std::collections::HashMap;")?;
+                    writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
                 }
             }
             if !self.messages.is_empty() || !self.oneofs.is_empty() {
@@ -1663,6 +1666,7 @@ pub struct Config {
     pub custom_includes: Vec<String>,
     pub owned: bool,
     pub nostd: bool,
+    pub hashbrown: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -2160,7 +2164,6 @@ impl FileDescriptor {
         }
 
         if config.nostd {
-            writeln!(w, "extern crate alloc;")?;
             writeln!(w, "use alloc::vec::Vec;")?;
         }
 
@@ -2179,11 +2182,15 @@ impl FileDescriptor {
             .iter()
             .any(|m| m.all_fields().any(|f| f.typ.is_map()))
         {
-            if config.nostd {
+            if config.hashbrown {
+                writeln!(w, "use hashbrown::HashMap;")?;
+                writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
+            } else if config.nostd {
                 writeln!(w, "use alloc::collections::BTreeMap;")?;
-                writeln!(w, "pub type HashMap<K, V> = BTreeMap<K, V>;")?;
+                writeln!(w, "type KVMap<K, V> = BTreeMap<K, V>;")?;
             } else {
                 writeln!(w, "use std::collections::HashMap;")?;
+                writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
             }
         }
         writeln!(
@@ -2195,9 +2202,9 @@ impl FileDescriptor {
             write!(
                 w,
                 "\
-                 use std::convert::TryFrom;\n\
-                 use std::ops::Deref;\n\
-                 use std::ops::DerefMut;\n\
+                 use core::convert::TryFrom;\n\
+                 use core::ops::Deref;\n\
+                 use core::ops::DerefMut;\n\
                  "
             )?;
         }
