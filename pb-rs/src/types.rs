@@ -860,6 +860,15 @@ impl Message {
                     writeln!(w, "use std::borrow::Cow;")?;
                 }
             }
+            if config.nostd
+                && self.messages.iter().any(|m| {
+                    desc.owned && m.has_lifetime(desc, &mut Vec::new())
+                        || m.all_fields().any(|f| f.boxed)
+                })
+            {
+                writeln!(w)?;
+                writeln!(w, "use alloc::boxed::Box;")?;
+            }
             if self
                 .messages
                 .iter()
@@ -1057,13 +1066,13 @@ impl Message {
             }}
 
             impl {name}OwnedInner {{
-                fn new(buf: Vec<u8>) -> Result<core::pin::Pin<{boxed}<Self>>> {{
+                fn new(buf: Vec<u8>) -> Result<core::pin::Pin<Box<Self>>> {{
                     let inner = Self {{
                         buf,
                         proto: unsafe {{ core::mem::MaybeUninit::zeroed().assume_init() }},
                         _pin: core::marker::PhantomPinned,
                     }};
-                    let mut pinned = {boxed}::pin(inner);
+                    let mut pinned = Box::pin(inner);
 
                     let mut reader = BytesReader::from_bytes(&pinned.buf);
                     let proto = {name}::from_reader(&mut reader, &pinned.buf)?;
@@ -1077,7 +1086,7 @@ impl Message {
             }}
 
             pub struct {name}Owned {{
-                inner: core::pin::Pin<{boxed}<{name}OwnedInner>>,
+                inner: core::pin::Pin<Box<{name}OwnedInner>>,
             }}
 
             #[allow(dead_code)]
@@ -1132,11 +1141,6 @@ impl Message {
             }}
             "#,
             name = self.name,
-            boxed = if config.nostd {
-                "::alloc::boxed::Box"
-            } else {
-                "Box"
-            }
         )?;
         Ok(())
     }
@@ -2181,6 +2185,15 @@ impl FileDescriptor {
             } else {
                 writeln!(w, "use std::borrow::Cow;")?;
             }
+        }
+        if config.nostd
+            && self.messages.iter().any(|m| {
+                self.owned && m.has_lifetime(&self, &mut Vec::new())
+                    || m.all_fields().any(|f| f.boxed)
+            })
+        {
+            writeln!(w)?;
+            writeln!(w, "use alloc::boxed::Box;")?;
         }
         if self
             .messages
