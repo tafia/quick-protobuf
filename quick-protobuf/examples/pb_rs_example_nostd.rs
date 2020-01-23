@@ -1,12 +1,17 @@
 #![no_std]
 
-extern crate quick_protobuf;
+extern crate std as ext_std;
+
 extern crate alloc;
+extern crate quick_protobuf;
+
+#[global_allocator]
+static A: ext_std::alloc::System = ext_std::alloc::System;
 
 mod pb_rs_nostd;
 
 use crate::pb_rs_nostd::protos::no_std::NoStdMessage;
-use quick_protobuf::{serialize_into_slice, deserialize_from_slice};
+use quick_protobuf::{deserialize_from_slice, serialize_into_slice};
 
 fn main() {
     let message = NoStdMessage::default();
@@ -17,4 +22,3 @@ fn main() {
     let read_message = deserialize_from_slice(&buf).unwrap();
     assert_eq!(message, read_message);
 }
-
