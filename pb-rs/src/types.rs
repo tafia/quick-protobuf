@@ -840,7 +840,7 @@ impl Message {
 
         if desc.owned && self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w)?;
-            self.write_impl_owned(w, config)?;
+            self.write_impl_owned(w)?;
         }
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
@@ -1054,7 +1054,7 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_owned<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
+    fn write_impl_owned<W: Write>(&self, w: &mut W) -> Result<()> {
         write!(
             w,
             r#"
