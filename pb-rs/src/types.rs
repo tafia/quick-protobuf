@@ -447,15 +447,15 @@ impl Field {
                 "i32" => format!("{}i32", *d),
                 "i64" => format!("{}i64", *d),
                 "f32" => match &*d.to_lowercase() {
-                    "inf" => "::std::f32::INFINITY".to_string(),
-                    "-inf" => "::std::f32::NEG_INFINITY".to_string(),
-                    "nan" => "::std::f32::NAN".to_string(),
+                    "inf" => "::core::f32::INFINITY".to_string(),
+                    "-inf" => "::core::f32::NEG_INFINITY".to_string(),
+                    "nan" => "::core::f32::NAN".to_string(),
                     _ => format!("{}f32", *d),
                 },
                 "f64" => match &*d.to_lowercase() {
-                    "inf" => "::std::f64::INFINITY".to_string(),
-                    "-inf" => "::std::f64::NEG_INFINITY".to_string(),
-                    "nan" => "::std::f64::NAN".to_string(),
+                    "inf" => "::core::f64::INFINITY".to_string(),
+                    "-inf" => "::core::f64::NEG_INFINITY".to_string(),
+                    "nan" => "::core::f64::NAN".to_string(),
                     _ => format!("{}f64", *d),
                 },
                 "Cow<'a, str>" => format!("Cow::Borrowed({})", d),
@@ -840,7 +840,7 @@ impl Message {
 
         if desc.owned && self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w)?;
-            self.write_impl_owned(w)?;
+            self.write_impl_owned(w, config)?;
         }
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
@@ -1045,7 +1045,7 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_owned<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_impl_owned<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         write!(
             w,
             r#"
@@ -1053,23 +1053,23 @@ impl Message {
             struct {name}OwnedInner {{
                 buf: Vec<u8>,
                 proto: {name}<'static>,
-                _pin: std::marker::PhantomPinned,
+                _pin: core::marker::PhantomPinned,
             }}
 
             impl {name}OwnedInner {{
-                fn new(buf: Vec<u8>) -> Result<std::pin::Pin<Box<Self>>> {{
+                fn new(buf: Vec<u8>) -> Result<core::pin::Pin<{boxed}<Self>>> {{
                     let inner = Self {{
                         buf,
-                        proto: unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }},
-                        _pin: std::marker::PhantomPinned,
+                        proto: unsafe {{ core::mem::MaybeUninit::zeroed().assume_init() }},
+                        _pin: core::marker::PhantomPinned,
                     }};
-                    let mut pinned = Box::pin(inner);
+                    let mut pinned = {boxed}::pin(inner);
 
                     let mut reader = BytesReader::from_bytes(&pinned.buf);
                     let proto = {name}::from_reader(&mut reader, &pinned.buf)?;
 
                     unsafe {{
-                        let proto = std::mem::transmute::<_, {name}<'static>>(proto);
+                        let proto = core::mem::transmute::<_, {name}<'static>>(proto);
                         pinned.as_mut().get_unchecked_mut().proto = proto;
                     }}
                     Ok(pinned)
@@ -1077,7 +1077,7 @@ impl Message {
             }}
 
             pub struct {name}Owned {{
-                inner: std::pin::Pin<Box<{name}OwnedInner>>,
+                inner: core::pin::Pin<{boxed}<{name}OwnedInner>>,
             }}
 
             #[allow(dead_code)]
@@ -1091,8 +1091,8 @@ impl Message {
                 }}
             }}
 
-            impl std::fmt::Debug for {name}Owned {{
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
+            impl core::fmt::Debug for {name}Owned {{
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {{
                     self.inner.proto.fmt(f)
                 }}
             }}
@@ -1131,7 +1131,12 @@ impl Message {
                 }}
             }}
             "#,
-            name = self.name
+            name = self.name,
+            boxed = if config.nostd {
+                "::alloc::boxed::Box"
+            } else {
+                "Box"
+            }
         )?;
         Ok(())
     }
