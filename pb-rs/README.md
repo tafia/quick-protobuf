@@ -41,7 +41,7 @@ fn main() {
         headers: false, // do not generate headers
         dont_use_cow: false, // Don't use Cow<_,_> for Strings and Bytes
         custom_struct_derive: vec![], // Nothing
-        custom_rpc_generator: pb_rs::types::RpcGeneratorFunction::default(),
+        custom_rpc_generator: Box::new(|_, _| Ok(())),
         custom_includes: vec![],
         owned: true,
     };
