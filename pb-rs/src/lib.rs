@@ -67,6 +67,7 @@ pub struct ConfigBuilder {
     headers: bool,
     dont_use_cow: bool,
     custom_struct_derive: Vec<String>,
+    custom_repr: Option<String>,
     owned: bool,
 }
 
@@ -150,9 +151,15 @@ impl ConfigBuilder {
         self
     }
 
-    /// Add custom values to #[derive(...)] at the beginning of every structure
+    /// Add custom values to `#[derive(...)]` at the beginning of every structure
     pub fn custom_struct_derive(mut self, val: Vec<String>) -> Self {
         self.custom_struct_derive = val;
+        self
+    }
+
+    /// Add custom values to `#[repr(...)]` at the beginning of every structure
+    pub fn custom_repr(mut self, val: Option<String>) -> Self {
+        self.custom_repr = val;
         self
     }
 
@@ -193,6 +200,7 @@ impl ConfigBuilder {
                     headers: self.headers,
                     dont_use_cow: self.dont_use_cow, //Change this to true to not use cow with ./generate.sh for v2 and v3 tests
                     custom_struct_derive: self.custom_struct_derive.clone(),
+                    custom_repr: self.custom_repr.clone(),
                     custom_rpc_generator: Box::new(|_, _| Ok(())),
                     custom_includes: Vec::new(),
                     owned: self.owned,

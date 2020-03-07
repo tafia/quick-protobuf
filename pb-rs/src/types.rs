@@ -897,6 +897,11 @@ impl Message {
             "#[derive({}Debug, Default, PartialEq, Clone)]",
             custom_struct_derive
         )?;
+
+        if let Some(repr) = &config.custom_repr {
+            writeln!(w, "#[repr({})]", repr)?;
+        }
+
         if self.is_unit() {
             writeln!(w, "pub struct {} {{ }}", self.name)?;
             return Ok(());
@@ -1647,6 +1652,7 @@ pub struct Config {
     pub headers: bool,
     pub dont_use_cow: bool,
     pub custom_struct_derive: Vec<String>,
+    pub custom_repr: Option<String>,
     pub custom_rpc_generator: RpcGeneratorFunction,
     pub custom_includes: Vec<String>,
     pub owned: bool,
