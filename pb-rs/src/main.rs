@@ -74,7 +74,15 @@ fn run() -> Result<(), ::failure::Error> {
                 .long("custom_struct_derive")
                 .short("C")
                 .required(false)
+                .takes_value(true)
                 .help("The comma separated values to add to #[derive(...)] for every struct"),
+        ).arg(
+            Arg::with_name("CUSTOM_REPR")
+                .long("custom_repr")
+                .short("R")
+                .required(false)
+                .takes_value(true)
+                .help("The value to use for the optional #[repr(...)] for every struct"),
         ).arg(
             Arg::with_name("DONT_USE_COW")
                 .required(false)
@@ -102,6 +110,7 @@ fn run() -> Result<(), ::failure::Error> {
     let include_paths = path_vec(values_t!(matches, "INCLUDE_PATH", String));
     let out_file = matches.value_of("OUTPUT").map(|o| PathBuf::from(o));
     let out_dir = matches.value_of("OUTPUT_DIR").map(|o| PathBuf::from(o));
+    let custom_repr = matches.value_of("CUSTOM_REPR").map(|o| o.into());
     let custom_struct_derive: Vec<String> = matches
         .value_of("CUSTOM_STRUCT_DERIVE")
         .unwrap_or("")
@@ -121,9 +130,10 @@ fn run() -> Result<(), ::failure::Error> {
     .headers(!matches.is_present("NO_HEADERS"))
     .dont_use_cow(matches.is_present("DONT_USE_COW"))
     .custom_struct_derive(custom_struct_derive)
-    .owned(matches.is_present("OWNED"))
     .nostd(matches.is_present("NOSTD"))
-    .hashbrown(matches.is_present("HASHBROWN"));
+    .hashbrown(matches.is_present("HASHBROWN"))
+    .custom_repr(custom_repr)
+    .owned(matches.is_present("OWNED"));
 
     FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
 }
