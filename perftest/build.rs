@@ -62,6 +62,7 @@ fn main() {
         custom_rpc_generator: Box::new(|rpc, writer| generate_rpc_test(rpc, writer)),
         custom_includes: Vec::new(),
         owned: false,
+        hashbrown: false,
         nostd: false,
     };
     FileDescriptor::write_proto(&config).unwrap();
