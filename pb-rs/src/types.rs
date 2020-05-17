@@ -1044,7 +1044,7 @@ impl Message {
             #[derive(Debug)]
             struct {name}OwnedInner {{
                 buf: Vec<u8>,
-                proto: {name}<'static>,
+                proto: Option<{name}<'static>>,
                 _pin: std::marker::PhantomPinned,
             }}
 
@@ -1052,7 +1052,7 @@ impl Message {
                 fn new(buf: Vec<u8>) -> Result<std::pin::Pin<Box<Self>>> {{
                     let inner = Self {{
                         buf,
-                        proto: unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }},
+                        proto: None,
                         _pin: std::marker::PhantomPinned,
                     }};
                     let mut pinned = Box::pin(inner);
@@ -1061,8 +1061,8 @@ impl Message {
                     let proto = {name}::from_reader(&mut reader, &pinned.buf)?;
 
                     unsafe {{
-                        let proto = std::mem::transmute::<_, {name}<'static>>(proto);
-                        pinned.as_mut().get_unchecked_mut().proto = proto;
+                        let proto = std::mem::transmute::<_, {name}<'_>>(proto);
+                        pinned.as_mut().get_unchecked_mut().proto = Some(proto);
                     }}
                     Ok(pinned)
                 }}
@@ -1078,28 +1078,21 @@ impl Message {
                     &self.inner.buf
                 }}
 
-                pub fn proto(&self) -> &{name} {{
-                    &self.inner.proto
+                pub fn proto<'a>(&'a self) -> &'a {name}<'a> {{
+                    unsafe {{ std::mem::transmute::<&{name}<'static>, &{name}<'a>>(self.inner.proto.as_ref().unwrap()) }}
+                }}
+
+                pub fn proto_mut<'a>(&'a mut self) -> &'a mut {name}<'a> {{
+                    unsafe {{
+                        let proto = self.inner.as_mut().get_unchecked_mut().proto.as_mut().unwrap();
+                        std::mem::transmute::<_, &mut {name}<'a>>(proto)
+                    }}
                 }}
             }}
 
             impl std::fmt::Debug for {name}Owned {{
                 fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
-                    self.inner.proto.fmt(f)
-                }}
-            }}
-
-            impl Deref for {name}Owned {{
-                type Target = {name}<'static>;
-
-                fn deref(&self) -> &Self::Target {{
-                    &self.inner.proto
-                }}
-            }}
-
-            impl DerefMut for {name}Owned {{
-                fn deref_mut(&mut self) -> &mut Self::Target {{
-                    unsafe {{ &mut self.inner.as_mut().get_unchecked_mut().proto }}
+                    self.inner.proto.as_ref().unwrap().fmt(f)
                 }}
             }}
 
@@ -1111,15 +1104,15 @@ impl Message {
                 }}
             }}
 
-            #[cfg(feature = "test_helpers")]
-            impl<'a> From<{name}<'a>> for {name}Owned {{
-                fn from(proto: {name}) -> Self {{
-                    use quick_protobuf::{{MessageWrite, Writer}};
-
-                    let mut buf = Vec::new();
-                    let mut writer = Writer::new(&mut buf);
-                    proto.write_message(&mut writer).expect("bad proto serialization");
-                    Self {{ inner: {name}OwnedInner::new(buf).unwrap() }}
+            impl From<{name}<'static>> for {name}Owned {{
+                fn from(proto: {name}<'static>) -> Self {{
+                    Self {{
+                        inner: Box::pin({name}OwnedInner {{
+                            buf: Vec::new(),
+                            proto: Some(proto),
+                            _pin: std::marker::PhantomPinned,
+                        }})
+                    }}
                 }}
             }}
             "#,
@@ -2174,14 +2167,7 @@ impl FileDescriptor {
         )?;
 
         if self.owned {
-            write!(
-                w,
-                "\
-                 use std::convert::TryFrom;\n\
-                 use std::ops::Deref;\n\
-                 use std::ops::DerefMut;\n\
-                 "
-            )?;
+            writeln!(w, "use std::convert::TryFrom;")?;
         }
 
         writeln!(w, "use quick_protobuf::sizeofs::*;")?;
