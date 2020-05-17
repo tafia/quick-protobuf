@@ -1,9 +1,8 @@
 use clap::{crate_authors, crate_description, crate_name, crate_version, values_t, App, Arg};
-use pb_rs::types::FileDescriptor;
-use pb_rs::ConfigBuilder;
+use pb_rs::{ConfigBuilder, errors::Error, types::FileDescriptor};
 use std::path::{Path, PathBuf};
 
-fn run() -> Result<(), ::failure::Error> {
+fn run() -> Result<(), Error> {
     let matches = App::new(crate_name!())
         .about(crate_description!())
         .author(crate_authors!("\n"))
@@ -155,9 +154,11 @@ fn main() {
     env_logger::init();
     ::std::process::exit({
         if let Err(e) = run() {
-            eprintln!("pb-rs fatal error");
-            for e in e.iter_chain() {
-                eprintln!("  - {}", e);
+            eprintln!("pb-rs fatal error {}", e);
+            let mut e: &dyn std::error::Error = &e;
+            while let Some(err) = e.source() {
+                eprintln!("  - {}", err);
+                e = err;
             }
             1
         } else {
