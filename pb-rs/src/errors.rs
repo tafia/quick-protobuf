@@ -1,66 +1,39 @@
 //! A module to handle all errors via error-chain crate
 
-use failure_derive::Fail;
 use std::io;
 
-/// An error enum which derives `Fail`
-#[derive(Debug, Fail)]
+/// An error enum
+#[derive(Debug)]
 pub enum Error {
     /// Io error
-    #[fail(display = "{}", _0)]
-    Io(#[cause] io::Error),
+    Io(io::Error),
     /// Nom Error
-    #[fail(display = "{}", _0)]
-    Nom(#[cause] ::nom::simple_errors::Err),
-
-    // No .proto file provided
-    #[fail(display = "No .proto file provided")]
+    Nom(::nom::simple_errors::Err),
+    /// No .proto file provided
     NoProto,
     /// Input file
-    #[fail(display = "Cannot read input file '{}'", _0)]
     InputFile(String),
     /// Output file
-    #[fail(display = "Cannot read output file '{}'", _0)]
     OutputFile(String),
     /// Output file
-    #[fail(display = "Cannot read output directory '{}'", _0)]
     OutputDirectory(String),
     /// Multiple input files with --output argument
-    #[fail(display = "--output only allowed for single input file")]
     OutputMultipleInputs,
     /// Invalid message
-    #[fail(
-        display = "Message checks errored: {}\r\n\
-                   Proto definition might be invalid or something got wrong in the parsing",
-        _0
-    )]
     InvalidMessage(String),
     /// Varint decoding error
-    #[fail(
-        display = "Cannot convert protobuf import into module import:: {}\r\n\
-                   Import definition might be invalid, some characters may not be supported",
-        _0
-    )]
     InvalidImport(String),
     /// Empty read
-    #[fail(display = "No message or enum were read;\
-                   either definition might be invalid or there were only unsupported structures")]
     EmptyRead,
     /// enum or message not found
-    #[fail(display = "Could not find message or enum {}", _0)]
     MessageOrEnumNotFound(String),
-    #[fail(
-        display = "Enum field cannot be set to '{}', this variant does not exist",
-        _0
-    )]
+    /// Invalid default enum
     InvalidDefaultEnum(String),
     /// read_fn implementation for Maps
-    #[fail(display = "There should be a special case for maps")]
     ReadFnMap,
-    #[fail(display = "Messages {:?} are cyclic (missing an optional field)", _0)]
+    /// Cycle detected
     Cycle(Vec<String>),
     /// --output and --output_directory both used
-    #[fail(display = "only one of --output or --output_directory allowed")]
     OutputAndOutputDir,
 }
 
@@ -70,5 +43,40 @@ pub type Result<T> = ::std::result::Result<T, Error>;
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Error {
         Error::Io(e)
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Error::Io(e) => Some(e),
+            Error::Nom(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::result::Result<(), std::fmt::Error> {
+        match self {
+            Error::Io(e) => write!(f, "{}", e),
+            Error::Nom(e) => write!(f, "{}", e),
+            Error::NoProto => write!(f, "No .proto file provided"),
+            Error::InputFile(file) => write!(f, "Cannot read input file '{}'", file),
+            Error::OutputFile(file) => write!(f, "Cannot read output file '{}'", file),
+            Error::OutputDirectory(dir) => write!(f, "Cannot read output directory '{}'", dir),
+            Error::OutputMultipleInputs => write!(f, "--output only allowed for single input file"),
+            Error::InvalidMessage(msg) => write!(f, "Message checks errored: {}\r\n\
+                Proto definition might be invalid or something got wrong in the parsing", msg),
+            Error::InvalidImport(imp) => write!(f,"Cannot convert protobuf import into module import:: {}\r\n\
+                Import definition might be invalid, some characters may not be supported", imp),
+            Error::EmptyRead => write!(f, "No message or enum were read;\
+                either definition might be invalid or there were only unsupported structures"),
+            Error::MessageOrEnumNotFound(me) => write!(f, "Could not find message or enum {}", me),
+            Error::InvalidDefaultEnum(en) => write!(f, "Enum field cannot be set to '{}', this variant does not exist", en),
+            Error::ReadFnMap => write!(f, "There should be a special case for maps"),
+            Error::Cycle(msgs) => write!(f, "Messages {:?} are cyclic (missing an optional field)", msgs),
+            Error::OutputAndOutputDir => write!(f, "only one of --output or --output_directory allowed"),
+        }
     }
 }
