@@ -1,9 +1,6 @@
 #[macro_use]
-extern crate failure_derive;
-#[macro_use]
 extern crate nom;
-#[macro_use]
-extern crate log;
+
 pub mod errors;
 pub mod keywords;
 pub mod parser;
@@ -19,9 +16,6 @@ use types::Config;
 /// # Example buld.rs
 ///
 /// ```rust,no_run
-/// extern crate pb_rs;
-/// extern crate walkdir;
-///
 /// use pb_rs::{types::FileDescriptor, ConfigBuilder};
 /// use std::path::{Path, PathBuf};
 /// use walkdir::WalkDir;
@@ -120,9 +114,9 @@ impl ConfigBuilder {
         }
 
         Ok(ConfigBuilder {
-            in_files: in_files,
-            out_file: out_file,
-            include_paths: include_paths,
+            in_files,
+            out_file,
+            include_paths,
             headers: true,
             ..Default::default()
         })
@@ -207,7 +201,7 @@ impl ConfigBuilder {
 
                 Config {
                     in_file: in_file.to_owned(),
-                    out_file: out_file,
+                    out_file,
                     import_search_path: self.include_paths.clone(),
                     single_module: self.single_module,
                     no_output: self.no_output,

@@ -1,11 +1,4 @@
-#[macro_use]
-extern crate clap;
-extern crate env_logger;
-extern crate failure;
-extern crate log;
-extern crate pb_rs;
-
-use clap::{App, Arg};
+use clap::{crate_authors, crate_description, crate_name, crate_version, values_t, App, Arg};
 use pb_rs::types::FileDescriptor;
 use pb_rs::ConfigBuilder;
 use std::path::{Path, PathBuf};
@@ -108,13 +101,13 @@ fn run() -> Result<(), ::failure::Error> {
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
     let include_paths = path_vec(values_t!(matches, "INCLUDE_PATH", String));
-    let out_file = matches.value_of("OUTPUT").map(|o| PathBuf::from(o));
-    let out_dir = matches.value_of("OUTPUT_DIR").map(|o| PathBuf::from(o));
+    let out_file = matches.value_of("OUTPUT").map(PathBuf::from);
+    let out_dir = matches.value_of("OUTPUT_DIR").map(PathBuf::from);
     let custom_repr = matches.value_of("CUSTOM_REPR").map(|o| o.into());
     let custom_struct_derive: Vec<String> = matches
         .value_of("CUSTOM_STRUCT_DERIVE")
         .unwrap_or("")
-        .split(",")
+        .split(',')
         .map(|s| s.to_string())
         .collect();
 

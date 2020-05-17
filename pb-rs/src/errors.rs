@@ -1,5 +1,6 @@
 //! A module to handle all errors via error-chain crate
 
+use failure_derive::Fail;
 use std::io;
 
 /// An error enum which derives `Fail`

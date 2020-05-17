@@ -51,7 +51,7 @@ named!(
     do_parse!(tag!("/*") >> take_until_and_consume!("*/") >> ())
 );
 
-/// word break: multispace or comment
+// word break: multispace or comment
 named!(
     br<()>,
     alt!(map!(multispace, |_| ()) | comment | block_comment)
@@ -372,7 +372,7 @@ named!(
         Vec<MessageEvent>
     )| {
         let mut msg = Message {
-            name: name.clone(),
+            name,
             ..Message::default()
         };
         for e in events {
@@ -455,21 +455,21 @@ named!(
 );
 
 named!(pub file_descriptor<FileDescriptor>,
-       map!(many0!(event), |events: Vec<Event>| {
-           let mut desc = FileDescriptor::default();
-           for event in events {
-               match event {
-                   Event::Syntax(s) => desc.syntax = s,
-                   Event::Import(i) => desc.import_paths.push(i),
-                   Event::Package(p) => desc.package = p,
-                   Event::Message(m) => desc.messages.push(m),
-                   Event::Enum(e) => desc.enums.push(e),
-                   Event::RpcService(r) => desc.rpc_services.push(r),
-                   Event::Ignore => (),
-               }
-           }
-           desc
-       }));
+map!(many0!(event), |events: Vec<Event>| {
+    let mut desc = FileDescriptor::default();
+    for event in events {
+        match event {
+            Event::Syntax(s) => desc.syntax = s,
+            Event::Import(i) => desc.import_paths.push(i),
+            Event::Package(p) => desc.package = p,
+            Event::Message(m) => desc.messages.push(m),
+            Event::Enum(e) => desc.enums.push(e),
+            Event::RpcService(r) => desc.rpc_services.push(r),
+            Event::Ignore => (),
+        }
+    }
+    desc
+}));
 
 #[cfg(test)]
 mod test {

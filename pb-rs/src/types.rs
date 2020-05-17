@@ -4,6 +4,8 @@ use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 use std::path::{Path, PathBuf};
 
+use log::{debug, warn};
+
 use crate::errors::{Error, Result};
 use crate::keywords::sanitize_keyword;
 use crate::parser::file_descriptor;
@@ -12,8 +14,8 @@ fn sizeof_varint(v: u32) -> usize {
     match v {
         0x0..=0x7F => 1,
         0x80..=0x3FFF => 2,
-        0x4000..=0x1FFFFF => 3,
-        0x200000..=0xFFFFFFF => 4,
+        0x4000..=0x1F_FFFF => 3,
+        0x20_0000..=0xFFF_FFFF => 4,
         _ => 5,
     }
 }
@@ -830,12 +832,12 @@ impl Message {
 
     fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         println!("Writing message {}{}", self.get_modules(desc), self.name);
-        writeln!(w, "")?;
+        writeln!(w)?;
 
         self.write_definition(w, desc, config)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         self.write_impl_message_read(w, desc, config)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         self.write_impl_message_write(w, desc, config)?;
 
         if desc.owned && self.has_lifetime(desc, &mut Vec::new()) {
@@ -844,9 +846,9 @@ impl Message {
         }
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
-            writeln!(w, "")?;
+            writeln!(w)?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
-            writeln!(w, "")?;
+            writeln!(w)?;
             if config.nostd {
                 writeln!(w, "use alloc::vec::Vec;")?;
             }
@@ -898,7 +900,7 @@ impl Message {
                 o.write(w, desc)?;
             }
 
-            writeln!(w, "")?;
+            writeln!(w)?;
             writeln!(w, "}}")?;
         }
 
@@ -912,7 +914,7 @@ impl Message {
         config: &Config,
     ) -> Result<()> {
         let mut custom_struct_derive = config.custom_struct_derive.join(", ");
-        if custom_struct_derive.len() > 0 {
+        if !custom_struct_derive.is_empty() {
             custom_struct_derive += ", ";
         }
 
@@ -1053,7 +1055,7 @@ impl Message {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
         }
         self.write_get_size(w, desc)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         self.write_write_message(w, desc)?;
         writeln!(w, "}}")?;
         Ok(())
@@ -1203,7 +1205,7 @@ impl Message {
                 if let FieldType::Enum(ref e) = f.typ {
                     let e = e.get_enum(desc);
                     e.fields.iter().find(|&(ref name, _)| name == var)
-                    .ok_or(Error::InvalidDefaultEnum(format!(
+                    .ok_or_else(|| Error::InvalidDefaultEnum(format!(
                                 "Error in message {}\n\
                                 Enum field {:?} has a default value '{}' which is not valid for enum index {:?}",
                                 self.name, f, var, e)))?;
@@ -1389,16 +1391,16 @@ impl Enumerator {
 
     fn write<W: Write>(&self, w: &mut W) -> Result<()> {
         println!("Writing enum {}", self.name);
-        writeln!(w, "")?;
+        writeln!(w)?;
         self.write_definition(w)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         if self.fields.is_empty() {
             Ok(())
         } else {
             self.write_impl_default(w)?;
-            writeln!(w, "")?;
+            writeln!(w)?;
             self.write_from_i32(w)?;
-            writeln!(w, "")?;
+            writeln!(w)?;
             self.write_from_str(w)
         }
     }
@@ -1486,9 +1488,9 @@ impl OneOf {
     }
 
     fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
-        writeln!(w, "")?;
+        writeln!(w)?;
         self.write_definition(w, desc)?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         self.write_impl_default(w, desc)?;
         Ok(())
     }
@@ -1800,8 +1802,8 @@ impl FileDescriptor {
         let mut desc = file_descriptor(&buf).to_result().map_err(Error::Nom)?;
         for mut m in &mut desc.messages {
             if m.path.as_os_str().is_empty() {
-                m.path = in_file.clone().to_path_buf();
-                if &import_search_path.len() > &0 {
+                m.path = in_file.to_path_buf();
+                if !import_search_path.is_empty() {
                     if let Ok(p) = m.path.clone().strip_prefix(&import_search_path[0]) {
                         m.import = p.to_path_buf();
                     }
@@ -1811,7 +1813,7 @@ impl FileDescriptor {
         // proto files with no packages are given an implicit module,
         // since every generated Rust source file represents a module
         desc.module = if desc.package.is_empty() {
-            get_file_stem(in_file)?.clone()
+            get_file_stem(in_file)?
         } else {
             desc.package.clone()
         };
@@ -2091,7 +2093,7 @@ impl FileDescriptor {
                 })
             {
                 if let FieldType::MessageOrEnum(name) = typ.clone() {
-                    let test_names: Vec<String> = if name.starts_with(".") {
+                    let test_names: Vec<String> = if name.starts_with('.') {
                         vec![name.clone().split_off(1)]
                     } else if m.package.is_empty() {
                         vec![name.clone(), format!("{}.{}", m.name, name)]
@@ -2151,21 +2153,21 @@ impl FileDescriptor {
             "// Automatically generated rust module for '{}' file",
             filename
         )?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         writeln!(w, "#![allow(non_snake_case)]")?;
         writeln!(w, "#![allow(non_upper_case_globals)]")?;
         writeln!(w, "#![allow(non_camel_case_types)]")?;
         writeln!(w, "#![allow(unused_imports)]")?;
         writeln!(w, "#![allow(unknown_lints)]")?;
-        writeln!(w, "#![allow(clippy)]")?;
+        writeln!(w, "#![allow(clippy::all)]")?;
 
         writeln!(w, "#![cfg_attr(rustfmt, rustfmt_skip)]")?;
-        writeln!(w, "")?;
+        writeln!(w)?;
         Ok(())
     }
 
     fn write_package_start<W: Write>(&self, w: &mut W) -> Result<()> {
-        writeln!(w, "")?;
+        writeln!(w)?;
         Ok(())
     }
 
@@ -2257,20 +2259,20 @@ impl FileDescriptor {
     }
 
     fn write_package_end<W: Write>(&self, w: &mut W) -> Result<()> {
-        writeln!(w, "")?;
+        writeln!(w)?;
         Ok(())
     }
 
     fn write_enums<W: Write>(&self, w: &mut W) -> Result<()> {
         for m in self.enums.iter().filter(|e| !e.imported) {
             println!("Writing enum {}", m.name);
-            writeln!(w, "")?;
+            writeln!(w)?;
             m.write_definition(w)?;
-            writeln!(w, "")?;
+            writeln!(w)?;
             m.write_impl_default(w)?;
-            writeln!(w, "")?;
+            writeln!(w)?;
             m.write_from_i32(w)?;
-            writeln!(w, "")?;
+            writeln!(w)?;
             m.write_from_str(w)?;
         }
         Ok(())
@@ -2279,7 +2281,7 @@ impl FileDescriptor {
     fn write_rpc_services<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         for m in self.rpc_services.iter() {
             println!("Writing Rpc {}", m.service_name);
-            writeln!(w, "")?;
+            writeln!(w)?;
             m.write_definition(w, config)?;
         }
         Ok(())
@@ -2302,16 +2304,14 @@ fn tag(number: u32, typ: &FieldType, packed: bool) -> u32 {
 fn split_package(package: &str) -> (&str, &str) {
     if package.is_empty() {
         ("", "")
+    } else if let Some(i) = package.rfind('.') {
+        (&package[0..i], &package[i + 1..])
     } else {
-        if let Some(i) = package.rfind('.') {
-            (&package[0..i], &package[i + 1..])
-        } else {
-            ("", package)
-        }
+        ("", package)
     }
 }
 
-const MAGIC_HEADER: &'static str = "// Automatically generated mod.rs";
+const MAGIC_HEADER: &str = "// Automatically generated mod.rs";
 
 /// Given a file path, create or update the mod.rs file within its folder
 fn update_mod_file(path: &Path) -> Result<()> {
@@ -2353,10 +2353,10 @@ fn update_mod_file(path: &Path) -> Result<()> {
             OpenOptions::new().append(true).open(&file)?
         } else {
             let mut f = File::create(&file)?;
-            write!(f, "{}\n", MAGIC_HEADER)?;
+            writeln!(f, "{}", MAGIC_HEADER)?;
             f
         };
-        write!(f, "pub mod {};\n", name)?;
+        writeln!(f, "pub mod {};", name)?;
     }
     Ok(())
 }
@@ -2367,7 +2367,7 @@ fn get_file_stem(path: &Path) -> Result<String> {
         .file_stem()
         .and_then(|f| f.to_str())
         .map(|s| s.to_string())
-        .ok_or_else(|| Error::from(Error::OutputFile(format!("{}", path.display()))))?;
+        .ok_or_else(|| Error::OutputFile(format!("{}", path.display())))?;
 
     file_stem = file_stem.replace(|c: char| !c.is_alphanumeric(), "_");
     // will now be properly alphanumeric, but may be a keyword!
