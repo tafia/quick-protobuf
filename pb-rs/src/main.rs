@@ -87,6 +87,16 @@ fn run() -> Result<(), ::failure::Error> {
                 .long("owned")
                 .required(false)
                 .help("Generate Owned structs when the proto stuct has a lifetime"),
+        ).arg(
+            Arg::with_name("NOSTD")
+                .long("nostd")
+                .required(false)
+                .help("Generate no_std compliant code"),
+        ).arg(
+            Arg::with_name("HASHBROWN")
+                .long("hashrown")
+                .required(false)
+                .help("Use hashrown for HashMap implementation"),
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -113,6 +123,8 @@ fn run() -> Result<(), ::failure::Error> {
     .headers(!matches.is_present("NO_HEADERS"))
     .dont_use_cow(matches.is_present("DONT_USE_COW"))
     .custom_struct_derive(custom_struct_derive)
+    .nostd(matches.is_present("NOSTD"))
+    .hashbrown(matches.is_present("HASHBROWN"))
     .custom_repr(custom_repr)
     .owned(matches.is_present("OWNED"));
 

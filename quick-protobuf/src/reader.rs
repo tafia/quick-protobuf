@@ -7,9 +7,17 @@
 //!
 //! It is advised, for convenience to directly work with a `Reader`.
 
+#[cfg(feature = "std")]
 use std::fs::File;
-use std::io::{self, Read};
+#[cfg(feature = "std")]
+use std::io::Read;
+#[cfg(feature = "std")]
 use std::path::Path;
+
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 use crate::errors::{Error, Result};
 use crate::message::MessageRead;
@@ -91,12 +99,7 @@ impl BytesReader {
     /// Reads the next byte
     #[inline(always)]
     pub fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
-        let b = bytes.get(self.start).ok_or_else::<Error, _>(|| {
-            Error::Io(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Cannot read next bytes",
-            ))
-        })?;
+        let b = bytes.get(self.start).ok_or(Error::UnexpectedEndOfBuffer)?;
         self.start += 1;
         Ok(*b)
     }
@@ -258,12 +261,11 @@ impl BytesReader {
     /// Reads fixed64 (little endian u64)
     #[inline]
     fn read_fixed<M, F: Fn(&[u8]) -> M>(&mut self, bytes: &[u8], len: usize, read: F) -> Result<M> {
-        let v = read(&bytes.get(self.start..self.start + len).ok_or_else(|| {
-            Error::Io(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Cannot read next bytes",
-            ))
-        })?);
+        let v = read(
+            &bytes
+                .get(self.start..self.start + len)
+                .ok_or_else(|| Error::UnexpectedEndOfBuffer)?,
+        );
         self.start += len;
         Ok(v)
     }
@@ -344,12 +346,8 @@ impl BytesReader {
     #[inline]
     pub fn read_bytes<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a [u8]> {
         self.read_len_varint(bytes, |r, b| {
-            b.get(r.start..r.end).ok_or_else(|| {
-                Error::Io(io::Error::new(
-                    io::ErrorKind::UnexpectedEof,
-                    "Cannot read next bytes",
-                ))
-            })
+            b.get(r.start..r.end)
+                .ok_or_else(|| Error::UnexpectedEndOfBuffer)
         })
     }
 
@@ -358,13 +356,8 @@ impl BytesReader {
     pub fn read_string<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a str> {
         self.read_len_varint(bytes, |r, b| {
             b.get(r.start..r.end)
-                .ok_or_else(|| {
-                    Error::Io(io::Error::new(
-                        io::ErrorKind::UnexpectedEof,
-                        "Cannot read next bytes",
-                    ))
-                })
-                .and_then(|x| ::std::str::from_utf8(x).map_err(|e| e.into()))
+                .ok_or_else(|| Error::UnexpectedEndOfBuffer)
+                .and_then(|x| ::core::str::from_utf8(x).map_err(|e| e.into()))
         })
     }
 
@@ -394,14 +387,11 @@ impl BytesReader {
     pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a [u8]) -> Result<&'a [M]> {
         let len = self.read_varint32(bytes)? as usize;
         if self.len() < len {
-            return Err(Error::Io(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Cannot read fixed packed field",
-            )));
+            return Err(Error::UnexpectedEndOfBuffer);
         }
-        let n = len / ::std::mem::size_of::<M>();
+        let n = len / ::core::mem::size_of::<M>();
         let slice = unsafe {
-            ::std::slice::from_raw_parts(
+            ::core::slice::from_raw_parts(
                 bytes.get_unchecked(self.start) as *const u8 as *const M,
                 n,
             )
@@ -444,8 +434,8 @@ impl BytesReader {
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<K>,
         G: FnMut(&mut BytesReader, &'a [u8]) -> Result<V>,
-        K: ::std::fmt::Debug + Default,
-        V: ::std::fmt::Debug + Default,
+        K: ::core::fmt::Debug + Default,
+        V: ::core::fmt::Debug + Default,
     {
         self.read_len_varint(bytes, |r, bytes| {
             let mut k = K::default();
@@ -558,6 +548,7 @@ pub struct Reader {
 
 impl Reader {
     /// Creates a new `Reader`
+    #[cfg(feature = "std")]
     pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {
         let mut buf = Vec::with_capacity(capacity);
         unsafe {
@@ -569,6 +560,7 @@ impl Reader {
     }
 
     /// Creates a new `Reader` out of a file path
+    #[cfg(feature = "std")]
     pub fn from_file<P: AsRef<Path>>(src: P) -> Result<Reader> {
         let len = src.as_ref().metadata().unwrap().len() as usize;
         let f = File::open(src)?;

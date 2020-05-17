@@ -314,7 +314,7 @@ impl FieldType {
                 format!("{}{}{}", m.get_modules(desc), m.name, lifetime)
             }
             FieldType::Map(ref key, ref value) => format!(
-                "HashMap<{}, {}>",
+                "KVMap<{}, {}>",
                 key.rust_type(desc)?,
                 value.rust_type(desc)?
             ),
@@ -449,15 +449,15 @@ impl Field {
                 "i32" => format!("{}i32", *d),
                 "i64" => format!("{}i64", *d),
                 "f32" => match &*d.to_lowercase() {
-                    "inf" => "::std::f32::INFINITY".to_string(),
-                    "-inf" => "::std::f32::NEG_INFINITY".to_string(),
-                    "nan" => "::std::f32::NAN".to_string(),
+                    "inf" => "::core::f32::INFINITY".to_string(),
+                    "-inf" => "::core::f32::NEG_INFINITY".to_string(),
+                    "nan" => "::core::f32::NAN".to_string(),
                     _ => format!("{}f32", *d),
                 },
                 "f64" => match &*d.to_lowercase() {
-                    "inf" => "::std::f64::INFINITY".to_string(),
-                    "-inf" => "::std::f64::NEG_INFINITY".to_string(),
-                    "nan" => "::std::f64::NAN".to_string(),
+                    "inf" => "::core::f64::INFINITY".to_string(),
+                    "-inf" => "::core::f64::NEG_INFINITY".to_string(),
+                    "nan" => "::core::f64::NAN".to_string(),
                     _ => format!("{}f64", *d),
                 },
                 "Cow<'a, str>" => format!("Cow::Borrowed({})", d),
@@ -849,19 +849,43 @@ impl Message {
             writeln!(w)?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w)?;
-            if self
-                .messages
-                .iter()
-                .any(|m| m.all_fields().any(|f| f.typ.has_cow()))
+            if config.nostd {
+                writeln!(w, "use alloc::vec::Vec;")?;
+            }
+            if self.messages.iter().any(|m| {
+                m.all_fields()
+                    .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
+            }) {
+                if config.nostd {
+                    writeln!(w, "use alloc::borrow::Cow;")?;
+                } else {
+                    writeln!(w, "use std::borrow::Cow;")?;
+                }
+            }
+            if config.nostd
+                && self.messages.iter().any(|m| {
+                    desc.owned && m.has_lifetime(desc, &mut Vec::new())
+                        || m.all_fields().any(|f| f.boxed)
+                })
             {
-                writeln!(w, "use std::borrow::Cow;")?;
+                writeln!(w)?;
+                writeln!(w, "use alloc::boxed::Box;")?;
             }
             if self
                 .messages
                 .iter()
                 .any(|m| m.all_fields().any(|f| f.typ.is_map()))
             {
-                writeln!(w, "use std::collections::HashMap;")?;
+                if config.hashbrown {
+                    writeln!(w, "use hashbrown::HashMap;")?;
+                    writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
+                } else if config.nostd {
+                    writeln!(w, "use alloc::collections::BTreeMap;")?;
+                    writeln!(w, "type KVMap<K, V> = BTreeMap<K, V>;")?;
+                } else {
+                    writeln!(w, "use std::collections::HashMap;")?;
+                    writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
+                }
             }
             if !self.messages.is_empty() || !self.oneofs.is_empty() {
                 writeln!(w, "use super::*;")?;
@@ -1045,15 +1069,15 @@ impl Message {
             struct {name}OwnedInner {{
                 buf: Vec<u8>,
                 proto: {name}<'static>,
-                _pin: std::marker::PhantomPinned,
+                _pin: core::marker::PhantomPinned,
             }}
 
             impl {name}OwnedInner {{
-                fn new(buf: Vec<u8>) -> Result<std::pin::Pin<Box<Self>>> {{
+                fn new(buf: Vec<u8>) -> Result<core::pin::Pin<Box<Self>>> {{
                     let inner = Self {{
                         buf,
-                        proto: unsafe {{ std::mem::MaybeUninit::zeroed().assume_init() }},
-                        _pin: std::marker::PhantomPinned,
+                        proto: unsafe {{ core::mem::MaybeUninit::zeroed().assume_init() }},
+                        _pin: core::marker::PhantomPinned,
                     }};
                     let mut pinned = Box::pin(inner);
 
@@ -1061,7 +1085,7 @@ impl Message {
                     let proto = {name}::from_reader(&mut reader, &pinned.buf)?;
 
                     unsafe {{
-                        let proto = std::mem::transmute::<_, {name}<'static>>(proto);
+                        let proto = core::mem::transmute::<_, {name}<'static>>(proto);
                         pinned.as_mut().get_unchecked_mut().proto = proto;
                     }}
                     Ok(pinned)
@@ -1069,7 +1093,7 @@ impl Message {
             }}
 
             pub struct {name}Owned {{
-                inner: std::pin::Pin<Box<{name}OwnedInner>>,
+                inner: core::pin::Pin<Box<{name}OwnedInner>>,
             }}
 
             #[allow(dead_code)]
@@ -1083,8 +1107,8 @@ impl Message {
                 }}
             }}
 
-            impl std::fmt::Debug for {name}Owned {{
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
+            impl core::fmt::Debug for {name}Owned {{
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {{
                     self.inner.proto.fmt(f)
                 }}
             }}
@@ -1123,7 +1147,7 @@ impl Message {
                 }}
             }}
             "#,
-            name = self.name
+            name = self.name,
         )?;
         Ok(())
     }
@@ -1144,7 +1168,7 @@ impl Message {
     fn write_write_message<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
         writeln!(
             w,
-            "    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {{"
+            "    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {{"
         )?;
         for f in self.fields.iter().filter(|f| !f.deprecated) {
             f.write_write(w, desc)?;
@@ -1658,6 +1682,8 @@ pub struct Config {
     pub custom_rpc_generator: RpcGeneratorFunction,
     pub custom_includes: Vec<String>,
     pub owned: bool,
+    pub nostd: bool,
+    pub hashbrown: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -2153,33 +2179,58 @@ impl FileDescriptor {
             )?;
             return Ok(());
         }
-        writeln!(w, "use std::io::Write;")?;
-        if self
-            .messages
-            .iter()
-            .any(|m| m.all_fields().any(|f| f.typ.has_cow()))
+
+        if config.nostd {
+            writeln!(w, "use alloc::vec::Vec;")?;
+        }
+
+        if self.messages.iter().any(|m| {
+            m.all_fields()
+                .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
+        }) {
+            if config.nostd {
+                writeln!(w, "use alloc::borrow::Cow;")?;
+            } else {
+                writeln!(w, "use std::borrow::Cow;")?;
+            }
+        }
+        if config.nostd
+            && self.messages.iter().any(|m| {
+                self.owned && m.has_lifetime(&self, &mut Vec::new())
+                    || m.all_fields().any(|f| f.boxed)
+            })
         {
-            writeln!(w, "use std::borrow::Cow;")?;
+            writeln!(w)?;
+            writeln!(w, "use alloc::boxed::Box;")?;
         }
         if self
             .messages
             .iter()
             .any(|m| m.all_fields().any(|f| f.typ.is_map()))
         {
-            writeln!(w, "use std::collections::HashMap;")?;
+            if config.hashbrown {
+                writeln!(w, "use hashbrown::HashMap;")?;
+                writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
+            } else if config.nostd {
+                writeln!(w, "use alloc::collections::BTreeMap;")?;
+                writeln!(w, "type KVMap<K, V> = BTreeMap<K, V>;")?;
+            } else {
+                writeln!(w, "use std::collections::HashMap;")?;
+                writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
+            }
         }
         writeln!(
             w,
-            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, Result}};"
+            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
         )?;
 
         if self.owned {
             write!(
                 w,
                 "\
-                 use std::convert::TryFrom;\n\
-                 use std::ops::Deref;\n\
-                 use std::ops::DerefMut;\n\
+                 use core::convert::TryFrom;\n\
+                 use core::ops::Deref;\n\
+                 use core::ops::DerefMut;\n\
                  "
             )?;
         }

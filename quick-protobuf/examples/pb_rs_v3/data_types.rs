@@ -9,10 +9,9 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use std::io::Write;
 use std::borrow::Cow;
 use std::collections::HashMap;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, Result};
+use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -73,7 +72,7 @@ impl MessageWrite for BarMessage {
         + if self.b_int32 == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.b_int32) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.b_int32 != 0i32 { w.write_with_tag(8, |w| w.write_int32(*&self.b_int32))?; }
         Ok(())
     }
@@ -201,7 +200,7 @@ impl<'a> MessageWrite for FooMessage<'a> {
             mod_FooMessage::OneOftest_oneof::None => 0,
     }    }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.f_int32 != 0i32 { w.write_with_tag(8, |w| w.write_int32(*&self.f_int32))?; }
         if self.f_int64 != 0i64 { w.write_with_tag(16, |w| w.write_int64(*&self.f_int64))?; }
         if self.f_uint32 != 0u32 { w.write_with_tag(24, |w| w.write_uint32(*&self.f_uint32))?; }
@@ -289,7 +288,7 @@ impl<'a> MessageWrite for BazMessage<'a> {
         + if self.b_string == "" { 0 } else { 1 + sizeof_len((&self.b_string).len()) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.nested { w.write_with_tag(10, |w| w.write_message(s))?; }
         if self.b_int64 != 0i64 { w.write_with_tag(16, |w| w.write_int64(*&self.b_int64))?; }
         if self.b_string != "" { w.write_with_tag(26, |w| w.write_string(&**&self.b_string))?; }
@@ -326,7 +325,7 @@ impl MessageWrite for Nested {
         + self.f_nested.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.f_nested { w.write_with_tag(10, |w| w.write_message(s))?; }
         Ok(())
     }
@@ -361,7 +360,7 @@ impl MessageWrite for NestedMessage {
         + if self.f_nested == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.f_nested) as u64) }
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.f_nested != 0i32 { w.write_with_tag(8, |w| w.write_int32(*&self.f_nested))?; }
         Ok(())
     }
@@ -431,7 +430,7 @@ impl MessageWrite for RepeatedMessage {
         + self.bar_message.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
-    fn write_message<W: Write>(&self, w: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         for s in &self.bar_message { w.write_with_tag(10, |w| w.write_message(s))?; }
         Ok(())
     }

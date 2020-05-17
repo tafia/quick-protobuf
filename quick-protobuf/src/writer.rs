@@ -1,11 +1,11 @@
 //! A module to manage protobuf serialization
 
-use std::io::Write;
-
-use crate::errors::Result;
+use crate::errors::{Error, Result};
 use crate::message::MessageWrite;
 
-use byteorder::LittleEndian as LE;
+use byteorder::{ByteOrder, LittleEndian as LE};
+
+#[cfg(feature = "std")]
 use byteorder::WriteBytesExt;
 
 /// A struct to write protobuf messages
@@ -15,18 +15,17 @@ use byteorder::WriteBytesExt;
 /// ```rust
 /// // an automatically generated module which is in a separate file in general
 /// mod foo_bar {
-///     # use quick_protobuf::{MessageWrite, Writer, Result};
+///     # use quick_protobuf::{MessageWrite, Writer, WriterBackend, Result};
 ///     # use std::borrow::Cow;
-///     # use std::io::Write;
 ///     pub struct Foo<'a> { pub name: Option<Cow<'a, str>>, }
 ///     pub struct Bar { pub id: Option<u32> }
 ///     pub struct FooBar<'a> { pub foos: Vec<Foo<'a>>, pub bars: Vec<Bar>, }
 ///     impl<'a> MessageWrite for FooBar<'a> {
 ///         // implements
 ///         // fn get_size(&self) -> usize { ... }
-///         // fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> { ... }
+///         // fn write_message<W: WriterBackend>(&self, r: &mut Writer<W>) -> Result<()> { ... }
 ///         # fn get_size(&self) -> usize { 0 }
-///         # fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
+///         # fn write_message<W: WriterBackend>(&self, _: &mut Writer<W>) -> Result<()> { Ok(()) }
 ///     }
 /// }
 ///
@@ -52,11 +51,11 @@ use byteorder::WriteBytesExt;
 ///     writer.write_message(&foobar).expect("Cannot write FooBar");
 /// }
 /// ```
-pub struct Writer<W> {
+pub struct Writer<W: WriterBackend> {
     inner: W,
 }
 
-impl<W: Write> Writer<W> {
+impl<W: WriterBackend> Writer<W> {
     /// Creates a new `ProtobufWriter`
     pub fn new(w: W) -> Writer<W> {
         Writer { inner: w }
@@ -64,16 +63,16 @@ impl<W: Write> Writer<W> {
 
     /// Writes a byte which is NOT internally coded as a `varint`
     pub fn write_u8(&mut self, byte: u8) -> Result<()> {
-        self.inner.write_u8(byte).map_err(|e| e.into())
+        self.inner.pb_write_u8(byte).map_err(|e| e.into())
     }
 
     /// Writes a `varint` (compacted `u64`)
     pub fn write_varint(&mut self, mut v: u64) -> Result<()> {
         while v > 0x7F {
-            self.inner.write_u8(((v as u8) & 0x7F) | 0x80)?;
+            self.inner.pb_write_u8(((v as u8) & 0x7F) | 0x80)?;
             v >>= 7;
         }
-        self.inner.write_u8(v as u8).map_err(|e| e.into())
+        self.inner.pb_write_u8(v as u8).map_err(|e| e.into())
     }
 
     /// Writes a tag, which represents both the field number and the wire type
@@ -121,44 +120,44 @@ impl<W: Write> Writer<W> {
     /// Writes a `fixed64` which is little endian coded `u64`
     #[inline(always)]
     pub fn write_fixed64(&mut self, v: u64) -> Result<()> {
-        self.inner.write_u64::<LE>(v).map_err(|e| e.into())
+        self.inner.pb_write_u64(v).map_err(|e| e.into())
     }
 
     /// Writes a `fixed32` which is little endian coded `u32`
     #[inline(always)]
     pub fn write_fixed32(&mut self, v: u32) -> Result<()> {
-        self.inner.write_u32::<LE>(v).map_err(|e| e.into())
+        self.inner.pb_write_u32(v).map_err(|e| e.into())
     }
 
     /// Writes a `sfixed64` which is little endian coded `i64`
     #[inline(always)]
     pub fn write_sfixed64(&mut self, v: i64) -> Result<()> {
-        self.inner.write_i64::<LE>(v).map_err(|e| e.into())
+        self.inner.pb_write_i64(v).map_err(|e| e.into())
     }
 
     /// Writes a `sfixed32` which is little endian coded `i32`
     #[inline(always)]
     pub fn write_sfixed32(&mut self, v: i32) -> Result<()> {
-        self.inner.write_i32::<LE>(v).map_err(|e| e.into())
+        self.inner.pb_write_i32(v).map_err(|e| e.into())
     }
 
     /// Writes a `float`
     #[inline(always)]
     pub fn write_float(&mut self, v: f32) -> Result<()> {
-        self.inner.write_f32::<LE>(v).map_err(|e| e.into())
+        self.inner.pb_write_f32(v).map_err(|e| e.into())
     }
 
     /// Writes a `double`
     #[inline(always)]
     pub fn write_double(&mut self, v: f64) -> Result<()> {
-        self.inner.write_f64::<LE>(v).map_err(|e| e.into())
+        self.inner.pb_write_f64(v).map_err(|e| e.into())
     }
 
     /// Writes a `bool` 1 = true, 0 = false
     #[inline(always)]
     pub fn write_bool(&mut self, v: bool) -> Result<()> {
         self.inner
-            .write_u8(if v { 1 } else { 0 })
+            .pb_write_u8(if v { 1 } else { 0 })
             .map_err(|e| e.into())
     }
 
@@ -172,7 +171,7 @@ impl<W: Write> Writer<W> {
     #[inline(always)]
     pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
         self.write_varint(bytes.len() as u64)?;
-        self.inner.write_all(bytes).map_err(|e| e.into())
+        self.inner.pb_write_all(bytes).map_err(|e| e.into())
     }
 
     /// Writes `string`: length first then the chunk of data
@@ -205,8 +204,8 @@ impl<W: Write> Writer<W> {
     /// all data at once
     #[inline]
     pub fn write_packed_fixed<M>(&mut self, v: &[M]) -> Result<()> {
-        let len = v.len() * ::std::mem::size_of::<M>();
-        let bytes = unsafe { ::std::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
+        let len = v.len() * ::core::mem::size_of::<M>();
+        let bytes = unsafe { ::core::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
         self.write_bytes(bytes)
     }
 
@@ -264,8 +263,8 @@ impl<W: Write> Writer<W> {
         }
 
         self.write_tag(tag)?;
-        let len = ::std::mem::size_of::<M>() * v.len();
-        let bytes = unsafe { ::std::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
+        let len = ::core::mem::size_of::<M>() * v.len();
+        let bytes = unsafe { ::core::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
         self.write_bytes(bytes)
     }
 
@@ -284,7 +283,7 @@ impl<W: Write> Writer<W> {
         self.write_tag(tag)?;
         let len = v.len() * item_size;
         let bytes =
-            unsafe { ::std::slice::from_raw_parts(v as *const [M] as *const M as *const u8, len) };
+            unsafe { ::core::slice::from_raw_parts(v as *const [M] as *const M as *const u8, len) };
         self.write_bytes(bytes)
     }
 
@@ -310,6 +309,7 @@ impl<W: Write> Writer<W> {
 }
 
 /// Serialize a `MessageWrite` into a `Vec`
+#[cfg(feature = "std")]
 pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
     let len = message.get_size();
     let mut v = Vec::with_capacity(len + crate::sizeofs::sizeof_len(len));
@@ -318,4 +318,191 @@ pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
         writer.write_message(message)?;
     }
     Ok(v)
+}
+
+/// Serialize a `MessageWrite` into a byte slice
+pub fn serialize_into_slice<M: MessageWrite>(message: &M, out: &mut [u8]) -> Result<()> {
+    let len = message.get_size();
+    if out.len() < len {
+        return Err(Error::OutputBufferTooSmall);
+    }
+    {
+        let mut writer = Writer::new(BytesWriter::new(out));
+        writer.write_message(message)?;
+    }
+
+    Ok(())
+}
+
+/// Writer backend abstraction
+pub trait WriterBackend {
+    /// Write a u8
+    fn pb_write_u8(&mut self, x: u8) -> Result<()>;
+
+    /// Write a u32
+    fn pb_write_u32(&mut self, x: u32) -> Result<()>;
+
+    /// Write a i32
+    fn pb_write_i32(&mut self, x: i32) -> Result<()>;
+
+    /// Write a f32
+    fn pb_write_f32(&mut self, x: f32) -> Result<()>;
+
+    /// Write a u64
+    fn pb_write_u64(&mut self, x: u64) -> Result<()>;
+
+    /// Write a i64
+    fn pb_write_i64(&mut self, x: i64) -> Result<()>;
+
+    /// Write a f64
+    fn pb_write_f64(&mut self, x: f64) -> Result<()>;
+
+    /// Write all bytes in buf
+    fn pb_write_all(&mut self, buf: &[u8]) -> Result<()>;
+}
+
+/// A writer backend for byte buffers
+pub struct BytesWriter<'a> {
+    buf: &'a mut [u8],
+    cursor: usize,
+}
+
+impl<'a> BytesWriter<'a> {
+    /// Create a new BytesWriter to write into `buf`
+    pub fn new(buf: &'a mut [u8]) -> BytesWriter<'a> {
+        BytesWriter { buf, cursor: 0 }
+    }
+}
+
+impl<'a> WriterBackend for BytesWriter<'a> {
+    #[inline(always)]
+    fn pb_write_u8(&mut self, x: u8) -> Result<()> {
+        if self.buf.len() < 1 {
+            Err(Error::UnexpectedEndOfBuffer)
+        } else {
+            self.buf[self.cursor] = x;
+            self.cursor += 1;
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn pb_write_u32(&mut self, x: u32) -> Result<()> {
+        if self.buf.len() - self.cursor < 4 {
+            Err(Error::UnexpectedEndOfBuffer)
+        } else {
+            LE::write_u32(&mut self.buf[self.cursor..], x);
+            self.cursor += 4;
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn pb_write_i32(&mut self, x: i32) -> Result<()> {
+        if self.buf.len() - self.cursor < 4 {
+            Err(Error::UnexpectedEndOfBuffer)
+        } else {
+            LE::write_i32(&mut self.buf[self.cursor..], x);
+            self.cursor += 4;
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn pb_write_f32(&mut self, x: f32) -> Result<()> {
+        if self.buf.len() - self.cursor < 4 {
+            Err(Error::UnexpectedEndOfBuffer)
+        } else {
+            LE::write_f32(&mut self.buf[self.cursor..], x);
+            self.cursor += 4;
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn pb_write_u64(&mut self, x: u64) -> Result<()> {
+        if self.buf.len() - self.cursor < 8 {
+            Err(Error::UnexpectedEndOfBuffer)
+        } else {
+            LE::write_u64(&mut self.buf[self.cursor..], x);
+            self.cursor += 8;
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn pb_write_i64(&mut self, x: i64) -> Result<()> {
+        if self.buf.len() - self.cursor < 8 {
+            Err(Error::UnexpectedEndOfBuffer)
+        } else {
+            LE::write_i64(&mut self.buf[self.cursor..], x);
+            self.cursor += 8;
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn pb_write_f64(&mut self, x: f64) -> Result<()> {
+        if self.buf.len() - self.cursor < 8 {
+            Err(Error::UnexpectedEndOfBuffer)
+        } else {
+            LE::write_f64(&mut self.buf[self.cursor..], x);
+            self.cursor += 8;
+            Ok(())
+        }
+    }
+
+    #[inline(always)]
+    fn pb_write_all(&mut self, buf: &[u8]) -> Result<()> {
+        if self.buf.len() - self.cursor < buf.len() {
+            Err(Error::UnexpectedEndOfBuffer)
+        } else {
+            self.buf[self.cursor..(self.cursor + buf.len())].copy_from_slice(buf);
+            self.cursor += buf.len();
+            Ok(())
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<W: std::io::Write> WriterBackend for W {
+    #[inline(always)]
+    fn pb_write_u8(&mut self, x: u8) -> Result<()> {
+        self.write_u8(x).map_err(|e| e.into())
+    }
+
+    #[inline(always)]
+    fn pb_write_u32(&mut self, x: u32) -> Result<()> {
+        self.write_u32::<LE>(x).map_err(|e| e.into())
+    }
+
+    #[inline(always)]
+    fn pb_write_i32(&mut self, x: i32) -> Result<()> {
+        self.write_i32::<LE>(x).map_err(|e| e.into())
+    }
+
+    #[inline(always)]
+    fn pb_write_f32(&mut self, x: f32) -> Result<()> {
+        self.write_f32::<LE>(x).map_err(|e| e.into())
+    }
+
+    #[inline(always)]
+    fn pb_write_u64(&mut self, x: u64) -> Result<()> {
+        self.write_u64::<LE>(x).map_err(|e| e.into())
+    }
+
+    #[inline(always)]
+    fn pb_write_i64(&mut self, x: i64) -> Result<()> {
+        self.write_i64::<LE>(x).map_err(|e| e.into())
+    }
+
+    #[inline(always)]
+    fn pb_write_f64(&mut self, x: f64) -> Result<()> {
+        self.write_f64::<LE>(x).map_err(|e| e.into())
+    }
+
+    #[inline(always)]
+    fn pb_write_all(&mut self, buf: &[u8]) -> Result<()> {
+        self.write_all(buf).map_err(|e| e.into())
+    }
 }

@@ -63,6 +63,8 @@ pub struct ConfigBuilder {
     custom_struct_derive: Vec<String>,
     custom_repr: Option<String>,
     owned: bool,
+    nostd: bool,
+    hashbrown: bool,
 }
 
 impl ConfigBuilder {
@@ -169,6 +171,19 @@ impl ConfigBuilder {
         self
     }
 
+    /// Generate no_std compliant code
+    pub fn nostd(mut self, val: bool) -> Self {
+        self.nostd = val;
+        self
+    }
+
+    /// Use hashbrown as HashMap implementation instead of [std::collections::HashMap] or
+    /// [alloc::collections::BTreeMap] in a `no_std` environment
+    pub fn hashbrown(mut self, val: bool) -> Self {
+        self.hashbrown = val;
+        self
+    }
+
     /// Build Config from this ConfigBuilder
     pub fn build(self) -> Vec<Config> {
         self.in_files
@@ -198,6 +213,8 @@ impl ConfigBuilder {
                     custom_rpc_generator: Box::new(|_, _| Ok(())),
                     custom_includes: Vec::new(),
                     owned: self.owned,
+                    nostd: self.nostd,
+                    hashbrown: self.hashbrown,
                 }
             })
             .collect()

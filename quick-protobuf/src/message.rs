@@ -2,18 +2,21 @@
 //!
 //! Creates the struct and implements a reader
 
+#[cfg(feature = "std")]
 use std::fs::File;
-use std::io::{BufWriter, Write};
+#[cfg(feature = "std")]
+use std::io::BufWriter;
+#[cfg(feature = "std")]
 use std::path::Path;
 
 use crate::errors::Result;
 use crate::reader::BytesReader;
-use crate::writer::Writer;
+use crate::writer::{Writer, WriterBackend};
 
 /// A trait to handle deserialization based on parsed `Field`s
 pub trait MessageWrite: Sized {
     /// Writes `Self` into W writer
-    fn write_message<W: Write>(&self, _: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, _: &mut Writer<W>) -> Result<()> {
         Ok(())
     }
 
@@ -23,6 +26,7 @@ pub trait MessageWrite: Sized {
     }
 
     /// Writes self into a file
+    #[cfg(feature = "std")]
     fn write_file<P: AsRef<Path>>(&self, p: P) -> Result<()> {
         let file = BufWriter::new(File::create(p)?);
         let mut writer = Writer::new(file);

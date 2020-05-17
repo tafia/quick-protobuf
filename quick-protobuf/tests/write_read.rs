@@ -1,11 +1,12 @@
 extern crate quick_protobuf;
 
 use quick_protobuf::sizeofs::*;
-use quick_protobuf::{deserialize_from_slice, serialize_into_vec};
-use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Reader, Result, Writer};
+use quick_protobuf::{deserialize_from_slice, serialize_into_slice, serialize_into_vec};
+use quick_protobuf::{
+    BytesReader, MessageRead, MessageWrite, Reader, Result, Writer, WriterBackend,
+};
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::io::Write;
 
 macro_rules! write_read_primitive {
     ($name:ident, $read:ident, $write:ident) => {
@@ -128,7 +129,7 @@ impl MessageWrite for TestMessage {
                 .sum::<usize>()
     }
 
-    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, r: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.id {
             r.write_with_tag(10, |r| r.write_uint32(*s))?;
         }
@@ -150,6 +151,19 @@ fn wr_message() {
 
     // test get_size!
     assert_eq!(buf.len(), sizeof_varint(8) + v.get_size());
+}
+
+#[test]
+fn wr_message_slice() {
+    let v = TestMessage {
+        id: Some(63),
+        val: vec![53, 5, 76, 743, 23, 753],
+    };
+
+    let mut buf = [0u8; 1024];
+    serialize_into_slice(&v, &mut buf).unwrap();
+
+    assert_eq!(v, deserialize_from_slice(&buf).unwrap());
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Default)]
@@ -186,7 +200,7 @@ impl<'a> MessageWrite for TestMessageBorrow<'a> {
                 .sum::<usize>()
     }
 
-    fn write_message<W: Write>(&self, r: &mut Writer<W>) -> Result<()> {
+    fn write_message<W: WriterBackend>(&self, r: &mut Writer<W>) -> Result<()> {
         if let Some(ref s) = self.id {
             r.write_with_tag(10, |r| r.write_uint32(*s))?;
         }

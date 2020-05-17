@@ -19,3 +19,4 @@ failure = "0.1.5"
 protobuf-codegen-pure = "2.0.4"
 pb-rs = { path = "../pb-rs" }
 prost-build = "0.4.0"
+[features]

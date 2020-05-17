@@ -21,10 +21,17 @@ proto_sets=(
     quick-protobuf/tests/rust_protobuf/common
 )
 
+nostd_proto_sets=(
+    quick-protobuf/examples/pb_rs_nostd
+)
+
 for ps in "${proto_sets[@]}"; do
   cargo run -p pb-rs -- -I "$ps" -d "$ps" "$ps"/*.proto
 done
 
+for ps in "${nostd_proto_sets[@]}"; do
+  cargo run -p pb-rs -- --nostd -I "$ps" -d "$ps" "$ps"/*.proto
+done
 
 rm -rf quick-protobuf/examples/pb_rs_v3/owned
 mkdir -p quick-protobuf/examples/pb_rs_v3/owned
