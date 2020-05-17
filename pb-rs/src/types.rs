@@ -2131,7 +2131,7 @@ impl FileDescriptor {
         writeln!(w, "#![allow(non_camel_case_types)]")?;
         writeln!(w, "#![allow(unused_imports)]")?;
         writeln!(w, "#![allow(unknown_lints)]")?;
-        writeln!(w, "#![allow(clippy)]")?;
+        writeln!(w, "#![allow(clippy::all)]")?;
 
         writeln!(w, "#![cfg_attr(rustfmt, rustfmt_skip)]")?;
         writeln!(w, "")?;
