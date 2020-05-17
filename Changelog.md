@@ -8,6 +8,11 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.9.0
+- feat: add no_std support
+- feat: deprecate failure
+- refactor: modernize code
+
 ## quick-protobuf 0.6.4
 - feat: failible get byte
 
@@ -28,9 +33,6 @@
 and Cow with regular strings and vectors. This will decrease performance - and will 
 eventually be replaced with a whitelist for specific structures instead of a boolean.
 This is meant for the structure to fully own the data it has.
-
-## pb-rs 0.7.0
-- feat: add a ConfigBuilder
 
 ## pb-rs 0.5.0
 - fix: nested messages issue (missing OneOf, lifetime)
