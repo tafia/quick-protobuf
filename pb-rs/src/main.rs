@@ -1,5 +1,5 @@
 use clap::{crate_authors, crate_description, crate_name, crate_version, values_t, App, Arg};
-use pb_rs::{ConfigBuilder, errors::Error, types::FileDescriptor};
+use pb_rs::{errors::Error, types::FileDescriptor, ConfigBuilder};
 use std::path::{Path, PathBuf};
 
 fn run() -> Result<(), Error> {

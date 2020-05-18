@@ -6,10 +6,6 @@
 #![allow(dead_code)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
-extern crate byteorder;
-extern crate failure;
-extern crate failure_derive;
-
 pub mod errors;
 pub mod message;
 pub mod reader;

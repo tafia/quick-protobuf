@@ -10,9 +10,9 @@
 
 
 use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
-use std::convert::TryFrom;
-use std::ops::Deref;
-use std::ops::DerefMut;
+use core::convert::TryFrom;
+use core::ops::Deref;
+use core::ops::DerefMut;
 use quick_protobuf::sizeofs::*;
 use super::super::*;
 
