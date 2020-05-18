@@ -66,17 +66,38 @@ impl std::fmt::Display for Error {
             Error::OutputFile(file) => write!(f, "Cannot read output file '{}'", file),
             Error::OutputDirectory(dir) => write!(f, "Cannot read output directory '{}'", dir),
             Error::OutputMultipleInputs => write!(f, "--output only allowed for single input file"),
-            Error::InvalidMessage(msg) => write!(f, "Message checks errored: {}\r\n\
-                Proto definition might be invalid or something got wrong in the parsing", msg),
-            Error::InvalidImport(imp) => write!(f,"Cannot convert protobuf import into module import:: {}\r\n\
-                Import definition might be invalid, some characters may not be supported", imp),
-            Error::EmptyRead => write!(f, "No message or enum were read;\
-                either definition might be invalid or there were only unsupported structures"),
+            Error::InvalidMessage(msg) => write!(
+                f,
+                "Message checks errored: {}\r\n\
+                Proto definition might be invalid or something got wrong in the parsing",
+                msg
+            ),
+            Error::InvalidImport(imp) => write!(
+                f,
+                "Cannot convert protobuf import into module import:: {}\r\n\
+                Import definition might be invalid, some characters may not be supported",
+                imp
+            ),
+            Error::EmptyRead => write!(
+                f,
+                "No message or enum were read;\
+                either definition might be invalid or there were only unsupported structures"
+            ),
             Error::MessageOrEnumNotFound(me) => write!(f, "Could not find message or enum {}", me),
-            Error::InvalidDefaultEnum(en) => write!(f, "Enum field cannot be set to '{}', this variant does not exist", en),
+            Error::InvalidDefaultEnum(en) => write!(
+                f,
+                "Enum field cannot be set to '{}', this variant does not exist",
+                en
+            ),
             Error::ReadFnMap => write!(f, "There should be a special case for maps"),
-            Error::Cycle(msgs) => write!(f, "Messages {:?} are cyclic (missing an optional field)", msgs),
-            Error::OutputAndOutputDir => write!(f, "only one of --output or --output_directory allowed"),
+            Error::Cycle(msgs) => write!(
+                f,
+                "Messages {:?} are cyclic (missing an optional field)",
+                msgs
+            ),
+            Error::OutputAndOutputDir => {
+                write!(f, "only one of --output or --output_directory allowed")
+            }
         }
     }
 }

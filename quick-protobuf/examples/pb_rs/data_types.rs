@@ -11,6 +11,7 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+type KVMap<K, V> = HashMap<K, V>;
 use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
@@ -105,7 +106,7 @@ pub struct FooMessage<'a> {
     pub f_baz: Option<BazMessage>,
     pub f_nested: Option<mod_BazMessage::Nested>,
     pub f_nested_enum: Option<mod_BazMessage::mod_Nested::NestedEnum>,
-    pub f_map: HashMap<Cow<'a, str>, i32>,
+    pub f_map: KVMap<Cow<'a, str>, i32>,
     pub test_oneof: mod_FooMessage::OneOftest_oneof<'a>,
 }
 

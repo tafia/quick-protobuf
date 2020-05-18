@@ -11,10 +11,11 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+type KVMap<K, V> = HashMap<K, V>;
 use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
-use std::convert::TryFrom;
-use std::ops::Deref;
-use std::ops::DerefMut;
+use core::convert::TryFrom;
+use core::ops::Deref;
+use core::ops::DerefMut;
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -108,7 +109,7 @@ pub struct FooMessage<'a> {
     pub f_baz: Option<BazMessage<'a>>,
     pub f_nested: Option<mod_BazMessage::Nested>,
     pub f_nested_enum: mod_BazMessage::mod_Nested::NestedEnum,
-    pub f_map: HashMap<Cow<'a, str>, i32>,
+    pub f_map: KVMap<Cow<'a, str>, i32>,
     pub f_repeated_string: Vec<Cow<'a, str>>,
     pub f_repeated_baz_message: Vec<BazMessage<'a>>,
     pub test_oneof: mod_FooMessage::OneOftest_oneof<'a>,
@@ -245,15 +246,15 @@ impl<'a> MessageWrite for FooMessage<'a> {
             struct FooMessageOwnedInner {
                 buf: Vec<u8>,
                 proto: FooMessage<'static>,
-                _pin: std::marker::PhantomPinned,
+                _pin: core::marker::PhantomPinned,
             }
 
             impl FooMessageOwnedInner {
-                fn new(buf: Vec<u8>) -> Result<std::pin::Pin<Box<Self>>> {
+                fn new(buf: Vec<u8>) -> Result<core::pin::Pin<Box<Self>>> {
                     let inner = Self {
                         buf,
-                        proto: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
-                        _pin: std::marker::PhantomPinned,
+                        proto: unsafe { core::mem::MaybeUninit::zeroed().assume_init() },
+                        _pin: core::marker::PhantomPinned,
                     };
                     let mut pinned = Box::pin(inner);
 
@@ -261,16 +262,15 @@ impl<'a> MessageWrite for FooMessage<'a> {
                     let proto = FooMessage::from_reader(&mut reader, &pinned.buf)?;
 
                     unsafe {
-                        let proto = std::mem::transmute::<_, FooMessage<'static>>(proto);
+                        let proto = core::mem::transmute::<_, FooMessage<'static>>(proto);
                         pinned.as_mut().get_unchecked_mut().proto = proto;
                     }
                     Ok(pinned)
                 }
             }
 
-            #[allow(dead_code)]
             pub struct FooMessageOwned {
-                inner: std::pin::Pin<Box<FooMessageOwnedInner>>,
+                inner: core::pin::Pin<Box<FooMessageOwnedInner>>,
             }
 
             #[allow(dead_code)]
@@ -284,8 +284,8 @@ impl<'a> MessageWrite for FooMessage<'a> {
                 }
             }
 
-            impl std::fmt::Debug for FooMessageOwned {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            impl core::fmt::Debug for FooMessageOwned {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                     self.inner.proto.fmt(f)
                 }
             }
@@ -388,15 +388,15 @@ impl<'a> MessageWrite for BazMessage<'a> {
             struct BazMessageOwnedInner {
                 buf: Vec<u8>,
                 proto: BazMessage<'static>,
-                _pin: std::marker::PhantomPinned,
+                _pin: core::marker::PhantomPinned,
             }
 
             impl BazMessageOwnedInner {
-                fn new(buf: Vec<u8>) -> Result<std::pin::Pin<Box<Self>>> {
+                fn new(buf: Vec<u8>) -> Result<core::pin::Pin<Box<Self>>> {
                     let inner = Self {
                         buf,
-                        proto: unsafe { std::mem::MaybeUninit::zeroed().assume_init() },
-                        _pin: std::marker::PhantomPinned,
+                        proto: unsafe { core::mem::MaybeUninit::zeroed().assume_init() },
+                        _pin: core::marker::PhantomPinned,
                     };
                     let mut pinned = Box::pin(inner);
 
@@ -404,16 +404,15 @@ impl<'a> MessageWrite for BazMessage<'a> {
                     let proto = BazMessage::from_reader(&mut reader, &pinned.buf)?;
 
                     unsafe {
-                        let proto = std::mem::transmute::<_, BazMessage<'static>>(proto);
+                        let proto = core::mem::transmute::<_, BazMessage<'static>>(proto);
                         pinned.as_mut().get_unchecked_mut().proto = proto;
                     }
                     Ok(pinned)
                 }
             }
 
-            #[allow(dead_code)]
             pub struct BazMessageOwned {
-                inner: std::pin::Pin<Box<BazMessageOwnedInner>>,
+                inner: core::pin::Pin<Box<BazMessageOwnedInner>>,
             }
 
             #[allow(dead_code)]
@@ -427,8 +426,8 @@ impl<'a> MessageWrite for BazMessage<'a> {
                 }
             }
 
-            impl std::fmt::Debug for BazMessageOwned {
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            impl core::fmt::Debug for BazMessageOwned {
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                     self.inner.proto.fmt(f)
                 }
             }

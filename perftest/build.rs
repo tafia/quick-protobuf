@@ -21,7 +21,7 @@ fn generate_rpc_test<W: Write + ?Sized>(
     for func in rpc.functions.iter() {
         writeln!(
             w,
-            "   fn {FUNC}(&self, arg: &{ARG}) -> std::result::Result<{RET}, failure::Error>;",
+            "   fn {FUNC}(&self, arg: &{ARG}) -> std::result::Result<{RET}, quick_protobuf::Error>;",
             FUNC = func.name,
             ARG = func.arg,
             RET = func.ret

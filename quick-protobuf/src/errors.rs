@@ -1,4 +1,4 @@
-//! A module to handle all errors via failure crate
+//! A module to handle all errors
 
 /// An error enum
 #[derive(Debug)]
@@ -70,7 +70,9 @@ impl core::fmt::Display for Error {
             Error::Io(e) => write!(f, "{}", e),
             Error::Utf8(e) => write!(f, "{}", e),
             Error::Deprecated(feature) => write!(f, "Feature '{}' has been deprecated", feature),
-            Error::UnknownWireType(e) => write!(f, "Unknown wire type '{}', must be less than 6", e),
+            Error::UnknownWireType(e) => {
+                write!(f, "Unknown wire type '{}', must be less than 6", e)
+            }
             Error::Varint => write!(f, "Cannot decode varint"),
             #[cfg(feature = "std")]
             Error::Message(msg) => write!(f, "Error while parsing message: {}", msg),
