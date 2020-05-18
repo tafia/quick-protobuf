@@ -8,6 +8,10 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## quick-protobuf 0.7.0
+- feat: deprecate failure (use std::error::Error)
+- feat: add WriterBackend to use with last pb-rs codegen
+
 ## pb-rs 0.9.0
 - feat: add no_std support
 - feat: deprecate failure
