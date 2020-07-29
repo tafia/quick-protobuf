@@ -377,7 +377,7 @@ impl<'a> BytesWriter<'a> {
 impl<'a> WriterBackend for BytesWriter<'a> {
     #[inline(always)]
     fn pb_write_u8(&mut self, x: u8) -> Result<()> {
-        if self.buf.len() < 1 {
+        if self.buf.len() - self.cursor < 1 {
             Err(Error::UnexpectedEndOfBuffer)
         } else {
             self.buf[self.cursor] = x;
