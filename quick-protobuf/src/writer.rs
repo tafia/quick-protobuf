@@ -63,7 +63,7 @@ impl<W: WriterBackend> Writer<W> {
 
     /// Writes a byte which is NOT internally coded as a `varint`
     pub fn write_u8(&mut self, byte: u8) -> Result<()> {
-        self.inner.pb_write_u8(byte).map_err(|e| e.into())
+        self.inner.pb_write_u8(byte)
     }
 
     /// Writes a `varint` (compacted `u64`)
@@ -72,7 +72,7 @@ impl<W: WriterBackend> Writer<W> {
             self.inner.pb_write_u8(((v as u8) & 0x7F) | 0x80)?;
             v >>= 7;
         }
-        self.inner.pb_write_u8(v as u8).map_err(|e| e.into())
+        self.inner.pb_write_u8(v as u8)
     }
 
     /// Writes a tag, which represents both the field number and the wire type
@@ -120,37 +120,37 @@ impl<W: WriterBackend> Writer<W> {
     /// Writes a `fixed64` which is little endian coded `u64`
     #[inline(always)]
     pub fn write_fixed64(&mut self, v: u64) -> Result<()> {
-        self.inner.pb_write_u64(v).map_err(|e| e.into())
+        self.inner.pb_write_u64(v)
     }
 
     /// Writes a `fixed32` which is little endian coded `u32`
     #[inline(always)]
     pub fn write_fixed32(&mut self, v: u32) -> Result<()> {
-        self.inner.pb_write_u32(v).map_err(|e| e.into())
+        self.inner.pb_write_u32(v)
     }
 
     /// Writes a `sfixed64` which is little endian coded `i64`
     #[inline(always)]
     pub fn write_sfixed64(&mut self, v: i64) -> Result<()> {
-        self.inner.pb_write_i64(v).map_err(|e| e.into())
+        self.inner.pb_write_i64(v)
     }
 
     /// Writes a `sfixed32` which is little endian coded `i32`
     #[inline(always)]
     pub fn write_sfixed32(&mut self, v: i32) -> Result<()> {
-        self.inner.pb_write_i32(v).map_err(|e| e.into())
+        self.inner.pb_write_i32(v)
     }
 
     /// Writes a `float`
     #[inline(always)]
     pub fn write_float(&mut self, v: f32) -> Result<()> {
-        self.inner.pb_write_f32(v).map_err(|e| e.into())
+        self.inner.pb_write_f32(v)
     }
 
     /// Writes a `double`
     #[inline(always)]
     pub fn write_double(&mut self, v: f64) -> Result<()> {
-        self.inner.pb_write_f64(v).map_err(|e| e.into())
+        self.inner.pb_write_f64(v)
     }
 
     /// Writes a `bool` 1 = true, 0 = false
@@ -158,7 +158,6 @@ impl<W: WriterBackend> Writer<W> {
     pub fn write_bool(&mut self, v: bool) -> Result<()> {
         self.inner
             .pb_write_u8(if v { 1 } else { 0 })
-            .map_err(|e| e.into())
     }
 
     /// Writes an `enum` converting it to a `i32` first
@@ -171,7 +170,7 @@ impl<W: WriterBackend> Writer<W> {
     #[inline(always)]
     pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
         self.write_varint(bytes.len() as u64)?;
-        self.inner.pb_write_all(bytes).map_err(|e| e.into())
+        self.inner.pb_write_all(bytes)
     }
 
     /// Writes `string`: length first then the chunk of data
