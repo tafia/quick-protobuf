@@ -595,17 +595,26 @@ impl Field {
                     self.typ.get_size("")
                 )?;
             }
-            Frequency::Optional => writeln!(
-                w,
-                "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
-                self.name,
-                self.default.as_ref().map_or_else(
-                    || self.typ.regular_default(desc).unwrap_or("None"),
-                    |s| s.as_str()
-                ),
-                tag_size,
-                self.typ.get_size(&format!("&self.{}", self.name))
-            )?,
+            Frequency::Optional => match self.typ {
+                FieldType::Bytes_ => writeln!(
+                    w,
+                    "if self.{}.is_empty() {{ 0 }} else {{ {} + {} }}",
+                    self.name,
+                    tag_size,
+                    self.typ.get_size(&format!("&self.{}", self.name))
+                )?,
+                _ => writeln!(
+                    w,
+                    "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
+                    self.name,
+                    self.default.as_ref().map_or_else(
+                        || self.typ.regular_default(desc).unwrap_or("None"),
+                        |s| s.as_str()
+                    ),
+                    tag_size,
+                    self.typ.get_size(&format!("&self.{}", self.name))
+                )?,
+            },
             Frequency::Required => writeln!(
                 w,
                 "{} + {}",
@@ -676,20 +685,32 @@ impl Field {
                     }
                 }
             }
-            Frequency::Optional => {
-                writeln!(
-                    w,
-                    "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                    self.name,
-                    self.default.as_ref().map_or_else(
-                        || self.typ.regular_default(desc).unwrap_or("None"),
-                        |s| s.as_str()
-                    ),
-                    self.tag(),
-                    self.typ
-                        .get_write(&format!("&self.{}", self.name), self.boxed)
-                )?;
-            }
+            Frequency::Optional => match self.typ {
+                FieldType::Bytes_ => {
+                    writeln!(
+                        w,
+                        "        if !self.{}.is_empty() {{ w.write_with_tag({}, |w| w.{})?; }}",
+                        self.name,
+                        self.tag(),
+                        self.typ
+                            .get_write(&format!("&self.{}", self.name), self.boxed)
+                    )?;
+                }
+                _ => {
+                    writeln!(
+                        w,
+                        "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                        self.name,
+                        self.default.as_ref().map_or_else(
+                            || self.typ.regular_default(desc).unwrap_or("None"),
+                            |s| s.as_str()
+                        ),
+                        self.tag(),
+                        self.typ
+                            .get_write(&format!("&self.{}", self.name), self.boxed)
+                    )?;
+                }
+            },
             Frequency::Required if self.typ.is_map() => {
                 writeln!(
                     w,
