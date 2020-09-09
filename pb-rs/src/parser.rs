@@ -242,7 +242,7 @@ named!(
             >> many0!(br)
             >> tag!("=")
             >> many0!(br)
-            >> number: integer
+            >> number: alt!(hex_integer | integer)
             >> many0!(br)
             >> key_vals: many0!(key_val)
             >> tag!(";")
