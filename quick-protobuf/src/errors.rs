@@ -6,6 +6,9 @@ pub enum Error {
     /// Io error
     #[cfg(feature = "std")]
     Io(std::io::Error),
+    /// Io error
+    #[cfg(not(feature = "std"))]
+    Io,
     /// Utf8 Error
     Utf8(::core::str::Utf8Error),
     /// Deprecated feature (in protocol buffer specification)
@@ -68,6 +71,8 @@ impl core::fmt::Display for Error {
         match self {
             #[cfg(feature = "std")]
             Error::Io(e) => write!(f, "{}", e),
+            #[cfg(not(feature = "std"))]
+            Error::Io => write!(f, "IO error"),
             Error::Utf8(e) => write!(f, "{}", e),
             Error::Deprecated(feature) => write!(f, "Feature '{}' has been deprecated", feature),
             Error::UnknownWireType(e) => {
