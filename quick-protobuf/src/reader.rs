@@ -91,13 +91,13 @@ impl BytesReader {
     }
 
     /// Reads next tag, `None` if all bytes have been read
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn next_tag(&mut self, bytes: &[u8]) -> Result<u32> {
         self.read_varint32(bytes)
     }
 
     /// Reads the next byte
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn read_u8(&mut self, bytes: &[u8]) -> Result<u8> {
         let b = bytes.get(self.start).ok_or(Error::UnexpectedEndOfBuffer)?;
         self.start += 1;
@@ -105,7 +105,7 @@ impl BytesReader {
     }
 
     /// Reads the next varint encoded u64
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn read_varint32(&mut self, bytes: &[u8]) -> Result<u32> {
         let mut b = self.read_u8(bytes)?;
         if b & 0x80 == 0 {
@@ -149,7 +149,7 @@ impl BytesReader {
     }
 
     /// Reads the next varint encoded u64
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn read_varint64(&mut self, bytes: &[u8]) -> Result<u64> {
         // part0
         let mut b = self.read_u8(bytes)?;
@@ -219,31 +219,31 @@ impl BytesReader {
     }
 
     /// Reads int32 (varint)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_int32(&mut self, bytes: &[u8]) -> Result<i32> {
         self.read_varint32(bytes).map(|i| i as i32)
     }
 
     /// Reads int64 (varint)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_int64(&mut self, bytes: &[u8]) -> Result<i64> {
         self.read_varint64(bytes).map(|i| i as i64)
     }
 
     /// Reads uint32 (varint)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_uint32(&mut self, bytes: &[u8]) -> Result<u32> {
         self.read_varint32(bytes)
     }
 
     /// Reads uint64 (varint)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_uint64(&mut self, bytes: &[u8]) -> Result<u64> {
         self.read_varint64(bytes)
     }
 
     /// Reads sint32 (varint)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_sint32(&mut self, bytes: &[u8]) -> Result<i32> {
         // zigzag
         let n = self.read_varint32(bytes)?;
@@ -251,7 +251,7 @@ impl BytesReader {
     }
 
     /// Reads sint64 (varint)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_sint64(&mut self, bytes: &[u8]) -> Result<i64> {
         // zigzag
         let n = self.read_varint64(bytes)?;
@@ -259,7 +259,7 @@ impl BytesReader {
     }
 
     /// Reads fixed64 (little endian u64)
-    #[inline]
+    #[cfg_attr(std, inline)]
     fn read_fixed<M, F: Fn(&[u8]) -> M>(&mut self, bytes: &[u8], len: usize, read: F) -> Result<M> {
         let v = read(
             &bytes
@@ -271,55 +271,55 @@ impl BytesReader {
     }
 
     /// Reads fixed64 (little endian u64)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_fixed64(&mut self, bytes: &[u8]) -> Result<u64> {
         self.read_fixed(bytes, 8, LE::read_u64)
     }
 
     /// Reads fixed32 (little endian u32)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_fixed32(&mut self, bytes: &[u8]) -> Result<u32> {
         self.read_fixed(bytes, 4, LE::read_u32)
     }
 
     /// Reads sfixed64 (little endian i64)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_sfixed64(&mut self, bytes: &[u8]) -> Result<i64> {
         self.read_fixed(bytes, 8, LE::read_i64)
     }
 
     /// Reads sfixed32 (little endian i32)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_sfixed32(&mut self, bytes: &[u8]) -> Result<i32> {
         self.read_fixed(bytes, 4, LE::read_i32)
     }
 
     /// Reads float (little endian f32)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_float(&mut self, bytes: &[u8]) -> Result<f32> {
         self.read_fixed(bytes, 4, LE::read_f32)
     }
 
     /// Reads double (little endian f64)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_double(&mut self, bytes: &[u8]) -> Result<f64> {
         self.read_fixed(bytes, 8, LE::read_f64)
     }
 
     /// Reads bool (varint, check if == 0)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_bool(&mut self, bytes: &[u8]) -> Result<bool> {
         self.read_varint32(bytes).map(|i| i != 0)
     }
 
     /// Reads enum, encoded as i32
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_enum<E: From<i32>>(&mut self, bytes: &[u8]) -> Result<E> {
         self.read_int32(bytes).map(|e| e.into())
     }
 
     /// First reads a varint and use it as size to read a generic object
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn read_len_varint<'a, M, F>(&mut self, bytes: &'a [u8], read: F) -> Result<M>
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
@@ -329,7 +329,7 @@ impl BytesReader {
     }
 
     /// Reads a certain number of bytes specified by len
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn read_len<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F, len: usize) -> Result<M>
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
@@ -343,7 +343,7 @@ impl BytesReader {
     }
 
     /// Reads bytes (Vec<u8>)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_bytes<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a [u8]> {
         self.read_len_varint(bytes, |r, b| {
             b.get(r.start..r.end)
@@ -352,7 +352,7 @@ impl BytesReader {
     }
 
     /// Reads string (String)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_string<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a str> {
         self.read_len_varint(bytes, |r, b| {
             b.get(r.start..r.end)
@@ -365,7 +365,7 @@ impl BytesReader {
     ///
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_packed<'a, M, F>(&mut self, bytes: &'a [u8], mut read: F) -> Result<Vec<M>>
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
@@ -383,7 +383,7 @@ impl BytesReader {
     ///
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a [u8]) -> Result<&'a [M]> {
         let len = self.read_varint32(bytes)? as usize;
         if self.len() < len {
@@ -403,7 +403,7 @@ impl BytesReader {
     /// Reads a nested message
     ///
     /// First reads a varint and interprets it as the length of the message
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_message<'a, M>(&mut self, bytes: &'a [u8]) -> Result<M>
     where
         M: MessageRead<'a>,
@@ -415,7 +415,7 @@ impl BytesReader {
     ///
     /// Reads just the message and does not try to read it's size first.
     ///  * 'len' - The length of the message to be read.
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_message_by_len<'a, M>(&mut self, bytes: &'a [u8], len: usize) -> Result<M>
     where
         M: MessageRead<'a>,
@@ -424,7 +424,7 @@ impl BytesReader {
     }
 
     /// Reads a map item: (key, value)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_map<'a, K, V, F, G>(
         &mut self,
         bytes: &'a [u8],
@@ -453,7 +453,7 @@ impl BytesReader {
     }
 
     /// Reads unknown data, based on its tag value (which itself gives us the wire_type value)
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read_unknown(&mut self, bytes: &[u8], tag_value: u32) -> Result<()> {
         match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => {
@@ -476,13 +476,13 @@ impl BytesReader {
     }
 
     /// Gets the remaining length of bytes not read yet
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn len(&self) -> usize {
         self.end - self.start
     }
 
     /// Checks if `self.len == 0`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn is_eof(&self) -> bool {
         self.start == self.end
     }
@@ -580,7 +580,7 @@ impl Reader {
     }
 
     /// Run a `BytesReader` dependent function
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn read<'a, M, F>(&'a mut self, mut read: F) -> Result<M>
     where
         F: FnMut(&mut BytesReader, &'a [u8]) -> Result<M>,
