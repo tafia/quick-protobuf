@@ -156,8 +156,7 @@ impl<W: WriterBackend> Writer<W> {
     /// Writes a `bool` 1 = true, 0 = false
     #[inline(always)]
     pub fn write_bool(&mut self, v: bool) -> Result<()> {
-        self.inner
-            .pb_write_u8(if v { 1 } else { 0 })
+        self.inner.pb_write_u8(if v { 1 } else { 0 })
     }
 
     /// Writes an `enum` converting it to a `i32` first
