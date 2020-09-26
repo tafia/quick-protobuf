@@ -8,12 +8,20 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.9.1
+- feat: allow hexadecimal tag numbers
+- fix: Fix empty bytes field checking when `--dont_use_cow` flag is used.
+
+## quick-protobuf 0.8.0
+- feat: Add Error::Io for `no_std`
+- feat: Don't force inlining on `no_std`
+
 ## quick-protobuf 0.7.0
 - feat: deprecate failure (use std::error::Error)
 - feat: add WriterBackend to use with last pb-rs codegen
 
 ## pb-rs 0.9.0
-- feat: add no_std support
+- feat: add `no_std` support
 - feat: deprecate failure
 - refactor: modernize code
 

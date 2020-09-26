@@ -50,7 +50,7 @@ pb-rs /path/to/your/protobuf/file.proto
 ```toml
 # Cargo.toml
 [dependencies]
-quick-protobuf = "0.6.2"
+quick-protobuf = "0.8.0"
 ```
 
  - 3. Have fun
