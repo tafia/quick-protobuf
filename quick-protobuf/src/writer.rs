@@ -76,104 +76,104 @@ impl<W: WriterBackend> Writer<W> {
     }
 
     /// Writes a tag, which represents both the field number and the wire type
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_tag(&mut self, tag: u32) -> Result<()> {
         self.write_varint(tag as u64)
     }
 
     /// Writes a `int32` which is internally coded as a `varint`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_int32(&mut self, v: i32) -> Result<()> {
         self.write_varint(v as u64)
     }
 
     /// Writes a `int64` which is internally coded as a `varint`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_int64(&mut self, v: i64) -> Result<()> {
         self.write_varint(v as u64)
     }
 
     /// Writes a `uint32` which is internally coded as a `varint`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_uint32(&mut self, v: u32) -> Result<()> {
         self.write_varint(v as u64)
     }
 
     /// Writes a `uint64` which is internally coded as a `varint`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_uint64(&mut self, v: u64) -> Result<()> {
         self.write_varint(v)
     }
 
     /// Writes a `sint32` which is internally coded as a `varint`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_sint32(&mut self, v: i32) -> Result<()> {
         self.write_varint(((v << 1) ^ (v >> 31)) as u64)
     }
 
     /// Writes a `sint64` which is internally coded as a `varint`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_sint64(&mut self, v: i64) -> Result<()> {
         self.write_varint(((v << 1) ^ (v >> 63)) as u64)
     }
 
     /// Writes a `fixed64` which is little endian coded `u64`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_fixed64(&mut self, v: u64) -> Result<()> {
         self.inner.pb_write_u64(v)
     }
 
     /// Writes a `fixed32` which is little endian coded `u32`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_fixed32(&mut self, v: u32) -> Result<()> {
         self.inner.pb_write_u32(v)
     }
 
     /// Writes a `sfixed64` which is little endian coded `i64`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_sfixed64(&mut self, v: i64) -> Result<()> {
         self.inner.pb_write_i64(v)
     }
 
     /// Writes a `sfixed32` which is little endian coded `i32`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_sfixed32(&mut self, v: i32) -> Result<()> {
         self.inner.pb_write_i32(v)
     }
 
     /// Writes a `float`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_float(&mut self, v: f32) -> Result<()> {
         self.inner.pb_write_f32(v)
     }
 
     /// Writes a `double`
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_double(&mut self, v: f64) -> Result<()> {
         self.inner.pb_write_f64(v)
     }
 
     /// Writes a `bool` 1 = true, 0 = false
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_bool(&mut self, v: bool) -> Result<()> {
         self.inner.pb_write_u8(if v { 1 } else { 0 })
     }
 
     /// Writes an `enum` converting it to a `i32` first
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_enum(&mut self, v: i32) -> Result<()> {
         self.write_int32(v)
     }
 
     /// Writes `bytes`: length first then the chunk of data
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_bytes(&mut self, bytes: &[u8]) -> Result<()> {
         self.write_varint(bytes.len() as u64)?;
         self.inner.pb_write_all(bytes)
     }
 
     /// Writes `string`: length first then the chunk of data
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     pub fn write_string(&mut self, s: &str) -> Result<()> {
         self.write_bytes(s.as_bytes())
     }
@@ -200,7 +200,7 @@ impl<W: WriterBackend> Writer<W> {
     /// `item_size` is internally used to compute the total length
     /// As the length is fixed (and the same as rust internal representation, we can directly dump
     /// all data at once
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn write_packed_fixed<M>(&mut self, v: &[M]) -> Result<()> {
         let len = v.len() * ::core::mem::size_of::<M>();
         let bytes = unsafe { ::core::slice::from_raw_parts(v.as_ptr() as *const u8, len) };
@@ -208,7 +208,7 @@ impl<W: WriterBackend> Writer<W> {
     }
 
     /// Writes a message which implements `MessageWrite`
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn write_message<M: MessageWrite>(&mut self, m: &M) -> Result<()> {
         let len = m.get_size();
         self.write_varint(len as u64)?;
@@ -216,7 +216,7 @@ impl<W: WriterBackend> Writer<W> {
     }
 
     /// Writes another item prefixed with tag
-    #[inline]
+    #[cfg_attr(std, inline)]
     pub fn write_with_tag<F>(&mut self, tag: u32, mut write: F) -> Result<()>
     where
         F: FnMut(&mut Self) -> Result<()>,
@@ -373,7 +373,7 @@ impl<'a> BytesWriter<'a> {
 }
 
 impl<'a> WriterBackend for BytesWriter<'a> {
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn pb_write_u8(&mut self, x: u8) -> Result<()> {
         if self.buf.len() - self.cursor < 1 {
             Err(Error::UnexpectedEndOfBuffer)
@@ -384,7 +384,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
         }
     }
 
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn pb_write_u32(&mut self, x: u32) -> Result<()> {
         if self.buf.len() - self.cursor < 4 {
             Err(Error::UnexpectedEndOfBuffer)
@@ -395,7 +395,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
         }
     }
 
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn pb_write_i32(&mut self, x: i32) -> Result<()> {
         if self.buf.len() - self.cursor < 4 {
             Err(Error::UnexpectedEndOfBuffer)
@@ -406,7 +406,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
         }
     }
 
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn pb_write_f32(&mut self, x: f32) -> Result<()> {
         if self.buf.len() - self.cursor < 4 {
             Err(Error::UnexpectedEndOfBuffer)
@@ -417,7 +417,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
         }
     }
 
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn pb_write_u64(&mut self, x: u64) -> Result<()> {
         if self.buf.len() - self.cursor < 8 {
             Err(Error::UnexpectedEndOfBuffer)
@@ -428,7 +428,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
         }
     }
 
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn pb_write_i64(&mut self, x: i64) -> Result<()> {
         if self.buf.len() - self.cursor < 8 {
             Err(Error::UnexpectedEndOfBuffer)
@@ -439,7 +439,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
         }
     }
 
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn pb_write_f64(&mut self, x: f64) -> Result<()> {
         if self.buf.len() - self.cursor < 8 {
             Err(Error::UnexpectedEndOfBuffer)
@@ -450,7 +450,7 @@ impl<'a> WriterBackend for BytesWriter<'a> {
         }
     }
 
-    #[inline(always)]
+    #[cfg_attr(std, inline(always))]
     fn pb_write_all(&mut self, buf: &[u8]) -> Result<()> {
         if self.buf.len() - self.cursor < buf.len() {
             Err(Error::UnexpectedEndOfBuffer)
