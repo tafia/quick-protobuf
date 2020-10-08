@@ -1770,10 +1770,11 @@ impl FileDescriptor {
             out_file.pop();
             for p in prefix.split('.') {
                 out_file.push(p);
-            }
-            if !out_file.exists() {
-                create_dir_all(&out_file)?;
-                update_mod_file(&out_file)?;
+
+                if !out_file.exists() {
+                    create_dir_all(&out_file)?;
+                    update_mod_file(&out_file)?;
+                }
             }
             out_file.push(file);
         }
