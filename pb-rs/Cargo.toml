@@ -11,13 +11,14 @@ edition = "2018"
 
 [dependencies]
 nom = "3.2.1"
-clap = "2.33.1"
 log = "0.4.4"
-env_logger = "0.7.1"
+clap = { version = "2.33.1", optional = true }
+env_logger = { version = "0.7.1", optional = true }
 
 [dev-dependencies]
 walkdir = "2.3.1"
 
 [features]
-default = []
+default = ["std"]
+std = ["clap", "env_logger"]
 generateImplFromForEnums = []
