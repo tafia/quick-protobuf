@@ -12,7 +12,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 type KVMap<K, V> = HashMap<K, V>;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
+use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
 use core::convert::TryFrom;
 use core::ops::Deref;
 use core::ops::DerefMut;
@@ -54,6 +54,10 @@ impl<'a> From<&'a str> for FooEnum {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct BarMessage {
     pub b_int32: i32,
+}
+
+impl MessageInfo for BarMessage {
+    const PATH : &'static str = "data_types.BarMessage";
 }
 
 impl<'a> MessageRead<'a> for BarMessage {
@@ -113,6 +117,10 @@ pub struct FooMessage<'a> {
     pub f_repeated_string: Vec<Cow<'a, str>>,
     pub f_repeated_baz_message: Vec<BazMessage<'a>>,
     pub test_oneof: mod_FooMessage::OneOftest_oneof<'a>,
+}
+
+impl<'a> MessageInfo for FooMessage<'a> {
+    const PATH : &'static str = "data_types.FooMessage";
 }
 
 impl<'a> MessageRead<'a> for FooMessage<'a> {
@@ -351,6 +359,10 @@ pub struct BazMessage<'a> {
     pub b_string: Cow<'a, str>,
 }
 
+impl<'a> MessageInfo for BazMessage<'a> {
+    const PATH : &'static str = "data_types.BazMessage";
+}
+
 impl<'a> MessageRead<'a> for BazMessage<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -475,6 +487,10 @@ pub struct Nested {
     pub f_nested: Option<mod_BazMessage::mod_Nested::NestedMessage>,
 }
 
+impl MessageInfo for Nested {
+    const PATH : &'static str = "data_types.mod_BazMessage.Nested";
+}
+
 impl<'a> MessageRead<'a> for Nested {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -508,6 +524,10 @@ use super::*;
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct NestedMessage {
     pub f_nested: i32,
+}
+
+impl MessageInfo for NestedMessage {
+    const PATH : &'static str = "data_types.mod_BazMessage.mod_Nested.NestedMessage";
 }
 
 impl<'a> MessageRead<'a> for NestedMessage {
@@ -578,6 +598,10 @@ impl<'a> From<&'a str> for NestedEnum {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct RepeatedMessage {
     pub bar_message: Vec<BarMessage>,
+}
+
+impl MessageInfo for RepeatedMessage {
+    const PATH : &'static str = "data_types.RepeatedMessage";
 }
 
 impl<'a> MessageRead<'a> for RepeatedMessage {

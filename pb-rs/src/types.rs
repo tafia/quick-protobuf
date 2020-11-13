@@ -857,6 +857,8 @@ impl Message {
 
         self.write_definition(w, desc, config)?;
         writeln!(w)?;
+        self.write_impl_message_info(w, desc, config)?;
+        writeln!(w)?;
         self.write_impl_message_read(w, desc, config)?;
         writeln!(w)?;
         self.write_impl_message_write(w, desc, config)?;
@@ -969,6 +971,30 @@ impl Message {
         for o in &self.oneofs {
             o.write_message_definition(w, desc)?;
         }
+        writeln!(w, "}}")?;
+        Ok(())
+    }
+
+    fn write_impl_message_info<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
+        let mut ignore = Vec::new();
+        if config.dont_use_cow {
+            ignore.push(self.index.clone());
+        }
+        if self.has_lifetime(desc, &mut ignore) {
+            writeln!(w, "impl<'a> MessageInfo for {}<'a> {{", self.name)?;
+        } else {
+            writeln!(w, "impl MessageInfo for {} {{", self.name)?;
+        }
+        writeln!(
+            w,
+            "    const PATH : &'static str = \"{}.{}\";",
+            self.module, self.name
+        )?;
         writeln!(w, "}}")?;
         Ok(())
     }
@@ -2197,7 +2223,7 @@ impl FileDescriptor {
         if self.messages.iter().all(|m| m.is_unit()) {
             writeln!(
                 w,
-                "use quick_protobuf::{{BytesReader, Result, MessageRead, MessageWrite}};"
+                "use quick_protobuf::{{BytesReader, Result, MessageInfo, MessageRead, MessageWrite}};"
             )?;
             return Ok(());
         }
@@ -2243,7 +2269,7 @@ impl FileDescriptor {
         }
         writeln!(
             w,
-            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
+            "use quick_protobuf::{{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
         )?;
 
         if self.owned {

@@ -9,7 +9,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use quick_protobuf::{BytesReader, Result, MessageRead, MessageWrite};
+use quick_protobuf::{BytesReader, Result, MessageInfo, MessageRead, MessageWrite};
 use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -43,6 +43,10 @@ impl<'a> From<&'a str> for test {
 
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct unit_message { }
+
+impl MessageInfo for unit_message {
+    const PATH : &'static str = "data_types_unit.unit_message";
+}
 
 impl<'a> MessageRead<'a> for unit_message {
     fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
