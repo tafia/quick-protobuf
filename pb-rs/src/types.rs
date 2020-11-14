@@ -1143,6 +1143,10 @@ impl Message {
                 inner: core::pin::Pin<Box<{name}OwnedInner>>,
             }}
 
+            impl MessageInfo for {name}Owned {{
+                const PATH: &'static str = "{module}.{name}";
+            }}
+
             #[allow(dead_code)]
             impl {name}Owned {{
                 pub fn buf(&self) -> &[u8] {{
@@ -1182,6 +1186,17 @@ impl Message {
                 }}
             }}
 
+            impl TryInto<Vec<u8>> for {name}Owned {{
+                type Error=quick_protobuf::Error;
+
+                fn try_into(self) -> Result<Vec<u8>> {{
+                    let mut buf = Vec::new();
+                    let mut writer = Writer::new(&mut buf);
+                    self.deref().write_message(&mut writer)?;
+                    Ok(buf)
+                }}
+            }}
+
             #[cfg(feature = "test_helpers")]
             impl<'a> From<{name}<'a>> for {name}Owned {{
                 fn from(proto: {name}) -> Self {{
@@ -1195,6 +1210,7 @@ impl Message {
             }}
             "#,
             name = self.name,
+            module = self.module
         )?;
         Ok(())
     }
@@ -2275,11 +2291,7 @@ impl FileDescriptor {
         if self.owned {
             write!(
                 w,
-                "\
-                 use core::convert::TryFrom;\n\
-                 use core::ops::Deref;\n\
-                 use core::ops::DerefMut;\n\
-                 "
+                "use core::{{convert::{{TryFrom, TryInto}}, ops::{{Deref, DerefMut}}}};"
             )?;
         }
 
@@ -2404,6 +2416,7 @@ fn update_mod_file(path: &Path) -> Result<()> {
             writeln!(f, "{}", MAGIC_HEADER)?;
             f
         };
+
         writeln!(f, "pub mod {};", name)?;
     }
     Ok(())

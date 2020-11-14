@@ -13,10 +13,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 type KVMap<K, V> = HashMap<K, V>;
 use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
-use core::convert::TryFrom;
-use core::ops::Deref;
-use core::ops::DerefMut;
-use quick_protobuf::sizeofs::*;
+use core::{convert::{TryFrom, TryInto}, ops::{Deref, DerefMut}};use quick_protobuf::sizeofs::*;
 use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -281,6 +278,10 @@ impl<'a> MessageWrite for FooMessage<'a> {
                 inner: core::pin::Pin<Box<FooMessageOwnedInner>>,
             }
 
+            impl MessageInfo for FooMessageOwned {
+                const PATH: &'static str = "data_types.FooMessage";
+            }
+
             #[allow(dead_code)]
             impl FooMessageOwned {
                 pub fn buf(&self) -> &[u8] {
@@ -317,6 +318,17 @@ impl<'a> MessageWrite for FooMessage<'a> {
 
                 fn try_from(buf: Vec<u8>) -> Result<Self> {
                     Ok(Self { inner: FooMessageOwnedInner::new(buf)? })
+                }
+            }
+
+            impl TryInto<Vec<u8>> for FooMessageOwned {
+                type Error=quick_protobuf::Error;
+
+                fn try_into(self) -> Result<Vec<u8>> {
+                    let mut buf = Vec::new();
+                    let mut writer = Writer::new(&mut buf);
+                    self.deref().write_message(&mut writer)?;
+                    Ok(buf)
                 }
             }
 
@@ -427,6 +439,10 @@ impl<'a> MessageWrite for BazMessage<'a> {
                 inner: core::pin::Pin<Box<BazMessageOwnedInner>>,
             }
 
+            impl MessageInfo for BazMessageOwned {
+                const PATH: &'static str = "data_types.BazMessage";
+            }
+
             #[allow(dead_code)]
             impl BazMessageOwned {
                 pub fn buf(&self) -> &[u8] {
@@ -463,6 +479,17 @@ impl<'a> MessageWrite for BazMessage<'a> {
 
                 fn try_from(buf: Vec<u8>) -> Result<Self> {
                     Ok(Self { inner: BazMessageOwnedInner::new(buf)? })
+                }
+            }
+
+            impl TryInto<Vec<u8>> for BazMessageOwned {
+                type Error=quick_protobuf::Error;
+
+                fn try_into(self) -> Result<Vec<u8>> {
+                    let mut buf = Vec::new();
+                    let mut writer = Writer::new(&mut buf);
+                    self.deref().write_message(&mut writer)?;
+                    Ok(buf)
                 }
             }
 

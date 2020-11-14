@@ -10,10 +10,7 @@
 
 
 use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
-use core::convert::TryFrom;
-use core::ops::Deref;
-use core::ops::DerefMut;
-use quick_protobuf::sizeofs::*;
+use core::{convert::{TryFrom, TryInto}, ops::{Deref, DerefMut}};use quick_protobuf::sizeofs::*;
 use super::super::*;
 
 #[derive(Debug, Default, PartialEq, Clone)]
