@@ -65,6 +65,7 @@ pub struct ConfigBuilder {
     owned: bool,
     nostd: bool,
     hashbrown: bool,
+    gen_info: bool,
 }
 
 impl ConfigBuilder {
@@ -184,6 +185,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Generate MessageInfo implementations
+    pub fn gen_info(mut self, val: bool) -> Self {
+        self.gen_info = val;
+        self
+    }
+
     /// Build Config from this ConfigBuilder
     pub fn build(self) -> Vec<Config> {
         self.in_files
@@ -215,6 +222,7 @@ impl ConfigBuilder {
                     owned: self.owned,
                     nostd: self.nostd,
                     hashbrown: self.hashbrown,
+                    gen_info: self.gen_info
                 }
             })
             .collect()

@@ -18,10 +18,6 @@ pub struct ImportedMessage {
     pub i: Option<bool>,
 }
 
-impl MessageInfo for ImportedMessage {
-    const PATH : &'static str = "a.b.ImportedMessage";
-}
-
 impl<'a> MessageRead<'a> for ImportedMessage {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();

@@ -53,10 +53,6 @@ pub struct EmbeddedMessage {
     pub e: protos::no_std::MyEnum,
 }
 
-impl MessageInfo for EmbeddedMessage {
-    const PATH : &'static str = "protos.no_std.EmbeddedMessage";
-}
-
 impl<'a> MessageRead<'a> for EmbeddedMessage {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -92,10 +88,6 @@ pub struct NoStdMessage<'a> {
     pub nums: Cow<'a, [u32]>,
     pub message: Option<protos::no_std::EmbeddedMessage>,
     pub messages: Vec<protos::no_std::EmbeddedMessage>,
-}
-
-impl<'a> MessageInfo for NoStdMessage<'a> {
-    const PATH : &'static str = "protos.no_std.NoStdMessage";
 }
 
 impl<'a> MessageRead<'a> for NoStdMessage<'a> {

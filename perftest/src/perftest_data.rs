@@ -19,10 +19,6 @@ pub struct Test1 {
     pub value: Option<i32>,
 }
 
-impl MessageInfo for Test1 {
-    const PATH : &'static str = "perftest_data.Test1";
-}
-
 impl<'a> MessageRead<'a> for Test1 {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -52,10 +48,6 @@ impl MessageWrite for Test1 {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestRepeatedBool {
     pub values: Vec<bool>,
-}
-
-impl MessageInfo for TestRepeatedBool {
-    const PATH : &'static str = "perftest_data.TestRepeatedBool";
 }
 
 impl<'a> MessageRead<'a> for TestRepeatedBool {
@@ -89,10 +81,6 @@ pub struct TestRepeatedPackedInt32 {
     pub values: Vec<i32>,
 }
 
-impl MessageInfo for TestRepeatedPackedInt32 {
-    const PATH : &'static str = "perftest_data.TestRepeatedPackedInt32";
-}
-
 impl<'a> MessageRead<'a> for TestRepeatedPackedInt32 {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -124,10 +112,6 @@ pub struct TestRepeatedMessages {
     pub messages1: Vec<perftest_data::TestRepeatedMessages>,
     pub messages2: Vec<perftest_data::TestRepeatedMessages>,
     pub messages3: Vec<perftest_data::TestRepeatedMessages>,
-}
-
-impl MessageInfo for TestRepeatedMessages {
-    const PATH : &'static str = "perftest_data.TestRepeatedMessages";
 }
 
 impl<'a> MessageRead<'a> for TestRepeatedMessages {
@@ -169,10 +153,6 @@ pub struct TestOptionalMessages {
     pub message3: Option<Box<perftest_data::TestOptionalMessages>>,
 }
 
-impl MessageInfo for TestOptionalMessages {
-    const PATH : &'static str = "perftest_data.TestOptionalMessages";
-}
-
 impl<'a> MessageRead<'a> for TestOptionalMessages {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -212,10 +192,6 @@ pub struct TestStrings<'a> {
     pub s3: Option<Cow<'a, str>>,
 }
 
-impl<'a> MessageInfo for TestStrings<'a> {
-    const PATH : &'static str = "perftest_data.TestStrings";
-}
-
 impl<'a> MessageRead<'a> for TestStrings<'a> {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -251,10 +227,6 @@ impl<'a> MessageWrite for TestStrings<'a> {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct TestBytes<'a> {
     pub b1: Option<Cow<'a, [u8]>>,
-}
-
-impl<'a> MessageInfo for TestBytes<'a> {
-    const PATH : &'static str = "perftest_data.TestBytes";
 }
 
 impl<'a> MessageRead<'a> for TestBytes<'a> {
@@ -293,10 +265,6 @@ pub struct PerftestData<'a> {
     pub test_repeated_packed_int32: Vec<perftest_data::TestRepeatedPackedInt32>,
     pub test_small_bytearrays: Vec<perftest_data::TestBytes<'a>>,
     pub test_large_bytearrays: Vec<perftest_data::TestBytes<'a>>,
-}
-
-impl<'a> MessageInfo for PerftestData<'a> {
-    const PATH : &'static str = "perftest_data.PerftestData";
 }
 
 impl<'a> MessageRead<'a> for PerftestData<'a> {

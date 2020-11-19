@@ -96,6 +96,11 @@ fn run() -> Result<(), Error> {
                 .long("hashrown")
                 .required(false)
                 .help("Use hashrown for HashMap implementation"),
+        ).arg(
+            Arg::with_name("GEN_INFO")
+                .long("gen-info")
+                .required(false)
+                .help("Generate MessageInfo implementations")
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -124,6 +129,7 @@ fn run() -> Result<(), Error> {
     .custom_struct_derive(custom_struct_derive)
     .nostd(matches.is_present("NOSTD"))
     .hashbrown(matches.is_present("HASHBROWN"))
+    .gen_info(matches.is_present("GEN_INFO"))
     .custom_repr(custom_repr)
     .owned(matches.is_present("OWNED"));
 

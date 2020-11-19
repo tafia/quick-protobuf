@@ -44,10 +44,6 @@ impl<'a> From<&'a str> for test {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct unit_message { }
 
-impl MessageInfo for unit_message {
-    const PATH : &'static str = "data_types_unit.unit_message";
-}
-
 impl<'a> MessageRead<'a> for unit_message {
     fn from_reader(r: &mut BytesReader, _: &[u8]) -> Result<Self> {
         r.read_to_end();

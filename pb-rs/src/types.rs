@@ -857,15 +857,18 @@ impl Message {
 
         self.write_definition(w, desc, config)?;
         writeln!(w)?;
-        self.write_impl_message_info(w, desc, config)?;
-        writeln!(w)?;
         self.write_impl_message_read(w, desc, config)?;
         writeln!(w)?;
         self.write_impl_message_write(w, desc, config)?;
 
+        if config.gen_info {
+            self.write_impl_message_info(w, desc, config)?;
+            writeln!(w)?;
+        }
+
         if desc.owned && self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w)?;
-            self.write_impl_owned(w)?;
+            self.write_impl_owned(w, config)?;
         }
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
@@ -1108,7 +1111,7 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_owned<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_impl_owned<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         write!(
             w,
             r#"
@@ -1141,10 +1144,6 @@ impl Message {
 
             pub struct {name}Owned {{
                 inner: core::pin::Pin<Box<{name}OwnedInner>>,
-            }}
-
-            impl MessageInfo for {name}Owned {{
-                const PATH: &'static str = "{module}.{name}";
             }}
 
             #[allow(dead_code)]
@@ -1209,9 +1208,16 @@ impl Message {
                 }}
             }}
             "#,
-            name = self.name,
-            module = self.module
+            name = self.name
         )?;
+
+        if config.gen_info {
+            write!(w, r#"
+            impl MessageInfo for {name}Owned {{
+                const PATH: &'static str = "{module}.{name}";
+            }}
+            "#, name = self.name, module = self.module)?;
+        }
         Ok(())
     }
 
@@ -1747,6 +1753,7 @@ pub struct Config {
     pub owned: bool,
     pub nostd: bool,
     pub hashbrown: bool,
+    pub gen_info: bool,
 }
 
 #[derive(Debug, Default, Clone)]

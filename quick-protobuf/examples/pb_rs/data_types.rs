@@ -53,10 +53,6 @@ pub struct BarMessage {
     pub b_required_int32: i32,
 }
 
-impl MessageInfo for BarMessage {
-    const PATH : &'static str = "data_types.BarMessage";
-}
-
 impl<'a> MessageRead<'a> for BarMessage {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -112,10 +108,6 @@ pub struct FooMessage<'a> {
     pub f_nested_enum: Option<mod_BazMessage::mod_Nested::NestedEnum>,
     pub f_map: KVMap<Cow<'a, str>, i32>,
     pub test_oneof: mod_FooMessage::OneOftest_oneof<'a>,
-}
-
-impl<'a> MessageInfo for FooMessage<'a> {
-    const PATH : &'static str = "data_types.FooMessage";
 }
 
 impl<'a> MessageRead<'a> for FooMessage<'a> {
@@ -263,10 +255,6 @@ pub struct BazMessage {
     pub nested: Option<mod_BazMessage::Nested>,
 }
 
-impl MessageInfo for BazMessage {
-    const PATH : &'static str = "data_types.BazMessage";
-}
-
 impl<'a> MessageRead<'a> for BazMessage {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -302,10 +290,6 @@ pub struct Nested {
     pub f_nested: mod_BazMessage::mod_Nested::NestedMessage,
 }
 
-impl MessageInfo for Nested {
-    const PATH : &'static str = "data_types.mod_BazMessage.Nested";
-}
-
 impl<'a> MessageRead<'a> for Nested {
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self> {
         let mut msg = Self::default();
@@ -339,10 +323,6 @@ use super::*;
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct NestedMessage {
     pub f_nested: i32,
-}
-
-impl MessageInfo for NestedMessage {
-    const PATH : &'static str = "data_types.mod_BazMessage.mod_Nested.NestedMessage";
 }
 
 impl<'a> MessageRead<'a> for NestedMessage {
