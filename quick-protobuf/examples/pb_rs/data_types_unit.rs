@@ -9,7 +9,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use quick_protobuf::{BytesReader, Result, MessageRead, MessageWrite};
+use quick_protobuf::{BytesReader, Result, MessageInfo, MessageRead, MessageWrite};
 use super::*;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

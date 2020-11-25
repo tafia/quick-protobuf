@@ -861,9 +861,14 @@ impl Message {
         writeln!(w)?;
         self.write_impl_message_write(w, desc, config)?;
 
+        if config.gen_info {
+            self.write_impl_message_info(w, desc, config)?;
+            writeln!(w)?;
+        }
+
         if desc.owned && self.has_lifetime(desc, &mut Vec::new()) {
             writeln!(w)?;
-            self.write_impl_owned(w)?;
+            self.write_impl_owned(w, config)?;
         }
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
@@ -969,6 +974,30 @@ impl Message {
         for o in &self.oneofs {
             o.write_message_definition(w, desc)?;
         }
+        writeln!(w, "}}")?;
+        Ok(())
+    }
+
+    fn write_impl_message_info<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
+        let mut ignore = Vec::new();
+        if config.dont_use_cow {
+            ignore.push(self.index.clone());
+        }
+        if self.has_lifetime(desc, &mut ignore) {
+            writeln!(w, "impl<'a> MessageInfo for {}<'a> {{", self.name)?;
+        } else {
+            writeln!(w, "impl MessageInfo for {} {{", self.name)?;
+        }
+        writeln!(
+            w,
+            "    const PATH : &'static str = \"{}.{}\";",
+            self.module, self.name
+        )?;
         writeln!(w, "}}")?;
         Ok(())
     }
@@ -1082,7 +1111,7 @@ impl Message {
         Ok(())
     }
 
-    fn write_impl_owned<W: Write>(&self, w: &mut W) -> Result<()> {
+    fn write_impl_owned<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         write!(
             w,
             r#"
@@ -1156,6 +1185,17 @@ impl Message {
                 }}
             }}
 
+            impl TryInto<Vec<u8>> for {name}Owned {{
+                type Error=quick_protobuf::Error;
+
+                fn try_into(self) -> Result<Vec<u8>> {{
+                    let mut buf = Vec::new();
+                    let mut writer = Writer::new(&mut buf);
+                    self.deref().write_message(&mut writer)?;
+                    Ok(buf)
+                }}
+            }}
+
             #[cfg(feature = "test_helpers")]
             impl<'a> From<{name}<'a>> for {name}Owned {{
                 fn from(proto: {name}) -> Self {{
@@ -1168,8 +1208,16 @@ impl Message {
                 }}
             }}
             "#,
-            name = self.name,
+            name = self.name
         )?;
+
+        if config.gen_info {
+            write!(w, r#"
+            impl MessageInfo for {name}Owned {{
+                const PATH: &'static str = "{module}.{name}";
+            }}
+            "#, name = self.name, module = self.module)?;
+        }
         Ok(())
     }
 
@@ -1705,6 +1753,7 @@ pub struct Config {
     pub owned: bool,
     pub nostd: bool,
     pub hashbrown: bool,
+    pub gen_info: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -2197,7 +2246,7 @@ impl FileDescriptor {
         if self.messages.iter().all(|m| m.is_unit()) {
             writeln!(
                 w,
-                "use quick_protobuf::{{BytesReader, Result, MessageRead, MessageWrite}};"
+                "use quick_protobuf::{{BytesReader, Result, MessageInfo, MessageRead, MessageWrite}};"
             )?;
             return Ok(());
         }
@@ -2243,17 +2292,13 @@ impl FileDescriptor {
         }
         writeln!(
             w,
-            "use quick_protobuf::{{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
+            "use quick_protobuf::{{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
         )?;
 
         if self.owned {
             write!(
                 w,
-                "\
-                 use core::convert::TryFrom;\n\
-                 use core::ops::Deref;\n\
-                 use core::ops::DerefMut;\n\
-                 "
+                "use core::{{convert::{{TryFrom, TryInto}}, ops::{{Deref, DerefMut}}}};"
             )?;
         }
 
@@ -2378,6 +2423,7 @@ fn update_mod_file(path: &Path) -> Result<()> {
             writeln!(f, "{}", MAGIC_HEADER)?;
             f
         };
+
         writeln!(f, "pub mod {};", name)?;
     }
     Ok(())

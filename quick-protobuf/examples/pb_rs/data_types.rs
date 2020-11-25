@@ -12,7 +12,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 type KVMap<K, V> = HashMap<K, V>;
-use quick_protobuf::{MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
+use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
 use quick_protobuf::sizeofs::*;
 use super::*;
 

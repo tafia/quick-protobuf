@@ -43,3 +43,9 @@ pub trait MessageRead<'a>: Sized {
     /// length message, use `BytesReader::read_message` directly
     fn from_reader(r: &mut BytesReader, bytes: &'a [u8]) -> Result<Self>;
 }
+
+/// A trait to provide basic information about a given message
+pub trait MessageInfo {
+    /// Full message path, in form of Module.Message
+    const PATH: &'static str;
+}
