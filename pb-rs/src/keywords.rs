@@ -43,7 +43,6 @@ static RUST_KEYWORDS: [&str; 76] = [
     "Option",
     "override",
     "priv",
-    "proc",
     "pub",
     "pure",
     "ref",
