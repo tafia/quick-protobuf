@@ -64,6 +64,7 @@ fn main() {
         owned: false,
         hashbrown: false,
         nostd: false,
+        gen_info: false,
     };
     FileDescriptor::write_proto(&config).unwrap();
 

@@ -1,4 +1,4 @@
-static RUST_KEYWORDS: [&str; 76] = [
+static RUST_KEYWORDS: [&str; 75] = [
     "abstract",
     "alignof",
     "as",
