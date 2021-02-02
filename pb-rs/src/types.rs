@@ -2277,6 +2277,7 @@ impl FileDescriptor {
         if self
             .messages
             .iter()
+            .filter(|m| !m.imported)
             .any(|m| m.all_fields().any(|f| f.typ.is_map()))
         {
             if config.hashbrown {
