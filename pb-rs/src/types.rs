@@ -1571,7 +1571,7 @@ impl OneOf {
         } else {
             writeln!(w, "pub enum OneOf{} {{", self.name)?;
         }
-        for f in &self.fields {
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
             let rust_type = f.typ.rust_type(desc)?;
             if f.boxed {
                 writeln!(w, "    {}(Box<{}>),", f.name, rust_type)?;
@@ -1596,7 +1596,7 @@ impl OneOf {
     ) -> Result<()> {
         // For the first of each enumeration type, generate an impl From<> for it.
         let mut handled_fields = Vec::new();
-        for f in &self.fields {
+        for f in self.fields.iter().filter(|f| !f.deprecated) {
             let rust_type = f.typ.rust_type(desc)?;
             if handled_fields.contains(&rust_type) {
                 continue;
