@@ -1,23 +1,21 @@
-//! A module to handle all errors via error-chain crate
-
 use std::io;
 
 /// An error enum
 #[derive(Debug)]
 pub enum Error {
-    /// Io error
+    /// IO error
     Io(io::Error),
     /// Nom Error
     Nom(::nom::simple_errors::Err),
     /// No .proto file provided
     NoProto,
-    /// Input file
+    /// Cannot read input file
     InputFile(String),
-    /// Output file
+    /// Cannot read output file
     OutputFile(String),
-    /// Output file
+    /// Cannot read output directory
     OutputDirectory(String),
-    /// Multiple input files with --output argument
+    /// Multiple input files with `--output` argument
     OutputMultipleInputs,
     /// Invalid message
     InvalidMessage(String),
@@ -25,15 +23,15 @@ pub enum Error {
     InvalidImport(String),
     /// Empty read
     EmptyRead,
-    /// enum or message not found
+    /// Enum or message not found
     MessageOrEnumNotFound(String),
     /// Invalid default enum
     InvalidDefaultEnum(String),
-    /// read_fn implementation for Maps
+    /// Missing `read_fn` implementation for maps
     ReadFnMap,
     /// Cycle detected
     Cycle(Vec<String>),
-    /// --output and --output_directory both used
+    /// `--output` and `--output_directory` both used
     OutputAndOutputDir,
 }
 
