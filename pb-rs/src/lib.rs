@@ -66,6 +66,7 @@ pub struct ConfigBuilder {
     nostd: bool,
     hashbrown: bool,
     gen_info: bool,
+    add_deprecated_fields: bool,
 }
 
 impl ConfigBuilder {
@@ -191,6 +192,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Add deprecated fields and mark them as `#[deprecated]`
+    pub fn add_deprecated_fields(mut self, val: bool) -> Self {
+        self.add_deprecated_fields = val;
+        self
+    }
+
     /// Build Config from this ConfigBuilder
     pub fn build(self) -> Vec<Config> {
         self.in_files
@@ -222,7 +229,8 @@ impl ConfigBuilder {
                     owned: self.owned,
                     nostd: self.nostd,
                     hashbrown: self.hashbrown,
-                    gen_info: self.gen_info
+                    gen_info: self.gen_info,
+                    add_deprecated_fields: self.add_deprecated_fields,
                 }
             })
             .collect()
