@@ -35,7 +35,7 @@ done
 
 rm -rf quick-protobuf/examples/pb_rs_v3/owned
 mkdir -p quick-protobuf/examples/pb_rs_v3/owned
-cargo run -p pb-rs quick-protobuf/examples/pb_rs_v3/*.proto \
+cargo run -p pb-rs -- quick-protobuf/examples/pb_rs_v3/*.proto \
   -I quick-protobuf/examples/pb_rs_v3 \
   --owned \
   --output_directory quick-protobuf/examples/pb_rs_v3/owned

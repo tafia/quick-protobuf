@@ -2,18 +2,18 @@
 extern crate nom;
 
 pub mod errors;
-pub mod keywords;
-pub mod parser;
-pub mod scc;
+mod keywords;
+mod parser;
+mod scc;
 pub mod types;
 
 use errors::{Error, Result};
 use std::path::{Path, PathBuf};
 use types::Config;
 
-/// A builder for Config
+/// A builder for [Config]
 ///
-/// # Example buld.rs
+/// # Example build.rs
 ///
 /// ```rust,no_run
 /// use pb_rs::{types::FileDescriptor, ConfigBuilder};
@@ -49,7 +49,6 @@ use types::Config;
 ///     FileDescriptor::run(&config_builder.build()).unwrap()
 /// }
 /// ```
-
 #[derive(Debug, Default)]
 pub struct ConfigBuilder {
     in_files: Vec<PathBuf>,
@@ -161,32 +160,33 @@ impl ConfigBuilder {
         self
     }
 
-    /// Use Cow<_,_> for Strings and Bytes
+    /// Use `Cow<_,_>` for Strings and Bytes
     pub fn dont_use_cow(mut self, val: bool) -> Self {
         self.dont_use_cow = val;
         self
     }
 
-    /// Generate Owned structs when the proto stuct has a lifetime
+    /// Generate Owned structs when the proto struct has a lifetime
     pub fn owned(mut self, val: bool) -> Self {
         self.owned = val;
         self
     }
 
-    /// Generate no_std compliant code
+    /// Generate `#![no_std]` compliant code
     pub fn nostd(mut self, val: bool) -> Self {
         self.nostd = val;
         self
     }
 
-    /// Use hashbrown as HashMap implementation instead of [std::collections::HashMap] or
-    /// [alloc::collections::BTreeMap] in a `no_std` environment
+    /// Use hashbrown as `HashMap` implementation instead of [std::collections::HashMap] or
+    /// [alloc::collections::BTreeMap](https://doc.rust-lang.org/alloc/collections/btree_map/struct.BTreeMap.html)
+    /// in a `no_std` environment
     pub fn hashbrown(mut self, val: bool) -> Self {
         self.hashbrown = val;
         self
     }
 
-    /// Generate MessageInfo implementations
+    /// Generate `MessageInfo` implementations
     pub fn gen_info(mut self, val: bool) -> Self {
         self.gen_info = val;
         self
@@ -198,7 +198,7 @@ impl ConfigBuilder {
         self
     }
 
-    /// Build Config from this ConfigBuilder
+    /// Build [Config] from this `ConfigBuilder`
     pub fn build(self) -> Vec<Config> {
         self.in_files
             .iter()
