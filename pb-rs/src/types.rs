@@ -487,6 +487,13 @@ impl Field {
         desc: &FileDescriptor,
         config: &Config,
     ) -> Result<()> {
+        if self.deprecated {
+            if config.add_deprecated_fields {
+                writeln!(w, "    #[deprecated]")?;
+            } else {
+                return Ok(())
+            }
+        }
         write!(w, "    pub {}: ", self.name)?;
         let rust_type = self.typ.rust_type(desc)?;
         match self.frequency {
@@ -508,7 +515,11 @@ impl Field {
         Ok(())
     }
 
-    fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+        if self.deprecated && !config.add_deprecated_fields {
+            return Ok(());
+        }
+
         // special case for FieldType::Map: destructure tuple before inserting in HashMap
         if let FieldType::Map(ref key, ref value) = self.typ {
             writeln!(w, "                Ok({}) => {{", self.tag())?;
@@ -557,7 +568,11 @@ impl Field {
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+        if self.deprecated && !config.add_deprecated_fields {
+            return Ok(());
+        }
+
         write!(w, "        + ")?;
         let tag_size = sizeof_varint(self.tag());
         match self.frequency {
@@ -656,7 +671,11 @@ impl Field {
         Ok(())
     }
 
-    fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+        if self.deprecated && !config.add_deprecated_fields {
+            return Ok(());
+        }
+
         match self.frequency {
             Frequency::Optional
                 if desc.syntax == Syntax::Proto2 || self.typ.message().is_some() =>
@@ -923,7 +942,7 @@ impl Message {
                 e.write(w)?;
             }
             for o in &self.oneofs {
-                o.write(w, desc)?;
+                o.write(w, desc, config)?;
             }
 
             writeln!(w)?;
@@ -968,7 +987,7 @@ impl Message {
         } else {
             writeln!(w, "pub struct {} {{", self.name)?;
         }
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
+        for f in &self.fields {
             f.write_definition(w, desc, config)?;
         }
         for o in &self.oneofs {
@@ -1061,11 +1080,11 @@ impl Message {
         }
         writeln!(w, "        while !r.is_eof() {{")?;
         writeln!(w, "            match r.next_tag(bytes) {{")?;
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_match_tag(w, desc)?;
+        for f in &self.fields {
+            f.write_match_tag(w, desc, config)?;
         }
         for o in &self.oneofs {
-            o.write_match_tag(w, desc)?;
+            o.write_match_tag(w, desc, config)?;
         }
         writeln!(
             w,
@@ -1104,9 +1123,9 @@ impl Message {
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
         }
-        self.write_get_size(w, desc)?;
+        self.write_get_size(w, desc, config)?;
         writeln!(w)?;
-        self.write_write_message(w, desc)?;
+        self.write_write_message(w, desc, config)?;
         writeln!(w, "}}")?;
         Ok(())
     }
@@ -1221,29 +1240,29 @@ impl Message {
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         writeln!(w, "    fn get_size(&self) -> usize {{")?;
         writeln!(w, "        0")?;
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_get_size(w, desc)?;
+        for f in &self.fields {
+            f.write_get_size(w, desc, config)?;
         }
         for o in self.oneofs.iter() {
-            o.write_get_size(w, desc)?;
+            o.write_get_size(w, desc, config)?;
         }
         writeln!(w, "    }}")?;
         Ok(())
     }
 
-    fn write_write_message<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_write_message<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         writeln!(
             w,
             "    fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {{"
         )?;
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
-            f.write_write(w, desc)?;
+        for f in &self.fields {
+            f.write_write(w, desc, config)?;
         }
         for o in &self.oneofs {
-            o.write_write(w, desc)?;
+            o.write_write(w, desc, config)?;
         }
         writeln!(w, "        Ok(())")?;
         writeln!(w, "    }}")?;
@@ -1556,22 +1575,30 @@ impl OneOf {
         get_modules(&self.module, self.imported, desc)
     }
 
-    fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         writeln!(w)?;
-        self.write_definition(w, desc)?;
+        self.write_definition(w, desc, config)?;
         writeln!(w)?;
         self.write_impl_default(w, desc)?;
         Ok(())
     }
 
-    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         writeln!(w, "#[derive(Debug, PartialEq, Clone)]")?;
         if self.has_lifetime(desc) {
             writeln!(w, "pub enum OneOf{}<'a> {{", self.name)?;
         } else {
             writeln!(w, "pub enum OneOf{} {{", self.name)?;
         }
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
+        for f in &self.fields {
+            if f.deprecated {
+                if config.add_deprecated_fields {
+                    writeln!(w, "    #[deprecated]")?;
+                } else {
+                    continue;
+                }
+            }
+
             let rust_type = f.typ.rust_type(desc)?;
             if f.boxed {
                 writeln!(w, "    {}(Box<{}>),", f.name, rust_type)?;
@@ -1583,7 +1610,7 @@ impl OneOf {
         writeln!(w, "}}")?;
 
         if cfg!(feature = "generateImplFromForEnums") {
-            self.generate_impl_from_for_enums(w, desc)
+            self.generate_impl_from_for_enums(w, desc, config)
         } else {
             Ok(())
         }
@@ -1593,10 +1620,11 @@ impl OneOf {
         &self,
         w: &mut W,
         desc: &FileDescriptor,
+        config: &Config,
     ) -> Result<()> {
         // For the first of each enumeration type, generate an impl From<> for it.
         let mut handled_fields = Vec::new();
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
+        for f in self.fields.iter().filter(|f| !f.deprecated || config.add_deprecated_fields) {
             let rust_type = f.typ.rust_type(desc)?;
             if handled_fields.contains(&rust_type) {
                 continue;
@@ -1647,8 +1675,8 @@ impl OneOf {
         Ok(())
     }
 
-    fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
+    fn write_match_tag<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+        for f in self.fields.iter().filter(|f| !f.deprecated || config.add_deprecated_fields) {
             let (val, val_cow) = f.typ.read_fn(desc)?;
             if f.boxed {
                 writeln!(
@@ -1677,9 +1705,9 @@ impl OneOf {
         Ok(())
     }
 
-    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         writeln!(w, "        + match self.{} {{", self.name)?;
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
+        for f in self.fields.iter().filter(|f| !f.deprecated || config.add_deprecated_fields) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {
                 writeln!(
@@ -1713,9 +1741,9 @@ impl OneOf {
         Ok(())
     }
 
-    fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+    fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         write!(w, "        match self.{} {{", self.name)?;
-        for f in self.fields.iter().filter(|f| !f.deprecated) {
+        for f in self.fields.iter().filter(|f| !f.deprecated || config.add_deprecated_fields) {
             writeln!(
                 w,
                 "            {}OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},",
@@ -1754,6 +1782,7 @@ pub struct Config {
     pub nostd: bool,
     pub hashbrown: bool,
     pub gen_info: bool,
+    pub add_deprecated_fields: bool,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -2206,7 +2235,7 @@ impl FileDescriptor {
             self.enums.len()
         );
         if config.headers {
-            self.write_headers(w, filename)?;
+            self.write_headers(w, filename, config)?;
         }
         self.write_package_start(w)?;
         self.write_uses(w, config)?;
@@ -2218,7 +2247,7 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn write_headers<W: Write>(&self, w: &mut W, filename: &str) -> Result<()> {
+    fn write_headers<W: Write>(&self, w: &mut W, filename: &str, config: &Config) -> Result<()> {
         writeln!(
             w,
             "// Automatically generated rust module for '{}' file",
@@ -2231,6 +2260,10 @@ impl FileDescriptor {
         writeln!(w, "#![allow(unused_imports)]")?;
         writeln!(w, "#![allow(unknown_lints)]")?;
         writeln!(w, "#![allow(clippy::all)]")?;
+
+        if config.add_deprecated_fields {
+            writeln!(w, "#![allow(deprecated)]")?;
+        }
 
         writeln!(w, "#![cfg_attr(rustfmt, rustfmt_skip)]")?;
         writeln!(w)?;

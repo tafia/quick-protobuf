@@ -101,6 +101,11 @@ fn run() -> Result<(), Error> {
                 .long("gen-info")
                 .required(false)
                 .help("Generate MessageInfo implementations")
+        ).arg(
+            Arg::with_name("ADD_DEPRECATED_FIELDS")
+                .long("add-deprecated-fields")
+                .required(false)
+                .help("Add deprecated fields and mark them as #[deprecated]")
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -131,7 +136,8 @@ fn run() -> Result<(), Error> {
     .hashbrown(matches.is_present("HASHBROWN"))
     .gen_info(matches.is_present("GEN_INFO"))
     .custom_repr(custom_repr)
-    .owned(matches.is_present("OWNED"));
+    .owned(matches.is_present("OWNED"))
+    .add_deprecated_fields(matches.is_present("ADD_DEPRECATED_FIELDS"));
 
     FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
 }

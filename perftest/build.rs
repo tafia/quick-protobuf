@@ -65,6 +65,7 @@ fn main() {
         hashbrown: false,
         nostd: false,
         gen_info: false,
+        add_deprecated_fields: false,
     };
     FileDescriptor::write_proto(&config).unwrap();
 
