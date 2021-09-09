@@ -319,7 +319,7 @@ pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
 }
 
 /// Serialize a `MessageWrite` into a byte slice
-pub fn serialize_into_slice<M: MessageWrite>(message: &M, out: &mut [u8]) -> Result<()> {
+pub fn serialize_into_slice<M: MessageWrite>(message: &M, out: &mut [u8]) -> Result<usize> {
     let len = message.get_size();
     if out.len() < len {
         return Err(Error::OutputBufferTooSmall);
@@ -329,7 +329,7 @@ pub fn serialize_into_slice<M: MessageWrite>(message: &M, out: &mut [u8]) -> Res
         writer.write_message(message)?;
     }
 
-    Ok(())
+    Ok(len)
 }
 
 /// Writer backend abstraction
