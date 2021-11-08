@@ -1,6 +1,3 @@
-#[macro_use]
-extern crate nom;
-
 pub mod errors;
 mod keywords;
 mod parser;

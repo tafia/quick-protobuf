@@ -10,7 +10,7 @@ repository = "https://github.com/tafia/quick-protobuf"
 edition = "2018"
 
 [dependencies]
-nom = "3.2.1"
+nom = "7"
 log = "0.4.4"
 clap = { version = "2.33.1", optional = true }
 env_logger = { version = "0.7.1", optional = true }
