@@ -1,19 +1,11 @@
-extern crate bytes;
-extern crate prost;
-extern crate protobuf;
-extern crate quick_protobuf;
-extern crate rand;
-extern crate time;
-#[macro_use]
-extern crate prost_derive;
-
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::default::Default;
 use std::fmt::Debug;
 use std::fs::File;
 use std::io::Read;
+use std::time::Instant;
 
-use bytes::{Buf, IntoBuf};
+use bytes::Buf;
 
 use perftest_data::PerftestData;
 use perftest_data_quick::PerftestData as QuickPerftestData;
@@ -32,11 +24,11 @@ const SEED: [u8; 16] = [
     10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160,
 ];
 
-fn measure<R: Debug + PartialEq, F: FnMut() -> R>(iter: u64, mut f: F, check: Option<&R>) -> u64 {
-    let start = time::precise_time_ns();
+fn measure<R: Debug + PartialEq, F: FnMut() -> R>(iter: u128, mut f: F, check: Option<&R>) -> u128 {
+    let start = Instant::now();
     let r = f();
     check.map(|c| assert_eq!(c, &r));
-    (time::precise_time_ns() - start) / iter
+    (Instant::now() - start).as_nanos() / iter
 }
 
 struct TestRunner {
@@ -46,7 +38,7 @@ struct TestRunner {
 }
 
 impl TestRunner {
-    fn run_test<M: Clone + Message + Default + PartialEq>(&self, data: &[M]) -> [u64; 4] {
+    fn run_test<M: Clone + Message + Default + PartialEq>(&self, data: &[M]) -> [u128; 4] {
         let mut a = [0; 4];
 
         let mut rng = SmallRng::from_seed(SEED);
@@ -61,7 +53,7 @@ impl TestRunner {
 
         let mut buf = Vec::new();
         a[0] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 for m in &random_data {
                     m.write_length_delimited_to_vec(&mut buf).unwrap();
@@ -71,15 +63,12 @@ impl TestRunner {
         );
 
         a[1] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut r = Vec::new();
                 let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
                 while !coded_input_stream.eof().unwrap() {
-                    r.push(
-                        protobuf::parse_length_delimited_from::<M>(&mut coded_input_stream)
-                            .unwrap(),
-                    );
+                    r.push(coded_input_stream.read_message().unwrap());
                 }
                 r
             },
@@ -87,18 +76,18 @@ impl TestRunner {
         );
 
         a[2] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
                 while !coded_input_stream.eof().unwrap() {
-                    protobuf::parse_length_delimited_from::<M>(&mut coded_input_stream).unwrap();
+                    coded_input_stream.read_message::<M>().unwrap();
                 }
             },
             None,
         );
 
         a[3] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut coded_input_stream = protobuf::CodedInputStream::from_bytes(&buf);
                 let mut msg: M = Default::default();
@@ -116,13 +105,13 @@ impl TestRunner {
         a
     }
 
-    fn test<M: Message + Clone + Default + PartialEq>(&mut self, data: &[M]) -> [u64; 4] {
+    fn test<M: Message + Clone + Default + PartialEq>(&mut self, data: &[M]) -> [u128; 4] {
         let a = self.run_test(data);
         self.any_matched = true;
         a
     }
 
-    fn quick_run_test<M>(&self, data: &[M]) -> [u64; 4]
+    fn quick_run_test<M>(&self, data: &[M]) -> [u128; 4]
     where
         M: for<'a> MessageRead<'a> + MessageWrite + Clone + PartialEq + ::std::fmt::Debug,
     {
@@ -140,7 +129,7 @@ impl TestRunner {
 
         let mut buf = Vec::new();
         b[0] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut w = Writer::new(&mut buf);
                 for m in &random_data {
@@ -151,7 +140,7 @@ impl TestRunner {
         );
 
         b[1] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut r = Vec::<M>::new();
                 let mut reader = BytesReader::from_bytes(&buf);
@@ -164,7 +153,7 @@ impl TestRunner {
         );
 
         b[2] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut reader = BytesReader::from_bytes(&buf);
                 while !reader.is_eof() {
@@ -177,7 +166,7 @@ impl TestRunner {
         b
     }
 
-    fn quick_test<M>(&mut self, data: &[M]) -> [u64; 4]
+    fn quick_test<M>(&mut self, data: &[M]) -> [u128; 4]
     where
         M: for<'a> MessageRead<'a> + MessageWrite + Clone + PartialEq + ::std::fmt::Debug,
     {
@@ -186,7 +175,7 @@ impl TestRunner {
         b
     }
 
-    fn quick_run_test_strings(&self, data: &[perftest_data_quick::TestStrings]) -> [u64; 4] {
+    fn quick_run_test_strings(&self, data: &[perftest_data_quick::TestStrings]) -> [u128; 4] {
         let mut b = [0; 4];
 
         let mut rng = SmallRng::from_seed(SEED);
@@ -201,7 +190,7 @@ impl TestRunner {
 
         let mut buf = Vec::new();
         b[0] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut w = Writer::new(&mut buf);
                 for m in &random_data {
@@ -212,7 +201,7 @@ impl TestRunner {
         );
 
         b[1] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut r = Vec::<perftest_data_quick::TestStrings>::new();
                 let mut reader = BytesReader::from_bytes(&buf);
@@ -225,7 +214,7 @@ impl TestRunner {
         );
 
         b[2] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut reader = BytesReader::from_bytes(&buf);
                 while !reader.is_eof() {
@@ -238,7 +227,7 @@ impl TestRunner {
         b
     }
 
-    fn quick_run_test_bytes(&self, data: &[perftest_data_quick::TestBytes]) -> [u64; 4] {
+    fn quick_run_test_bytes(&self, data: &[perftest_data_quick::TestBytes]) -> [u128; 4] {
         let mut b = [0; 4];
 
         let mut rng = SmallRng::from_seed(SEED);
@@ -253,7 +242,7 @@ impl TestRunner {
 
         let mut buf = Vec::new();
         b[0] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut w = Writer::new(&mut buf);
                 for m in &random_data {
@@ -264,7 +253,7 @@ impl TestRunner {
         );
 
         b[1] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut r = Vec::<perftest_data_quick::TestBytes>::new();
                 let mut reader = BytesReader::from_bytes(&buf);
@@ -277,7 +266,7 @@ impl TestRunner {
         );
 
         b[2] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 let mut reader = BytesReader::from_bytes(&buf);
                 while !reader.is_eof() {
@@ -293,7 +282,7 @@ impl TestRunner {
     fn prost_run_test<M: ProstMessage + Clone + Default + PartialEq>(
         &mut self,
         data: &[M],
-    ) -> [u64; 4] {
+    ) -> [u128; 4] {
         let mut c = [0; 4];
 
         let mut rng = SmallRng::from_seed(SEED);
@@ -308,7 +297,7 @@ impl TestRunner {
 
         let mut buf = Vec::new();
         c[0] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             || {
                 for m in &random_data {
                     m.encode_length_delimited(&mut buf).unwrap();
@@ -317,13 +306,14 @@ impl TestRunner {
             None,
         );
 
-        let mut tmp_buf = buf.clone().into_buf();
+        let tmp_buf = buf.clone();
         c[1] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             move || {
                 let mut r = Vec::new();
-                while tmp_buf.has_remaining() {
-                    let m = M::decode_length_delimited(&mut tmp_buf).unwrap();
+                let mut buf = tmp_buf.as_slice();
+                while buf.has_remaining() {
+                    let m = M::decode_length_delimited(&mut buf).unwrap();
                     r.push(m);
                 }
                 r
@@ -331,12 +321,13 @@ impl TestRunner {
             Some(&random_data),
         );
 
-        let mut tmp_buf = buf.clone().into_buf();
+        let tmp_buf = buf.clone();
         c[2] = measure(
-            random_data.len() as u64,
+            random_data.len() as u128,
             move || {
-                while tmp_buf.has_remaining() {
-                    M::decode_length_delimited(&mut tmp_buf).unwrap();
+                let mut buf = tmp_buf.as_slice();
+                while buf.has_remaining() {
+                    M::decode_length_delimited(&mut buf).unwrap();
                 }
             },
             None,
@@ -348,7 +339,7 @@ impl TestRunner {
     fn prost_test<M: ProstMessage + Clone + Default + PartialEq>(
         &mut self,
         data: &[M],
-    ) -> [u64; 4] {
+    ) -> [u128; 4] {
         let c = self.prost_run_test(data);
         self.any_matched = true;
         c
@@ -362,7 +353,7 @@ impl TestRunner {
     }
 }
 
-fn print_results(name: &str, a: &[u64], b: &[u64], c: &[u64], print_header: bool) {
+fn print_results(name: &str, a: &[u128], b: &[u128], c: &[u128], print_header: bool) {
     let labels = ["write", "read", "read no vec", "read reuse"];
 
     if print_header {
@@ -447,11 +438,11 @@ fn main() {
         data
     };
 
-    let test_data = protobuf::parse_from_reader::<PerftestData>(&mut &*data).unwrap();
+    let test_data: PerftestData = protobuf::Message::parse_from_reader(&mut &*data).unwrap();
     let mut reader = Reader::from_reader(&mut &*data, data.len()).unwrap();
     let test_data_quick = reader.read(QuickPerftestData::from_reader).unwrap();
 
-    let test_data_prost = perftest_data_prost::PerftestData::decode(&data).unwrap();
+    let test_data_prost = perftest_data_prost::PerftestData::decode(data.as_slice()).unwrap();
 
     let a = runner.test(test_data.get_test1());
     let b = runner.quick_test::<perftest_data_quick::Test1>(&test_data_quick.test1);

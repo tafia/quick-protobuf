@@ -4,18 +4,17 @@ version = "0.0.0"
 authors = ["Stepan Koltsov <stepan.koltsov@gmail.com>",
            "Johann Tuffe <tafia973@gmail.com>"]
 build = "build.rs"
+edition = "2021"
 
 [dependencies]
-protobuf = "2.0.4"
+protobuf = "2.25.2"
 quick-protobuf = { path = "../quick-protobuf" }
-time = "0.1.40"
 rand = "0.5.5"
-prost = "0.4.0"
-prost-derive = "0.4.0"
-bytes = "0.4.9"
+prost = "0.9.0"
+bytes = "1"
 
 [build-dependencies]
-protobuf-codegen-pure = "2.0.4"
+protobuf-codegen-pure = "2.25.2"
 pb-rs = { path = "../pb-rs" }
-prost-build = "0.4.0"
+prost-build = "0.9.0"
 [features]

@@ -36,15 +36,12 @@ fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
 
     // protobuf
-    protobuf_codegen_pure::run(protobuf_codegen_pure::Args {
-        out_dir: "src",
-        input: &["src/perftest_data.proto"],
-        includes: &["src"],
-        customize: protobuf_codegen_pure::Customize {
-            ..Default::default()
-        },
-    })
-    .expect("protoc");
+    protobuf_codegen_pure::Codegen::new()
+        .out_dir("src")
+        .inputs(&["src/perftest_data.proto"])
+        .include("src")
+        .run()
+        .expect("protoc");
 
     // quick-protobuf
     let quick_dest = Path::new(&out_dir).join("perftest_data_quick.rs");
