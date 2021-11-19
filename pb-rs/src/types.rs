@@ -491,7 +491,7 @@ impl Field {
             if config.add_deprecated_fields {
                 writeln!(w, "    #[deprecated]")?;
             } else {
-                return Ok(())
+                return Ok(());
             }
         }
         write!(w, "    pub {}: ", self.name)?;
@@ -870,6 +870,57 @@ impl Message {
         self.fields.is_empty() && self.oneofs.is_empty()
     }
 
+    fn write_common_uses<W: Write>(
+        w: &mut W,
+        messages: &Vec<Message>,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
+        if config.nostd {
+            writeln!(w, "use alloc::vec::Vec;")?;
+        }
+
+        if messages.iter().any(|m| {
+            m.all_fields()
+                .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
+        }) {
+            if config.nostd {
+                writeln!(w, "use alloc::borrow::Cow;")?;
+            } else {
+                writeln!(w, "use std::borrow::Cow;")?;
+            }
+        }
+
+        if config.nostd
+            && messages.iter().any(|m| {
+                desc.owned && m.has_lifetime(desc, &mut Vec::new())
+                    || m.all_fields().any(|f| f.boxed)
+            })
+        {
+            writeln!(w)?;
+            writeln!(w, "use alloc::boxed::Box;")?;
+        }
+
+        if messages
+            .iter()
+            .filter(|m| !m.imported)
+            .any(|m| m.all_fields().any(|f| f.typ.is_map()))
+        {
+            if config.hashbrown {
+                writeln!(w, "use hashbrown::HashMap;")?;
+                writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
+            } else if config.nostd {
+                writeln!(w, "use alloc::collections::BTreeMap;")?;
+                writeln!(w, "type KVMap<K, V> = BTreeMap<K, V>;")?;
+            } else {
+                writeln!(w, "use std::collections::HashMap;")?;
+                writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         println!("Writing message {}{}", self.get_modules(desc), self.name);
         writeln!(w)?;
@@ -894,44 +945,9 @@ impl Message {
             writeln!(w)?;
             writeln!(w, "pub mod mod_{} {{", self.name)?;
             writeln!(w)?;
-            if config.nostd {
-                writeln!(w, "use alloc::vec::Vec;")?;
-            }
-            if self.messages.iter().any(|m| {
-                m.all_fields()
-                    .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
-            }) {
-                if config.nostd {
-                    writeln!(w, "use alloc::borrow::Cow;")?;
-                } else {
-                    writeln!(w, "use std::borrow::Cow;")?;
-                }
-            }
-            if config.nostd
-                && self.messages.iter().any(|m| {
-                    desc.owned && m.has_lifetime(desc, &mut Vec::new())
-                        || m.all_fields().any(|f| f.boxed)
-                })
-            {
-                writeln!(w)?;
-                writeln!(w, "use alloc::boxed::Box;")?;
-            }
-            if self
-                .messages
-                .iter()
-                .any(|m| m.all_fields().any(|f| f.typ.is_map()))
-            {
-                if config.hashbrown {
-                    writeln!(w, "use hashbrown::HashMap;")?;
-                    writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
-                } else if config.nostd {
-                    writeln!(w, "use alloc::collections::BTreeMap;")?;
-                    writeln!(w, "type KVMap<K, V> = BTreeMap<K, V>;")?;
-                } else {
-                    writeln!(w, "use std::collections::HashMap;")?;
-                    writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
-                }
-            }
+
+            Self::write_common_uses(w, &self.messages, desc, config)?;
+
             if !self.messages.is_empty() || !self.oneofs.is_empty() {
                 writeln!(w, "use super::*;")?;
             }
@@ -2284,46 +2300,8 @@ impl FileDescriptor {
             return Ok(());
         }
 
-        if config.nostd {
-            writeln!(w, "use alloc::vec::Vec;")?;
-        }
+        Message::write_common_uses(w, &self.messages, self, config)?;
 
-        if self.messages.iter().any(|m| {
-            m.all_fields()
-                .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
-        }) {
-            if config.nostd {
-                writeln!(w, "use alloc::borrow::Cow;")?;
-            } else {
-                writeln!(w, "use std::borrow::Cow;")?;
-            }
-        }
-        if config.nostd
-            && self.messages.iter().any(|m| {
-                self.owned && m.has_lifetime(&self, &mut Vec::new())
-                    || m.all_fields().any(|f| f.boxed)
-            })
-        {
-            writeln!(w)?;
-            writeln!(w, "use alloc::boxed::Box;")?;
-        }
-        if self
-            .messages
-            .iter()
-            .filter(|m| !m.imported)
-            .any(|m| m.all_fields().any(|f| f.typ.is_map()))
-        {
-            if config.hashbrown {
-                writeln!(w, "use hashbrown::HashMap;")?;
-                writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
-            } else if config.nostd {
-                writeln!(w, "use alloc::collections::BTreeMap;")?;
-                writeln!(w, "type KVMap<K, V> = BTreeMap<K, V>;")?;
-            } else {
-                writeln!(w, "use std::collections::HashMap;")?;
-                writeln!(w, "type KVMap<K, V> = HashMap<K, V>;")?;
-            }
-        }
         writeln!(
             w,
             "use quick_protobuf::{{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
