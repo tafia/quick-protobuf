@@ -148,6 +148,13 @@ impl FieldType {
         }
     }
 
+    fn has_bytes_and_string(&self) -> bool {
+        match *self {
+            FieldType::Bytes_ | FieldType::String_ => true,
+            _ => false,
+        }
+    }
+
     fn is_map(&self) -> bool {
         match *self {
             FieldType::Map(_, _) => true,
@@ -880,14 +887,23 @@ impl Message {
             writeln!(w, "use alloc::vec::Vec;")?;
         }
 
-        if messages.iter().any(|m| {
-            m.all_fields()
-                .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
-        }) {
-            if config.nostd {
-                writeln!(w, "use alloc::borrow::Cow;")?;
-            } else {
-                writeln!(w, "use std::borrow::Cow;")?;
+        if !config.dont_use_cow {
+            if messages.iter().any(|m| {
+                m.all_fields()
+                    .any(|f| (f.typ.has_cow() || (f.packed() && f.typ.is_fixed_size())))
+            }) {
+                if config.nostd {
+                    writeln!(w, "use alloc::borrow::Cow;")?;
+                } else {
+                    writeln!(w, "use std::borrow::Cow;")?;
+                }
+            }
+        } else if config.nostd {
+            if messages
+                .iter()
+                .any(|m| m.all_fields().any(|f| (f.typ.has_bytes_and_string())))
+            {
+                writeln!(w, "use alloc::borrow::ToOwned;")?;
             }
         }
 
