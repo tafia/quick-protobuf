@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::{Path, PathBuf};
 
 use log::{debug, warn};
@@ -1925,13 +1925,8 @@ impl FileDescriptor {
 
     /// Opens a proto file, reads it and returns raw parsed data
     pub fn read_proto(in_file: &Path, import_search_path: &[PathBuf]) -> Result<FileDescriptor> {
-        let mut buf = Vec::new();
-        {
-            let f = File::open(in_file)?;
-            let mut reader = BufReader::new(f);
-            reader.read_to_end(&mut buf)?;
-        }
-        let mut desc = file_descriptor(&buf).to_result().map_err(Error::Nom)?;
+        let file = std::fs::read_to_string(in_file)?;
+        let (_, mut desc) = file_descriptor(&file).map_err(|e| Error::Nom(e))?;
         for mut m in &mut desc.messages {
             if m.path.as_os_str().is_empty() {
                 m.path = in_file.to_path_buf();
