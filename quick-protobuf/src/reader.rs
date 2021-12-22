@@ -550,10 +550,7 @@ impl Reader {
     /// Creates a new `Reader`
     #[cfg(feature = "std")]
     pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {
-        let mut buf = Vec::with_capacity(capacity);
-        unsafe {
-            buf.set_len(capacity);
-        }
+        let mut buf = vec![0; capacity];
         buf.shrink_to_fit();
         r.read_exact(&mut buf)?;
         Ok(Reader::from_bytes(buf))
