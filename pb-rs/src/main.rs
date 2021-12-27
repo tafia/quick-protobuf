@@ -47,6 +47,7 @@ fn run() -> Result<(), Error> {
         ).arg(
             Arg::with_name("INPUT")
                 .multiple(true)
+                .required(true)
                 .help("The .proto files used to generate quick-protobuf code")
                 .validator(|x| extension_matches(x, "proto")),
         ).arg(
