@@ -327,7 +327,7 @@ fn message(input: &str) -> IResult<&str, Message> {
                 delimited(
                     tag("{"),
                     many0(delimited(many0(br), message_event, many0(br))),
-                    tag("}"),
+                    preceded(many0(br), tag("}")),
                 ),
             ),
             opt(pair(many0(br), tag(";"))),
@@ -442,6 +442,14 @@ mod test {
         if let ::nom::IResult::Ok((_, mess)) = mess {
             assert_eq!(10, mess.fields.len());
         }
+    }
+
+    #[test]
+    fn empty_message() {
+        let (rem, mess) = message("message Vec { }").expect("parse success");
+        assert_eq!("", rem);
+        assert_eq!("Vec", mess.name);
+        assert_eq!(0, mess.fields.len());
     }
 
     #[test]
