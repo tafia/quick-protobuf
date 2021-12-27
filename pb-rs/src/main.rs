@@ -93,9 +93,9 @@ fn run() -> Result<(), Error> {
                 .help("Generate no_std compliant code"),
         ).arg(
             Arg::with_name("HASHBROWN")
-                .long("hashrown")
+                .long("hashbrown")
                 .required(false)
-                .help("Use hashrown for HashMap implementation"),
+                .help("Use the hashbrown crate as the HashMap implementation"),
         ).arg(
             Arg::with_name("GEN_INFO")
                 .long("gen-info")
