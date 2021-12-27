@@ -366,13 +366,16 @@ fn enum_field(input: &str) -> IResult<&str, (String, i32)> {
 
 fn enumerator(input: &str) -> IResult<&str, Enumerator> {
     map(
-        pair(
-            delimited(pair(tag("enum"), many1(br)), word, many0(br)),
-            delimited(
-                pair(tag("{"), many0(br)),
-                separated_list0(many0(br), enum_field),
-                pair(many0(br), tag("}")),
+        terminated(
+            pair(
+                delimited(pair(tag("enum"), many1(br)), word, many0(br)),
+                delimited(
+                    pair(tag("{"), many0(br)),
+                    separated_list0(many0(br), enum_field),
+                    pair(many0(br), tag("}")),
+                ),
             ),
+            opt(pair(many0(br), tag(";"))),
         ),
         |(name, fields)| Enumerator {
             name,
@@ -629,6 +632,13 @@ mod test {
           }"#;
         let en = assert_complete(enumerator(msg));
         assert_eq!(2, en.fields.len());
+    }
+
+    #[test]
+    fn enum_semi() {
+        let msg = r#"message Foo { enum Bar { BAZ = 1; }; Bar boop = 1; }"#;
+        let desc = assert_desc(msg);
+        assert_eq!(1, desc.messages.len());
     }
 
     #[test]
