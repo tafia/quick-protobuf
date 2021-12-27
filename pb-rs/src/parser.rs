@@ -370,7 +370,7 @@ fn enumerator(input: &str) -> IResult<&str, Enumerator> {
             delimited(pair(tag("enum"), many1(br)), word, many0(br)),
             delimited(
                 pair(tag("{"), many0(br)),
-                separated_list0(br, enum_field),
+                separated_list0(many0(br), enum_field),
                 pair(many0(br), tag("}")),
             ),
         ),
@@ -617,6 +617,18 @@ mod test {
         } else {
             panic!("Could not parse reserved fields message");
         }
+    }
+
+    #[test]
+    fn enum_comments() {
+        let msg = r#"enum Turn {
+            UP = 1;
+            // for what?
+            // for what, you ask?
+            DOWN = 2;
+          }"#;
+        let en = assert_complete(enumerator(msg));
+        assert_eq!(2, en.fields.len());
     }
 
     #[test]
