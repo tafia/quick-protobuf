@@ -8,9 +8,9 @@ use crate::types::{
 
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until},
+    bytes::complete::{tag, take_until, take_while},
     character::complete::{alphanumeric1, digit1, hex_digit1, line_ending, multispace1},
-    combinator::{map, map_res, not, opt, recognize, value},
+    combinator::{map, map_res, opt, recognize, value},
     multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
     IResult,
@@ -60,7 +60,7 @@ fn integer(input: &str) -> IResult<&str, i32> {
 fn comment(input: &str) -> IResult<&str, ()> {
     value(
         (),
-        tuple((tag("//"), many0(not(line_ending)), opt(line_ending))),
+        tuple((tag("//"), take_while(|c| !"\n\r".contains(c)), opt(line_ending))),
     )(input)
 }
 
@@ -422,6 +422,18 @@ mod test {
 
     use std::path::Path;
 
+    fn assert_complete<T>(parse: nom::IResult<&str, T>) -> T {
+        let (rem, obj) = parse.expect("valid parse");
+        assert_eq!(rem, "", "expected no trailing data");
+        obj
+    }
+
+    fn assert_desc(msg: &str) -> FileDescriptor {
+        let (rem, obj) = file_descriptor(msg).expect("valid parse");
+        assert_eq!("", rem, "expected no trailing data");
+        obj
+    }
+
     #[test]
     fn test_message() {
         let msg = r#"message ReferenceData
@@ -446,8 +458,7 @@ mod test {
 
     #[test]
     fn empty_message() {
-        let (rem, mess) = message("message Vec { }").expect("parse success");
-        assert_eq!("", rem);
+        let mess = assert_complete(message("message Vec { }"));
         assert_eq!("Vec", mess.name);
         assert_eq!(0, mess.fields.len());
     }
@@ -465,6 +476,11 @@ mod test {
         if let ::nom::IResult::Ok((_, mess)) = mess {
             assert_eq!(4, mess.fields.len());
         }
+    }
+
+    #[test]
+    fn comments() {
+        assert_complete(comment("// foo\n"));
     }
 
     #[test]
@@ -493,6 +509,14 @@ mod test {
             vec![Path::new("test_import_nested_imported_pb.proto")],
             desc.import_paths
         );
+    }
+
+    #[test]
+    fn leading_comment() {
+        let msg = r#"//foo
+        message Bar {}"#;
+        let desc = assert_desc(msg);
+        assert_eq!(1, desc.messages.len());
     }
 
     #[test]
