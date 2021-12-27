@@ -61,6 +61,7 @@ fn main() {
         owned: false,
         hashbrown: false,
         nostd: false,
+        gen_write: true,
         gen_info: false,
         add_deprecated_fields: false,
     };

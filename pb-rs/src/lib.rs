@@ -61,6 +61,7 @@ pub struct ConfigBuilder {
     owned: bool,
     nostd: bool,
     hashbrown: bool,
+    gen_write: bool,
     gen_info: bool,
     add_deprecated_fields: bool,
 }
@@ -183,6 +184,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Generate `MessageWrite` implementations
+    pub fn gen_write(mut self, val: bool) -> Self {
+        self.gen_write = val;
+        self
+    }
+
     /// Generate `MessageInfo` implementations
     pub fn gen_info(mut self, val: bool) -> Self {
         self.gen_info = val;
@@ -226,6 +233,7 @@ impl ConfigBuilder {
                     owned: self.owned,
                     nostd: self.nostd,
                     hashbrown: self.hashbrown,
+                    gen_write: self.gen_write,
                     gen_info: self.gen_info,
                     add_deprecated_fields: self.add_deprecated_fields,
                 }

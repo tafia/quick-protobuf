@@ -97,6 +97,11 @@ fn run() -> Result<(), Error> {
                 .required(false)
                 .help("Use hashrown for HashMap implementation"),
         ).arg(
+            Arg::with_name("SKIP_WRITE")
+                .long("skip-write")
+                .required(false)
+                .help("Skip MessageWrite implementations")
+        ).arg(
             Arg::with_name("GEN_INFO")
                 .long("gen-info")
                 .required(false)
@@ -134,6 +139,7 @@ fn run() -> Result<(), Error> {
     .custom_struct_derive(custom_struct_derive)
     .nostd(matches.is_present("NOSTD"))
     .hashbrown(matches.is_present("HASHBROWN"))
+    .gen_write(!matches.is_present("SKIP_WRITE"))
     .gen_info(matches.is_present("GEN_INFO"))
     .custom_repr(custom_repr)
     .owned(matches.is_present("OWNED"))
