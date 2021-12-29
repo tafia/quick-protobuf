@@ -207,11 +207,17 @@ impl<W: WriterBackend> Writer<W> {
         self.write_bytes(bytes)
     }
 
-    /// Writes a message which implements `MessageWrite`
+    /// Writes a message which implements `MessageWrite` prefixed with a `varint` length
     #[cfg_attr(std, inline)]
     pub fn write_message<M: MessageWrite>(&mut self, m: &M) -> Result<()> {
         let len = m.get_size();
         self.write_varint(len as u64)?;
+        m.write_message(self)
+    }
+
+    /// Writes a message which implements `MessageWrite` without adding the length prefix
+    #[cfg_attr(std, inline)]
+    pub fn write_message_without_len<M: MessageWrite>(&mut self, m: &M) -> Result<()> {
         m.write_message(self)
     }
 
@@ -318,7 +324,7 @@ pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
     Ok(v)
 }
 
-/// Serialize a `MessageWrite` into a byte slice
+/// Serialize a `MessageWrite` into a byte slice with a length prefix
 pub fn serialize_into_slice<M: MessageWrite>(message: &M, out: &mut [u8]) -> Result<()> {
     let len = message.get_size();
     if out.len() < len {
@@ -327,6 +333,23 @@ pub fn serialize_into_slice<M: MessageWrite>(message: &M, out: &mut [u8]) -> Res
     {
         let mut writer = Writer::new(BytesWriter::new(out));
         writer.write_message(message)?;
+    }
+
+    Ok(())
+}
+
+/// Serialize a `MessageWrite` into a byte slice without a length prefix
+pub fn serialize_into_slice_without_len<M: MessageWrite>(
+    message: &M,
+    out: &mut [u8],
+) -> Result<()> {
+    let len = message.get_size();
+    if out.len() < len {
+        return Err(Error::OutputBufferTooSmall);
+    }
+    {
+        let mut writer = Writer::new(BytesWriter::new(out));
+        writer.write_message_without_len(message)?;
     }
 
     Ok(())
