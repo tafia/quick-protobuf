@@ -342,7 +342,7 @@ pub fn serialize_into_slice<M: MessageWrite>(message: &M, out: &mut [u8]) -> Res
 pub fn serialize_into_slice_without_len<M: MessageWrite>(
     message: &M,
     out: &mut [u8],
-) -> Result<()> {
+) -> Result<usize> {
     let len = message.get_size();
     if out.len() < len {
         return Err(Error::OutputBufferTooSmall);
@@ -352,7 +352,7 @@ pub fn serialize_into_slice_without_len<M: MessageWrite>(
         writer.write_message_without_len(message)?;
     }
 
-    Ok(())
+    Ok(len)
 }
 
 /// Writer backend abstraction

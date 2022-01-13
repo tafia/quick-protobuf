@@ -178,9 +178,10 @@ fn wr_message_slice_without_len() {
 
     let len = original.get_size();
     let mut serialized = vec![0u8; len];
-    serialize_into_slice_without_len(&original, &mut serialized).unwrap();
+    let serialized_len = serialize_into_slice_without_len(&original, &mut serialized).unwrap();
 
     let deserialized = deserialize_from_slice_without_len(&serialized).unwrap();
+    assert_eq!(len, serialized_len);
     assert_eq!(original, deserialized);
 }
 
