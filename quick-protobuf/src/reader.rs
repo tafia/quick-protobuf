@@ -455,18 +455,18 @@ impl BytesReader {
     /// Reads unknown data, based on its tag value (which itself gives us the wire_type value)
     #[cfg_attr(std, inline)]
     pub fn read_unknown(&mut self, bytes: &[u8], tag_value: u32) -> Result<()> {
-        match (tag_value & 0x7) as u8 {
+        use std::convert::TryFrom;
+
+        let offset = match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => {
                 self.read_varint64(bytes)?;
+                return Ok(());
             }
-            WIRE_TYPE_FIXED64 => self.start += 8,
-            WIRE_TYPE_FIXED32 => self.start += 4,
+            WIRE_TYPE_FIXED64 => 8,
+            WIRE_TYPE_FIXED32 => 4,
             WIRE_TYPE_LENGTH_DELIMITED => {
-                let len = self.read_varint64(bytes)? as usize;
-                self.start = self
-                    .start
-                    .checked_add(len)
-                    .ok_or(Error::UnexpectedEndOfBuffer)?;
+                // FIXME: overflow here as well
+                self.read_varint64(bytes)?
             }
             WIRE_TYPE_START_GROUP | WIRE_TYPE_END_GROUP => {
                 return Err(Error::Deprecated("group"));
@@ -474,7 +474,12 @@ impl BytesReader {
             t => {
                 return Err(Error::UnknownWireType(t));
             }
-        }
+        };
+
+        // make the safe conversion to platform dependent usize
+        let offset = usize::try_from(offset).map_err(|_| Error::SizeOverflow)?;
+
+        self.start = self.start.checked_add(offset).ok_or(Error::SizeOverflow)?;
         Ok(())
     }
 
@@ -632,5 +637,5 @@ fn read_size_overflowing_unknown() {
     assert_eq!(r.next_tag(bytes).unwrap(), 4730);
     let e = r.read_unknown(bytes, 4730).unwrap_err();
 
-    assert!(matches!(e, Error::UnexpectedEndOfBuffer), "{:?}", e);
+    assert!(matches!(e, Error::SizeOverflow), "{:?}", e);
 }
