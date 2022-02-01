@@ -463,7 +463,10 @@ impl BytesReader {
             WIRE_TYPE_FIXED32 => self.start += 4,
             WIRE_TYPE_LENGTH_DELIMITED => {
                 let len = self.read_varint64(bytes)? as usize;
-                self.start += len;
+                self.start = self
+                    .start
+                    .checked_add(len)
+                    .ok_or(Error::UnexpectedEndOfBuffer)?;
             }
             WIRE_TYPE_START_GROUP | WIRE_TYPE_END_GROUP => {
                 return Err(Error::Deprecated("group"));
