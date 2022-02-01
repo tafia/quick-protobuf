@@ -612,3 +612,22 @@ fn test_varint() {
     assert_eq!(150, r.read_varint32(&data[..]).unwrap());
     assert!(r.is_eof());
 }
+
+#[test]
+fn read_size_overflowing_unknown() {
+    let bytes = &[
+        200, 250, 35, 47, 250, 36, 255, 255, 255, 255, 255, 255, 255, 255, 255, 3, 255, 255, 227,
+    ];
+
+    let mut r = BytesReader::from_bytes(bytes);
+
+    assert!(!r.is_eof());
+    assert_eq!(r.next_tag(bytes).unwrap(), 589128);
+    r.read_unknown(bytes, 589128).unwrap();
+
+    assert!(!r.is_eof());
+    assert_eq!(r.next_tag(bytes).unwrap(), 4730);
+    let e = r.read_unknown(bytes, 4730).unwrap_err();
+
+    assert!(matches!(e, Error::UnexpectedEndOfBuffer), "{:?}", e);
+}
