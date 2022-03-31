@@ -2,7 +2,13 @@ syntax = "proto2";
 
 package perftest_data;
 
+// Single line comment
+
 message Test1 {
+/* Multi
+   line
+   comment
+*/
     optional int32 value = 1;
 }
 
