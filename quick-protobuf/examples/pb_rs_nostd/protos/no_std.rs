@@ -71,8 +71,8 @@ impl<'a> MessageRead<'a> for EmbeddedMessage {
 impl MessageWrite for EmbeddedMessage {
     fn get_size(&self) -> usize {
         0
-        + if self.val == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.val) as u64) }
-        + if self.e == protos::no_std::MyEnum::Val0 { 0 } else { 1 + sizeof_varint(*(&self.e) as u64) }
+        + if self.val == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.val) as u32 as u64) }
+        + if self.e == protos::no_std::MyEnum::Val0 { 0 } else { 1 + sizeof_varint(*(&self.e) as u32 as u64) }
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {

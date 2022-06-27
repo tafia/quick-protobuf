@@ -84,7 +84,7 @@ impl<W: WriterBackend> Writer<W> {
     /// Writes a `int32` which is internally coded as a `varint`
     #[cfg_attr(std, inline(always))]
     pub fn write_int32(&mut self, v: i32) -> Result<()> {
-        self.write_varint(v as u64)
+        self.write_varint(v as u32 as u64)
     }
 
     /// Writes a `int64` which is internally coded as a `varint`
