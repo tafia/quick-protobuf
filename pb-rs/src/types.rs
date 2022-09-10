@@ -129,15 +129,12 @@ pub enum FieldType {
 
 impl FieldType {
     pub fn is_primitive(&self) -> bool {
-        match *self {
-            FieldType::Message(_)
+        !matches!(*self, FieldType::Message(_)
             | FieldType::Map(_, _)
             | FieldType::StringCow
             | FieldType::BytesCow
             | FieldType::String_
-            | FieldType::Bytes_ => false,
-            _ => true,
-        }
+            | FieldType::Bytes_)
     }
 
     fn has_cow(&self) -> bool {
@@ -149,17 +146,11 @@ impl FieldType {
     }
 
     fn has_bytes_and_string(&self) -> bool {
-        match *self {
-            FieldType::Bytes_ | FieldType::String_ => true,
-            _ => false,
-        }
+        matches!(*self, FieldType::Bytes_ | FieldType::String_)
     }
 
     fn is_map(&self) -> bool {
-        match *self {
-            FieldType::Map(_, _) => true,
-            _ => false,
-        }
+        matches!(*self, FieldType::Map(_, _))
     }
 
     fn wire_type_num(&self, packed: bool) -> u32 {
@@ -227,10 +218,7 @@ impl FieldType {
     }
 
     fn is_fixed_size(&self) -> bool {
-        match self.wire_type_num_non_packed() {
-            1 | 5 => true,
-            _ => false,
-        }
+        matches!(self.wire_type_num_non_packed(), 1 | 5)
     }
 
     fn regular_default<'a, 'b>(&'a self, desc: &'b FileDescriptor) -> Option<&'b str> {
@@ -481,8 +469,7 @@ impl Field {
     }
 
     fn has_regular_default(&self, desc: &FileDescriptor) -> bool {
-        self.default.is_none()
-            || self.default.as_ref().map(|d| &**d) == self.typ.regular_default(desc)
+        self.default.is_none() || self.default.as_deref() == self.typ.regular_default(desc)
     }
 
     fn tag(&self) -> u32 {
@@ -785,11 +772,7 @@ impl Field {
 }
 
 fn get_modules(module: &str, imported: bool, desc: &FileDescriptor) -> String {
-    let skip = if desc.package.is_empty() && !imported {
-        1
-    } else {
-        0
-    };
+    let skip = usize::from(desc.package.is_empty() && !imported);
     module
         .split('.')
         .filter(|p| !p.is_empty())
@@ -846,7 +829,7 @@ impl Message {
     }
 
     fn has_lifetime(&self, desc: &FileDescriptor, config: &Config, ignore: &mut Vec<MessageIndex>) -> bool {
-        if ignore.contains(&&self.index) {
+        if ignore.contains(&self.index) {
             return false;
         }
         ignore.push(self.index.clone());
@@ -883,7 +866,7 @@ impl Message {
 
     fn write_common_uses<W: Write>(
         w: &mut W,
-        messages: &Vec<Message>,
+        messages: &[Message],
         desc: &FileDescriptor,
         config: &Config,
     ) -> Result<()> {
@@ -1499,7 +1482,7 @@ impl Enumerator {
                 let fqf = if self.module.is_empty() {
                     pqf.0.clone()
                 } else {
-                    format!("{}::{}", self.module.replace(".", "::"), pqf.0)
+                    format!("{}::{}", self.module.replace('.', "::"), pqf.0)
                 };
                 (fqf, pqf.1)
             })
@@ -1843,7 +1826,7 @@ pub struct FileDescriptor {
 impl FileDescriptor {
     pub fn run(configs: &[Config]) -> Result<()> {
         for config in configs {
-            Self::write_proto(&config)?
+            Self::write_proto(config)?
         }
         Ok(())
     }
@@ -1960,13 +1943,13 @@ impl FileDescriptor {
             desc.package.clone()
         };
 
-        desc.fetch_imports(&in_file, import_search_path)?;
+        desc.fetch_imports(in_file, import_search_path)?;
         Ok(desc)
     }
 
     fn sanity_checks(&self) -> Result<()> {
         for m in &self.messages {
-            m.sanity_checks(&self)?;
+            m.sanity_checks(self)?;
         }
         Ok(())
     }
@@ -1987,11 +1970,11 @@ impl FileDescriptor {
             let mut matching_file = None;
             for path in import_search_path {
                 let candidate = if path.is_absolute() {
-                    path.join(&import)
+                    path.join(import)
                 } else {
                     in_file
                         .parent()
-                        .map_or_else(|| path.join(&import), |p| p.join(path).join(&import))
+                        .map_or_else(|| path.join(import), |p| p.join(path).join(import))
                 };
                 if candidate.exists() {
                     matching_file = Some(candidate);
@@ -2398,7 +2381,7 @@ impl FileDescriptor {
 
     fn write_messages<W: Write>(&self, w: &mut W, config: &Config) -> Result<()> {
         for m in self.messages.iter().filter(|m| !m.imported) {
-            m.write(w, &self, config)?;
+            m.write(w, self, config)?;
         }
         Ok(())
     }
@@ -2440,7 +2423,7 @@ fn update_mod_file(path: &Path) -> Result<()> {
         for line in BufReader::new(f).lines() {
             let line = line?;
             if first {
-                if line.find(MAGIC_HEADER).is_none() {
+                if !line.contains(MAGIC_HEADER) {
                     // it is NOT one of our generated mod.rs files, so don't modify it!
                     present = true;
                     break;

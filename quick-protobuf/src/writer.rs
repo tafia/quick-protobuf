@@ -156,7 +156,7 @@ impl<W: WriterBackend> Writer<W> {
     /// Writes a `bool` 1 = true, 0 = false
     #[cfg_attr(std, inline(always))]
     pub fn write_bool(&mut self, v: bool) -> Result<()> {
-        self.inner.pb_write_u8(if v { 1 } else { 0 })
+        self.inner.pb_write_u8(u8::from(v))
     }
 
     /// Writes an `enum` converting it to a `i32` first
@@ -187,7 +187,7 @@ impl<W: WriterBackend> Writer<W> {
         if v.is_empty() {
             return Ok(());
         }
-        let len: usize = v.iter().map(|m| size(m)).sum();
+        let len: usize = v.iter().map(size).sum();
         self.write_varint(len as u64)?;
         for m in v {
             write(self, m)?;
@@ -244,7 +244,7 @@ impl<W: WriterBackend> Writer<W> {
         }
 
         self.write_tag(tag)?;
-        let len: usize = v.iter().map(|m| size(m)).sum();
+        let len: usize = v.iter().map(size).sum();
         self.write_varint(len as u64)?;
         for m in v {
             write(self, m)?;

@@ -327,12 +327,12 @@ fn rpc_service(input: &str) -> IResult<&str, RpcService> {
 
 fn message_event(input: &str) -> IResult<&str, MessageEvent> {
     alt((
-        map(reserved_nums, |r| MessageEvent::ReservedNums(r)),
-        map(reserved_names, |r| MessageEvent::ReservedNames(r)),
-        map(message_field, |f| MessageEvent::Field(f)),
-        map(message, |m| MessageEvent::Message(m)),
-        map(enumerator, |e| MessageEvent::Enumerator(e)),
-        map(one_of, |o| MessageEvent::OneOf(o)),
+        map(reserved_nums, MessageEvent::ReservedNums),
+        map(reserved_names, MessageEvent::ReservedNames),
+        map(message_field, MessageEvent::Field),
+        map(message, MessageEvent::Message),
+        map(enumerator, MessageEvent::Enumerator),
+        map(one_of, MessageEvent::OneOf),
         value(MessageEvent::Ignore, extensions),
         value(MessageEvent::Ignore, br),
     ))(input)
@@ -428,12 +428,12 @@ fn option_ignore(input: &str) -> IResult<&str, ()> {
 pub fn file_descriptor(input: &str) -> IResult<&str, FileDescriptor, nom::error::Error<String>> {
     map(
         many0(alt((
-            map(syntax, |s| Event::Syntax(s)),
-            map(import, |i| Event::Import(i)),
-            map(package, |p| Event::Package(p)),
-            map(message, |m| Event::Message(m)),
-            map(enumerator, |e| Event::Enum(e)),
-            map(rpc_service, |r| Event::RpcService(r)),
+            map(syntax, Event::Syntax),
+            map(import, Event::Import),
+            map(package, Event::Package),
+            map(message, Event::Message),
+            map(enumerator, Event::Enum),
+            map(rpc_service, Event::RpcService),
             value(Event::Ignore, option_ignore),
             value(Event::Ignore, br),
         ))),

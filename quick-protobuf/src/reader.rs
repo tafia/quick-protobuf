@@ -323,9 +323,9 @@ impl BytesReader {
     #[cfg_attr(std, inline)]
     fn read_fixed<M, F: Fn(&[u8]) -> M>(&mut self, bytes: &[u8], len: usize, read: F) -> Result<M> {
         let v = read(
-            &bytes
+            bytes
                 .get(self.start..self.start + len)
-                .ok_or_else(|| Error::UnexpectedEndOfBuffer)?,
+                .ok_or(Error::UnexpectedEndOfBuffer)?,
         );
         self.start += len;
         Ok(v)
@@ -408,7 +408,7 @@ impl BytesReader {
     pub fn read_bytes<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a [u8]> {
         self.read_len_varint(bytes, |r, b| {
             b.get(r.start..r.end)
-                .ok_or_else(|| Error::UnexpectedEndOfBuffer)
+                .ok_or(Error::UnexpectedEndOfBuffer)
         })
     }
 
@@ -417,7 +417,7 @@ impl BytesReader {
     pub fn read_string<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a str> {
         self.read_len_varint(bytes, |r, b| {
             b.get(r.start..r.end)
-                .ok_or_else(|| Error::UnexpectedEndOfBuffer)
+                .ok_or(Error::UnexpectedEndOfBuffer)
                 .and_then(|x| ::core::str::from_utf8(x).map_err(|e| e.into()))
         })
     }
@@ -674,8 +674,8 @@ impl Reader {
 
 /// Deserialize a `MessageRead from a `&[u8]`
 pub fn deserialize_from_slice<'a, M: MessageRead<'a>>(bytes: &'a [u8]) -> Result<M> {
-    let mut reader = BytesReader::from_bytes(&bytes);
-    reader.read_message::<M>(&bytes)
+    let mut reader = BytesReader::from_bytes(bytes);
+    reader.read_message::<M>(bytes)
 }
 
 #[test]
