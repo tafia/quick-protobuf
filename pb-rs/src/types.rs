@@ -851,7 +851,7 @@ impl Message {
         ignore.push(self.index.clone());
         let res = self
             .all_fields()
-            .any(|f| f.typ.has_lifetime(desc, f.packed(), ignore));
+            .any(|f| (f.typ.has_lifetime(desc, f.packed(), ignore) && !f.deprecated));
         ignore.pop();
         res
     }

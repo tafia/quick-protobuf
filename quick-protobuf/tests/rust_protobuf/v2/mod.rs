@@ -30,3 +30,4 @@ pub mod test_sanitize_file_name_pb;
 pub mod test_sync;
 pub mod test_text_format;
 pub mod test_text_format_pb;
+pub mod test_deprecated_lifetime;
