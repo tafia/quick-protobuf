@@ -8,8 +8,8 @@ use crate::types::{
 
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until, take_while},
-    character::complete::{alphanumeric1, digit1, hex_digit1, line_ending, multispace1},
+    bytes::complete::{tag, take_until},
+    character::complete::{alphanumeric1, digit1, hex_digit1, multispace1, not_line_ending},
     combinator::{map, map_res, opt, recognize, value},
     multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -58,10 +58,7 @@ fn integer(input: &str) -> IResult<&str, i32> {
 }
 
 fn comment(input: &str) -> IResult<&str, ()> {
-    value(
-        (),
-        tuple((tag("//"), take_while(|c| !"\n\r".contains(c)), opt(line_ending))),
-    )(input)
+    value((), pair(tag("//"), not_line_ending))(input)
 }
 
 fn block_comment(input: &str) -> IResult<&str, ()> {
@@ -77,7 +74,7 @@ fn string(input: &str) -> IResult<&str, String> {
 
 // word break: multispace or comment
 fn br(input: &str) -> IResult<&str, ()> {
-    alt((value((), multispace1), comment, block_comment))(input)
+    value((), many1(alt((value((), multispace1), comment, block_comment))))(input)
 }
 
 fn syntax(input: &str) -> IResult<&str, Syntax> {
@@ -324,11 +321,7 @@ fn message(input: &str) -> IResult<&str, Message> {
         terminated(
             pair(
                 delimited(pair(tag("message"), many1(br)), word, many0(br)),
-                delimited(
-                    tag("{"),
-                    many0(delimited(many0(br), message_event, many0(br))),
-                    preceded(many0(br), tag("}")),
-                ),
+                delimited(tag("{"), many0(message_event), tag("}")),
             ),
             opt(pair(many0(br), tag(";"))),
         ),
@@ -482,8 +475,11 @@ mod test {
     }
 
     #[test]
-    fn comments() {
-        assert_complete(comment("// foo\n"));
+    fn comment_vs_other_whitespace_behaviour() {
+        // I think it would be nice to not combine parsing comments with parsing
+        // other types of whitespace (like \n) at this level, but admittedly
+        // it's a small matter
+        assert_eq!("\n", comment("// foo\n").unwrap().0);
     }
 
     #[test]
@@ -494,6 +490,58 @@ mod test {
             ::nom::IResult::Ok(_) => (),
             e => panic!("Expecting done {:?}", e),
         }
+    }
+
+    #[test]
+    fn test_comments() {
+        assert_eq!("\nb", comment("// BOOM\nb").unwrap().0);
+        assert_eq!("\nb", comment("//\nb").unwrap().0);
+        assert_eq!("\nb", block_comment("/* BOOM */\nb").unwrap().0);
+        let msg = r#"
+            // BOOM
+
+            /* BOOM */
+            package foo.bar;
+
+            // BOOM
+
+            /* BOOM */
+            message A {
+                // BOOM
+                enum E1 {
+                    // BOOM
+
+                    // BOOM
+                    V1 = 1;
+
+                    // BOOM
+                    v2 = 2;
+                }
+                // BOOM
+
+                enum E2 {
+                    // BOOM
+                }
+
+                enum E3 { /* BOOM */ }
+                // BOOM
+                message B {
+                    // BOOM
+                    // BOOM
+                    optional string b = 1;
+                }
+                message C {
+                    // BOOM
+                }
+                message D { /* BOOM */ }
+                required string a = 1;
+            }
+            "#;
+        let desc = file_descriptor(msg).unwrap().1;
+        assert_eq!("foo.bar".to_string(), desc.package);
+        assert_eq!(1, desc.messages.len());
+        assert_eq!(3, desc.messages[0].messages.len());
+        assert_eq!(3, desc.messages[0].enums.len());
     }
 
     #[test]
@@ -544,13 +592,16 @@ mod test {
             repeated int32 a = 1;
             optional string b = 2;
         }
+        message C {
+        }
+        message D {}
         optional b = 1;
     }"#;
 
-        let mess = message(msg);
-        if let ::nom::IResult::Ok((_, mess)) = mess {
-            assert!(mess.messages.len() == 1);
-        }
+        let desc = file_descriptor(msg).unwrap().1;
+        dbg!(&desc);
+        assert_eq!(1, desc.messages.len());
+        assert_eq!(3, desc.messages[0].messages.len());
     }
 
     #[test]
