@@ -14,6 +14,8 @@ use std::io::Read;
 #[cfg(feature = "std")]
 use std::path::Path;
 
+use core::convert::TryFrom;
+
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
@@ -21,6 +23,7 @@ use alloc::vec::Vec;
 
 use crate::errors::{Error, Result};
 use crate::message::MessageRead;
+use crate::{BytesWriter, Writer};
 
 use byteorder::ByteOrder;
 use byteorder::LittleEndian as LE;
@@ -107,45 +110,85 @@ impl BytesReader {
     /// Reads the next varint encoded u64
     #[cfg_attr(std, inline(always))]
     pub fn read_varint32(&mut self, bytes: &[u8]) -> Result<u32> {
-        let mut b = self.read_u8(bytes)?;
+        let mut b = self.read_u8(bytes)?; // byte0
         if b & 0x80 == 0 {
             return Ok(b as u32);
         }
         let mut r = (b & 0x7f) as u32;
 
-        b = self.read_u8(bytes)?;
+        b = self.read_u8(bytes)?; // byte1
         r |= ((b & 0x7f) as u32) << 7;
         if b & 0x80 == 0 {
             return Ok(r);
         }
 
-        b = self.read_u8(bytes)?;
+        b = self.read_u8(bytes)?; // byte2
         r |= ((b & 0x7f) as u32) << 14;
         if b & 0x80 == 0 {
             return Ok(r);
         }
 
-        b = self.read_u8(bytes)?;
+        b = self.read_u8(bytes)?; // byte3
         r |= ((b & 0x7f) as u32) << 21;
         if b & 0x80 == 0 {
             return Ok(r);
         }
 
-        b = self.read_u8(bytes)?;
-        r |= ((b & 0xf) as u32) << 28;
+        b = self.read_u8(bytes)?; // byte4
+        r |= ((b & 0xf) as u32) << 28; // silently prevent overflow; only mask 0xF
         if b & 0x80 == 0 {
+            // In this case, byte4 takes the form 0ZZZ_YYYY where:
+            //     Y: part of the resulting 32-bit number
+            //     Z: beyond 32 bits (excess bits, not used)
+            //
+            // If the Z bits were set, it might indicate that the number being
+            // decoded was intended to be bigger than 32 bits, suggesting an
+            // error somewhere else.
+            //
+            // Therefore, even though we have silently prevented 32-bit overflow
+            // in our masking of byte 4, we still wish to return an error.
+            if b & 0b0111_0000 != 0 {
+                return Err(Error::SizeOverflow);
+            }
             return Ok(r);
         }
 
-        // discards extra bytes
-        for _ in 0..5 {
-            if self.read_u8(bytes)? & 0x80 == 0 {
-                return Ok(r);
+        // If we continue reading after byte 4, the only possible valid case is
+        // that we have a a negative number (since negative numbers are always
+        // 10 bytes in protobuf). We must have exactly 5 bytes more to go.
+        //
+        // Since we know it must be a negative number, and this function is
+        // meant to read 32-bit ints (there is a different function for reading
+        // 64-bit ints), we choose to make this function assert that this
+        // negative number is within valid i32 range, i.e. at least
+        // -2,147,483,648.
+        //
+        // What this means in the end is that our resulting number, once decoded
+        // from the varint format, must take such a form:
+        //
+        // 11111111_11111111_11111111_11111111_1XXXXXXX_XXXXXXXX_XXXXXXXX_XXXXXXXX
+        // ^(MSB bit 63)                       ^(bit 31 is set)                  ^(LSB bit 0)
+        //
+        // The rest of our code is just to assert this format.
+
+        if b & 0b1111_1000 != 0b1111_1000 {
+            return Err(Error::SizeOverflow);
+        }
+
+        for _ in 0..4 {
+            if self.read_u8(bytes)? != 0xFF {
+                return Err(Error::SizeOverflow);
             }
         }
 
+        // 0x01 is to prevent 64-bit overflow; see `read_varint64()`
+        if self.read_u8(bytes)? != 0x01 {
+            return Err(Error::SizeOverflow);
+        }
+
+        Ok(r)
+
         // cannot read more than 10 bytes
-        Err(Error::Varint)
     }
 
     /// Reads the next varint encoded u64
@@ -209,18 +252,29 @@ impl BytesReader {
         }
 
         b = self.read_u8(bytes)?;
-        r2 |= (b as u32) << 7;
-        if b & 0x80 == 0 {
-            return Ok((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56);
+
+        // Check two things at once:
+        // 1. This must be the last byte (MSB not set)
+        // 2. No 64-bit overflow (middle 6 bits are beyond 64 bits for the entire varint,
+        //    so they cannot be set either)
+        if b & 0b11111110 != 0 {
+            return Err(Error::SizeOverflow);
         }
 
+        r2 |= (b as u32) << 7;
+        Ok((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56)
+
         // cannot read more than 10 bytes
-        Err(Error::Varint)
     }
 
     /// Reads int32 (varint)
     #[cfg_attr(std, inline)]
     pub fn read_int32(&mut self, bytes: &[u8]) -> Result<i32> {
+        // let read_val = self.read_varint64(bytes)?;
+        // match i32::try_from(read_val) {
+        //     Ok(contents) => Ok(contents),
+        //     Err(_) => Err(Error::SizeOverflow),
+        // }
         self.read_varint32(bytes).map(|i| i as i32)
     }
 
@@ -455,8 +509,6 @@ impl BytesReader {
     /// Reads unknown data, based on its tag value (which itself gives us the wire_type value)
     #[cfg_attr(std, inline)]
     pub fn read_unknown(&mut self, bytes: &[u8], tag_value: u32) -> Result<()> {
-        use std::convert::TryFrom;
-
         let offset = match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => {
                 self.read_varint64(bytes)?;
@@ -464,10 +516,7 @@ impl BytesReader {
             }
             WIRE_TYPE_FIXED64 => 8,
             WIRE_TYPE_FIXED32 => 4,
-            WIRE_TYPE_LENGTH_DELIMITED => {
-                // FIXME: overflow here as well
-                self.read_varint64(bytes)?
-            }
+            WIRE_TYPE_LENGTH_DELIMITED => self.read_varint64(bytes)?,
             WIRE_TYPE_START_GROUP | WIRE_TYPE_END_GROUP => {
                 return Err(Error::Deprecated("group"));
             }
@@ -480,6 +529,7 @@ impl BytesReader {
         let offset = usize::try_from(offset).map_err(|_| Error::SizeOverflow)?;
 
         self.start = self.start.checked_add(offset).ok_or(Error::SizeOverflow)?;
+
         Ok(())
     }
 
@@ -624,7 +674,19 @@ fn test_varint() {
 #[test]
 fn read_size_overflowing_unknown() {
     let bytes = &[
-        200, 250, 35, 47, 250, 36, 255, 255, 255, 255, 255, 255, 255, 255, 255, 3, 255, 255, 227,
+        200, 250, 35, // varint tag with WIRE_TYPE_VARINT -- 589128
+        //
+        //
+        47, // varint itself
+        //
+        //
+        250, 36, // varint tag with WIRE_TYPE_LENGTH_DELIMITED -- 4730
+        //
+        //
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 3, // huge 10-byte length
+        //
+        //
+        255, 255, 227, // unused extra bytes
     ];
 
     let mut r = BytesReader::from_bytes(bytes);
@@ -638,4 +700,105 @@ fn read_size_overflowing_unknown() {
     let e = r.read_unknown(bytes, 4730).unwrap_err();
 
     assert!(matches!(e, Error::SizeOverflow), "{:?}", e);
+}
+
+#[test]
+fn check_size_overflow_varint32() {
+    fn assert_decode(buf: &[u8], assert_value: i32) {
+        let mut r = BytesReader::from_bytes(buf);
+        assert_eq!(assert_value, r.read_varint32(buf).unwrap() as i32);
+    }
+    fn assert_decode_fail(buf: &[u8]) {
+        let mut r = BytesReader::from_bytes(buf);
+        let e = r.read_varint32(buf).unwrap_err();
+        assert!(matches!(e, Error::SizeOverflow), "{:?}", e);
+    }
+
+    assert_decode(
+        &[0x80, 0x80, 0x80, 0x80, 0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0x01],
+        -2147483648,
+    );
+    assert_decode(&[0xFF, 0xFF, 0xFF, 0xFF, 0x07], 2147483647);
+    assert_decode(&[0xFE, 0xFF, 0xFF, 0xFF, 0x07], 2147483646);
+    assert_decode(
+        &[0xE9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01],
+        -23,
+    );
+    assert_decode(&[0xFF, 0xFF, 0xFF, 0xFF, 0x0F], -1);
+    assert_decode(&[0xFE, 0xFF, 0xFF, 0xFF, 0x0F], -2);
+    assert_decode(&[0xFF, 0xFF, 0xFF, 0xFF, 0x0E], -268435457);
+
+    // not enough bytes
+    assert_decode_fail(&[0xE9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]);
+
+    // too negative for i32
+    assert_decode_fail(&[0xE9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0x01]);
+    assert_decode_fail(&[0x80, 0x80, 0x80, 0x80, 0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]);
+    assert_decode_fail(&[0x80, 0x80, 0x80, 0x80, 0x88, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]);
+
+    // last byte not 0x01
+    assert_decode_fail(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
+    // positive overflow
+    assert_decode_fail(&[0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
+}
+
+#[test]
+fn check_size_overflow_varint64() {
+    let mut v = Vec::<u64>::new();
+    for i in 0..=255 {
+        let bytes = &[255, 255, 255, 255, 255, 255, 255, 255, 255, i];
+
+        let mut r = BytesReader::from_bytes(bytes);
+
+        match r.read_varint64(bytes) {
+            Ok(contents) => v.push(contents),
+            Err(e) => assert!(matches!(e, Error::SizeOverflow), "{:?}", e),
+        }
+    }
+    assert_eq!(v.len(), 2);
+}
+
+#[test]
+fn test_varint32_read_write() {
+    const CAPACITY: usize = 10000;
+    const STEP_SIZE: usize = 20000000;
+
+    let mut before = Vec::<u32>::with_capacity(CAPACITY);
+    let mut after = Vec::<u32>::with_capacity(CAPACITY);
+    let mut v = vec![0; CAPACITY];
+    let b = BytesWriter::new(&mut v);
+    let mut w = Writer::new(b);
+    for i in (0..2u128.pow(32)).step_by(STEP_SIZE) {
+        w.write_varint(i as u64).unwrap();
+        before.push(i as u32);
+    }
+    let mut r = BytesReader::from_bytes(&v);
+    for _ in (0..2u128.pow(32)).step_by(STEP_SIZE) {
+        let i = r.read_varint32(&v).unwrap();
+        after.push(i as u32);
+    }
+    assert_eq!(before, after);
+}
+
+#[test]
+fn test_varint64_read_write() {
+    const CAPACITY: usize = 1000000;
+    const STEP_SIZE: usize = 2000000000000000;
+
+    let mut before = Vec::<u64>::with_capacity(CAPACITY);
+    let mut after = Vec::<u64>::with_capacity(CAPACITY);
+    let mut v = vec![0; CAPACITY];
+    let b = BytesWriter::new(&mut v);
+    let mut w = Writer::new(b);
+    for i in (0..2u128.pow(64)).step_by(STEP_SIZE) {
+        w.write_varint(i as u64).unwrap();
+        before.push(i as u64);
+    }
+    let mut r = BytesReader::from_bytes(&v);
+    for _ in (0..2u128.pow(64)).step_by(STEP_SIZE) {
+        let i = r.read_varint64(&v).unwrap();
+        after.push(i as u64);
+    }
+    assert_eq!(before, after);
 }
