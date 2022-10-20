@@ -1,3 +1,5 @@
+syntax = "proto3";
+
 message ThisShouldNotHaveALifetimeParameter {
     optional string dep = 1 [deprecated=true];
 }

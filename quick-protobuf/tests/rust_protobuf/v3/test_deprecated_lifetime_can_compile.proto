@@ -1,16 +1,16 @@
-syntax = "proto2";
+syntax = "proto3";
 
-message ThisShouldNotHaveALifetimeParameter {
+message HasLifetimeParameterIfAddDeprecatedFields {
     optional string dep = 1 [deprecated=true];
 }
 
-message ThisShouldntEither {
+message SameHere {
     oneof ContainsDeprecated {
         string dep = 1 [deprecated=true];
     }
 }
 
-message NorShouldThis {
+message AndThisToo {
     optional MessageWithLifetime dep = 1 [deprecated=true];
 }
 

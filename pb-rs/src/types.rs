@@ -273,12 +273,13 @@ impl FieldType {
     fn has_lifetime(
         &self,
         desc: &FileDescriptor,
+        config: &Config,
         packed: bool,
         ignore: &mut Vec<MessageIndex>,
     ) -> bool {
         match *self {
             FieldType::StringCow | FieldType::BytesCow => true, // Cow<[u8]>
-            FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc, ignore),
+            FieldType::Message(ref m) => m.get_message(desc).has_lifetime(desc, config, ignore),
             FieldType::Fixed64
             | FieldType::Sfixed64
             | FieldType::Double
@@ -288,13 +289,13 @@ impl FieldType {
             | FieldType::Bytes_
             | FieldType::Float => packed, // Cow<[M]>
             FieldType::Map(ref key, ref value) => {
-                key.has_lifetime(desc, false, ignore) || value.has_lifetime(desc, false, ignore)
+                key.has_lifetime(desc, config, false, ignore) || value.has_lifetime(desc, config, false, ignore)
             }
             _ => false,
         }
     }
 
-    fn rust_type(&self, desc: &FileDescriptor) -> Result<String> {
+    fn rust_type(&self, desc: &FileDescriptor, config: &Config) -> Result<String> {
         Ok(match *self {
             FieldType::Int32 | FieldType::Sint32 | FieldType::Sfixed32 => "i32".to_string(),
             FieldType::Int64 | FieldType::Sint64 | FieldType::Sfixed64 => "i64".to_string(),
@@ -313,7 +314,7 @@ impl FieldType {
             }
             FieldType::Message(ref msg) => {
                 let m = msg.get_message(desc);
-                let lifetime = if m.has_lifetime(desc, &mut Vec::new()) {
+                let lifetime = if m.has_lifetime(desc, config, &mut Vec::new()) {
                     "<'a>"
                 } else {
                     ""
@@ -322,8 +323,8 @@ impl FieldType {
             }
             FieldType::Map(ref key, ref value) => format!(
                 "KVMap<{}, {}>",
-                key.rust_type(desc)?,
-                value.rust_type(desc)?
+                key.rust_type(desc, config)?,
+                value.rust_type(desc, config)?
             ),
             FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
         })
@@ -448,9 +449,9 @@ impl Field {
         self.packed.unwrap_or(false)
     }
 
-    fn sanitize_default(&mut self, desc: &FileDescriptor) -> Result<()> {
+    fn sanitize_default(&mut self, desc: &FileDescriptor, config: &Config) -> Result<()> {
         if let Some(ref mut d) = self.default {
-            *d = match &*self.typ.rust_type(desc)? {
+            *d = match &*self.typ.rust_type(desc, config)? {
                 "u32" => format!("{}u32", *d),
                 "u64" => format!("{}u64", *d),
                 "i32" => format!("{}i32", *d),
@@ -502,7 +503,7 @@ impl Field {
             }
         }
         write!(w, "    pub {}: ", self.name)?;
-        let rust_type = self.typ.rust_type(desc)?;
+        let rust_type = self.typ.rust_type(desc, config)?;
         match self.frequency {
             _ if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
             Frequency::Optional
@@ -844,14 +845,15 @@ impl Message {
         }
     }
 
-    fn has_lifetime(&self, desc: &FileDescriptor, ignore: &mut Vec<MessageIndex>) -> bool {
+    fn has_lifetime(&self, desc: &FileDescriptor, config: &Config, ignore: &mut Vec<MessageIndex>) -> bool {
         if ignore.contains(&&self.index) {
             return false;
         }
         ignore.push(self.index.clone());
-        let res = self
-            .all_fields()
-            .any(|f| (f.typ.has_lifetime(desc, f.packed(), ignore) && !f.deprecated));
+        let res = self.all_fields().any(|f| {
+            f.typ.has_lifetime(desc, config, f.packed(), ignore)
+                && (!f.deprecated || config.add_deprecated_fields)
+        });
         ignore.pop();
         res
     }
@@ -909,7 +911,7 @@ impl Message {
 
         if config.nostd
             && messages.iter().any(|m| {
-                desc.owned && m.has_lifetime(desc, &mut Vec::new())
+                desc.owned && m.has_lifetime(desc, config, &mut Vec::new())
                     || m.all_fields().any(|f| f.boxed)
             })
         {
@@ -952,7 +954,7 @@ impl Message {
             writeln!(w)?;
         }
 
-        if desc.owned && self.has_lifetime(desc, &mut Vec::new()) {
+        if desc.owned && self.has_lifetime(desc, config, &mut Vec::new()) {
             writeln!(w)?;
             self.write_impl_owned(w, config)?;
         }
@@ -1014,7 +1016,7 @@ impl Message {
         if config.dont_use_cow {
             ignore.push(self.index.clone());
         }
-        if self.has_lifetime(desc, &mut ignore) {
+        if self.has_lifetime(desc, config, &mut ignore) {
             writeln!(w, "pub struct {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "pub struct {} {{", self.name)?;
@@ -1023,7 +1025,7 @@ impl Message {
             f.write_definition(w, desc, config)?;
         }
         for o in &self.oneofs {
-            o.write_message_definition(w, desc)?;
+            o.write_message_definition(w, desc, config)?;
         }
         writeln!(w, "}}")?;
         Ok(())
@@ -1039,7 +1041,7 @@ impl Message {
         if config.dont_use_cow {
             ignore.push(self.index.clone());
         }
-        if self.has_lifetime(desc, &mut ignore) {
+        if self.has_lifetime(desc, config, &mut ignore) {
             writeln!(w, "impl<'a> MessageInfo for {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "impl MessageInfo for {} {{", self.name)?;
@@ -1076,7 +1078,7 @@ impl Message {
         if config.dont_use_cow {
             ignore.push(self.index.clone());
         }
-        if self.has_lifetime(desc, &mut ignore) {
+        if self.has_lifetime(desc, config, &mut ignore) {
             writeln!(w, "impl<'a> MessageRead<'a> for {}<'a> {{", self.name)?;
             writeln!(
                 w,
@@ -1150,7 +1152,7 @@ impl Message {
         if config.dont_use_cow {
             ignore.push(self.index.clone());
         }
-        if self.has_lifetime(desc, &mut ignore) {
+        if self.has_lifetime(desc, config, &mut ignore) {
             writeln!(w, "impl<'a> MessageWrite for {}<'a> {{", self.name)?;
         } else {
             writeln!(w, "impl MessageWrite for {} {{", self.name)?;
@@ -1395,12 +1397,12 @@ impl Message {
         }
     }
 
-    fn sanitize_defaults(&mut self, desc: &FileDescriptor) -> Result<()> {
+    fn sanitize_defaults(&mut self, desc: &FileDescriptor, config: &Config) -> Result<()> {
         for f in self.all_fields_mut() {
-            f.sanitize_default(desc)?;
+            f.sanitize_default(desc, config)?;
         }
         for m in &mut self.messages {
-            m.sanitize_defaults(desc)?;
+            m.sanitize_defaults(desc, config)?;
         }
         Ok(())
     }
@@ -1584,10 +1586,12 @@ pub struct OneOf {
 }
 
 impl OneOf {
-    fn has_lifetime(&self, desc: &FileDescriptor) -> bool {
-        self.fields
-            .iter()
-            .any(|f| !f.deprecated && f.typ.has_lifetime(desc, f.packed(), &mut Vec::new()))
+    fn has_lifetime(&self, desc: &FileDescriptor, config: &Config) -> bool {
+        self.fields.iter().any(|f| {
+            f.typ
+                .has_lifetime(desc, config, f.packed(), &mut Vec::new())
+                && (!f.deprecated || config.add_deprecated_fields)
+        })
     }
 
     fn set_package(&mut self, package: &str, module: &str) {
@@ -1611,13 +1615,13 @@ impl OneOf {
         writeln!(w)?;
         self.write_definition(w, desc, config)?;
         writeln!(w)?;
-        self.write_impl_default(w, desc)?;
+        self.write_impl_default(w, desc, config)?;
         Ok(())
     }
 
     fn write_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
         writeln!(w, "#[derive(Debug, PartialEq, Clone)]")?;
-        if self.has_lifetime(desc) {
+        if self.has_lifetime(desc, config) {
             writeln!(w, "pub enum OneOf{}<'a> {{", self.name)?;
         } else {
             writeln!(w, "pub enum OneOf{} {{", self.name)?;
@@ -1631,7 +1635,7 @@ impl OneOf {
                 }
             }
 
-            let rust_type = f.typ.rust_type(desc)?;
+            let rust_type = f.typ.rust_type(desc, config)?;
             if f.boxed {
                 writeln!(w, "    {}(Box<{}>),", f.name, rust_type)?;
             } else {
@@ -1657,7 +1661,7 @@ impl OneOf {
         // For the first of each enumeration type, generate an impl From<> for it.
         let mut handled_fields = Vec::new();
         for f in self.fields.iter().filter(|f| !f.deprecated || config.add_deprecated_fields) {
-            let rust_type = f.typ.rust_type(desc)?;
+            let rust_type = f.typ.rust_type(desc, config)?;
             if handled_fields.contains(&rust_type) {
                 continue;
             }
@@ -1673,8 +1677,8 @@ impl OneOf {
         Ok(())
     }
 
-    fn write_impl_default<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
-        if self.has_lifetime(desc) {
+    fn write_impl_default<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+        if self.has_lifetime(desc, config) {
             writeln!(w, "impl<'a> Default for OneOf{}<'a> {{", self.name)?;
         } else {
             writeln!(w, "impl Default for OneOf{} {{", self.name)?;
@@ -1686,8 +1690,8 @@ impl OneOf {
         Ok(())
     }
 
-    fn write_message_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
-        if self.has_lifetime(desc) {
+    fn write_message_definition<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
+        if self.has_lifetime(desc, config) {
             writeln!(
                 w,
                 "    pub {}: {}OneOf{}<'a>,",
@@ -1853,7 +1857,7 @@ impl FileDescriptor {
             desc.convert_field_types(&FieldType::StringCow, &FieldType::String_);
             desc.convert_field_types(&FieldType::BytesCow, &FieldType::Bytes_);
         }
-        desc.set_defaults()?;
+        desc.set_defaults(config)?;
         desc.sanitize_names();
 
         if config.single_module {
@@ -2025,7 +2029,7 @@ impl FileDescriptor {
         Ok(())
     }
 
-    fn set_defaults(&mut self) -> Result<()> {
+    fn set_defaults(&mut self, config: &Config) -> Result<()> {
         // set map fields as required (they are equivalent to repeated message)
         for m in &mut self.messages {
             m.set_map_required();
@@ -2040,7 +2044,7 @@ impl FileDescriptor {
         //let msgs = self.messages.clone();
         let copy = self.clone();
         for m in &mut self.messages {
-            m.sanitize_defaults(&copy)?; //&msgs, &self.enums)?; ???
+            m.sanitize_defaults(&copy, config)?; //&msgs, &self.enums)?; ???
         }
         // force packed only on primitives
         for m in &mut self.messages {
