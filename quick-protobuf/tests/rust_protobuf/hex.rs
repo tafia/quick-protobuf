@@ -58,7 +58,7 @@ mod test {
 
     #[test]
     fn test_decode_hex() {
-        assert_eq!(decode_hex(""), [].to_vec());
+        assert_eq!(decode_hex(""), [].to_vec() as Vec<u8>);
         assert_eq!(decode_hex("00"), [0x00u8].to_vec());
         assert_eq!(decode_hex("ff"), [0xffu8].to_vec());
         assert_eq!(decode_hex("AB"), [0xabu8].to_vec());
