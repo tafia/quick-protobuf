@@ -23,7 +23,6 @@ use alloc::vec::Vec;
 
 use crate::errors::{Error, Result};
 use crate::message::MessageRead;
-use crate::{BytesWriter, Writer};
 
 use byteorder::ByteOrder;
 use byteorder::LittleEndian as LE;
@@ -137,58 +136,62 @@ impl BytesReader {
         b = self.read_u8(bytes)?; // byte4
         r |= ((b & 0xf) as u32) << 28; // silently prevent overflow; only mask 0xF
         if b & 0x80 == 0 {
+            // WARNING ABOUT TRUNCATION
+            //
             // In this case, byte4 takes the form 0ZZZ_YYYY where:
             //     Y: part of the resulting 32-bit number
-            //     Z: beyond 32 bits (excess bits, not used)
+            //     Z: beyond 32 bits (excess bits,not used)
             //
             // If the Z bits were set, it might indicate that the number being
             // decoded was intended to be bigger than 32 bits, suggesting an
             // error somewhere else.
             //
-            // Therefore, even though we have silently prevented 32-bit overflow
-            // in our masking of byte 4, we still wish to return an error.
-            if b & 0b0111_0000 != 0 {
-                return Err(Error::SizeOverflow);
-            }
+            // However, for the sake of consistency with Google's own protobuf
+            // implementation, and also to allow for any efficient use of those
+            // extra bits by users if they wish (this crate is meant for speed
+            // optimization anyway) we shall not check for this here.
+            //
+            // Therefore, THIS FUNCTION SIMPLY IGNORES THE EXTRA BITS, WHICH IS
+            // ESSENTIALLY A SILENT TRUNCATION!
             return Ok(r);
         }
 
-        // If we continue reading after byte 4, the only possible valid case is
-        // that we have a a negative number (since negative numbers are always
-        // 10 bytes in protobuf). We must have exactly 5 bytes more to go.
+        // ANOTHER WARNING ABOUT TRUNCATION
+        //
+        // Again, we do not check whether the byte representation fits within 32
+        // bits, and simply ignore extra bytes, CONSTITUTING A SILENT
+        // TRUNCATION!
+        //
+        // Therefore, if the user wants this function to avoid ignoring any
+        // bits/bytes, they need to ensure that the input is a varint
+        // representing a value within EITHER u32 OR i32 range. Since at this
+        // point we are beyond 5 bits, the only possible case is a negative i32
+        // (since negative numbers are always 10 bytes in protobuf). We must
+        // have exactly 5 bytes more to go.
         //
         // Since we know it must be a negative number, and this function is
         // meant to read 32-bit ints (there is a different function for reading
-        // 64-bit ints), we choose to make this function assert that this
+        // 64-bit ints), the user might want to take care to ensure that this
         // negative number is within valid i32 range, i.e. at least
-        // -2,147,483,648.
+        // -2,147,483,648. Otherwise, this function simply ignores the extra
+        // bits, essentially constituting a silent truncation!
         //
-        // What this means in the end is that our resulting number, once decoded
-        // from the varint format, must take such a form:
+        // What this means in the end is that the user should ensure that the
+        // resulting number, once decoded from the varint format, takes such a
+        // form:
         //
         // 11111111_11111111_11111111_11111111_1XXXXXXX_XXXXXXXX_XXXXXXXX_XXXXXXXX
         // ^(MSB bit 63)                       ^(bit 31 is set)                  ^(LSB bit 0)
-        //
-        // The rest of our code is just to assert this format.
 
-        if b & 0b1111_1000 != 0b1111_1000 {
-            return Err(Error::SizeOverflow);
-        }
-
-        for _ in 0..4 {
-            if self.read_u8(bytes)? != 0xFF {
-                return Err(Error::SizeOverflow);
+        // discards extra bytes
+        for _ in 0..5 {
+            if self.read_u8(bytes)? & 0x80 == 0 {
+                return Ok(r);
             }
         }
 
-        // 0x01 is to prevent 64-bit overflow; see `read_varint64()`
-        if self.read_u8(bytes)? != 0x01 {
-            return Err(Error::SizeOverflow);
-        }
-
-        Ok(r)
-
         // cannot read more than 10 bytes
+        Err(Error::Varint)
     }
 
     /// Reads the next varint encoded u64
@@ -251,30 +254,34 @@ impl BytesReader {
             return Ok((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56);
         }
 
-        b = self.read_u8(bytes)?;
-
-        // Check two things at once:
+        // WARNING ABOUT TRUNCATION:
+        //
+        // For the number to be within valid 64 bit range, some conditions about
+        // this last byte must be met:
         // 1. This must be the last byte (MSB not set)
-        // 2. No 64-bit overflow (middle 6 bits are beyond 64 bits for the entire varint,
-        //    so they cannot be set either)
-        if b & 0b11111110 != 0 {
-            return Err(Error::SizeOverflow);
+        // 2. No 64-bit overflow (middle 6 bits are beyond 64 bits for the
+        //    entire varint, so they cannot be set either)
+        //
+        // However, for the sake of consistency with Google's own protobuf
+        // implementation, and also to allow for any efficient use of those
+        // extra bits by users if they wish (this crate is meant for speed
+        // optimization anyway) we shall not check for this here.
+        //
+        // Therefore, THIS FUNCTION SIMPLY IGNORES THE EXTRA BITS, WHICH IS
+        // ESSENTIALLY A SILENT TRUNCATION!
+        b = self.read_u8(bytes)?;
+        r2 |= (b as u32) << 7;
+        if b & 0x80 == 0 {
+            return Ok((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56);
         }
 
-        r2 |= (b as u32) << 7;
-        Ok((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56)
-
         // cannot read more than 10 bytes
+        Err(Error::Varint)
     }
 
     /// Reads int32 (varint)
     #[cfg_attr(std, inline)]
     pub fn read_int32(&mut self, bytes: &[u8]) -> Result<i32> {
-        // let read_val = self.read_varint64(bytes)?;
-        // match i32::try_from(read_val) {
-        //     Ok(contents) => Ok(contents),
-        //     Err(_) => Err(Error::SizeOverflow),
-        // }
         self.read_varint32(bytes).map(|i| i as i32)
     }
 
@@ -509,6 +516,9 @@ impl BytesReader {
     /// Reads unknown data, based on its tag value (which itself gives us the wire_type value)
     #[cfg_attr(std, inline)]
     pub fn read_unknown(&mut self, bytes: &[u8], tag_value: u32) -> Result<()> {
+        // Since `read.varint64()` calls `read_u8()`, which increments
+        // `self.start`, we don't need to manually increment `self.start` in
+        // control flows that either call `read_varint64()` or error out.
         let offset = match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => {
                 self.read_varint64(bytes)?;
@@ -516,7 +526,9 @@ impl BytesReader {
             }
             WIRE_TYPE_FIXED64 => 8,
             WIRE_TYPE_FIXED32 => 4,
-            WIRE_TYPE_LENGTH_DELIMITED => self.read_varint64(bytes)?,
+            WIRE_TYPE_LENGTH_DELIMITED => {
+                usize::try_from(self.read_varint64(bytes)?).map_err(|_| Error::Varint)?
+            }
             WIRE_TYPE_START_GROUP | WIRE_TYPE_END_GROUP => {
                 return Err(Error::Deprecated("group"));
             }
@@ -525,12 +537,15 @@ impl BytesReader {
             }
         };
 
-        // make the safe conversion to platform dependent usize
-        let offset = usize::try_from(offset).map_err(|_| Error::SizeOverflow)?;
-
-        self.start = self.start.checked_add(offset).ok_or(Error::SizeOverflow)?;
-
-        Ok(())
+        // Meant to prevent overflowing. Comparison used is *strictly* lesser
+        // since `self.end` is given by `len()`; i.e. `self.end` is 1 more than
+        // highest index
+        if self.end - self.start < offset {
+            Err(Error::Varint)
+        } else {
+            self.start += offset;
+            Ok(())
+        }
     }
 
     /// Gets the remaining length of bytes not read yet
@@ -699,106 +714,5 @@ fn read_size_overflowing_unknown() {
     assert_eq!(r.next_tag(bytes).unwrap(), 4730);
     let e = r.read_unknown(bytes, 4730).unwrap_err();
 
-    assert!(matches!(e, Error::SizeOverflow), "{:?}", e);
-}
-
-#[test]
-fn check_size_overflow_varint32() {
-    fn assert_decode(buf: &[u8], assert_value: i32) {
-        let mut r = BytesReader::from_bytes(buf);
-        assert_eq!(assert_value, r.read_varint32(buf).unwrap() as i32);
-    }
-    fn assert_decode_fail(buf: &[u8]) {
-        let mut r = BytesReader::from_bytes(buf);
-        let e = r.read_varint32(buf).unwrap_err();
-        assert!(matches!(e, Error::SizeOverflow), "{:?}", e);
-    }
-
-    assert_decode(
-        &[0x80, 0x80, 0x80, 0x80, 0xF8, 0xFF, 0xFF, 0xFF, 0xFF, 0x01],
-        -2147483648,
-    );
-    assert_decode(&[0xFF, 0xFF, 0xFF, 0xFF, 0x07], 2147483647);
-    assert_decode(&[0xFE, 0xFF, 0xFF, 0xFF, 0x07], 2147483646);
-    assert_decode(
-        &[0xE9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01],
-        -23,
-    );
-    assert_decode(&[0xFF, 0xFF, 0xFF, 0xFF, 0x0F], -1);
-    assert_decode(&[0xFE, 0xFF, 0xFF, 0xFF, 0x0F], -2);
-    assert_decode(&[0xFF, 0xFF, 0xFF, 0xFF, 0x0E], -268435457);
-
-    // not enough bytes
-    assert_decode_fail(&[0xE9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]);
-
-    // too negative for i32
-    assert_decode_fail(&[0xE9, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE, 0x01]);
-    assert_decode_fail(&[0x80, 0x80, 0x80, 0x80, 0x80, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]);
-    assert_decode_fail(&[0x80, 0x80, 0x80, 0x80, 0x88, 0xFF, 0xFF, 0xFF, 0xFF, 0x01]);
-
-    // last byte not 0x01
-    assert_decode_fail(&[0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
-
-    // positive overflow
-    assert_decode_fail(&[0xFF, 0xFF, 0xFF, 0xFF, 0x7F]);
-}
-
-#[test]
-fn check_size_overflow_varint64() {
-    let mut v = Vec::<u64>::new();
-    for i in 0..=255 {
-        let bytes = &[255, 255, 255, 255, 255, 255, 255, 255, 255, i];
-
-        let mut r = BytesReader::from_bytes(bytes);
-
-        match r.read_varint64(bytes) {
-            Ok(contents) => v.push(contents),
-            Err(e) => assert!(matches!(e, Error::SizeOverflow), "{:?}", e),
-        }
-    }
-    assert_eq!(v.len(), 2);
-}
-
-#[test]
-fn test_varint32_read_write() {
-    const CAPACITY: usize = 10000;
-    const STEP_SIZE: usize = 20000000;
-
-    let mut before = Vec::<u32>::with_capacity(CAPACITY);
-    let mut after = Vec::<u32>::with_capacity(CAPACITY);
-    let mut v = vec![0; CAPACITY];
-    let b = BytesWriter::new(&mut v);
-    let mut w = Writer::new(b);
-    for i in (0..2u128.pow(32)).step_by(STEP_SIZE) {
-        w.write_varint(i as u64).unwrap();
-        before.push(i as u32);
-    }
-    let mut r = BytesReader::from_bytes(&v);
-    for _ in (0..2u128.pow(32)).step_by(STEP_SIZE) {
-        let i = r.read_varint32(&v).unwrap();
-        after.push(i as u32);
-    }
-    assert_eq!(before, after);
-}
-
-#[test]
-fn test_varint64_read_write() {
-    const CAPACITY: usize = 1000000;
-    const STEP_SIZE: usize = 2000000000000000;
-
-    let mut before = Vec::<u64>::with_capacity(CAPACITY);
-    let mut after = Vec::<u64>::with_capacity(CAPACITY);
-    let mut v = vec![0; CAPACITY];
-    let b = BytesWriter::new(&mut v);
-    let mut w = Writer::new(b);
-    for i in (0..2u128.pow(64)).step_by(STEP_SIZE) {
-        w.write_varint(i as u64).unwrap();
-        before.push(i as u64);
-    }
-    let mut r = BytesReader::from_bytes(&v);
-    for _ in (0..2u128.pow(64)).step_by(STEP_SIZE) {
-        let i = r.read_varint64(&v).unwrap();
-        after.push(i as u64);
-    }
-    assert_eq!(before, after);
+    assert!(matches!(e, Error::Varint), "{:?}", e);
 }

@@ -51,8 +51,6 @@ use byteorder::WriteBytesExt;
 ///     writer.write_message(&foobar).expect("Cannot write FooBar");
 /// }
 /// ```
-
-#[derive(Debug)]
 pub struct Writer<W: WriterBackend> {
     inner: W,
 }
@@ -361,7 +359,6 @@ pub trait WriterBackend {
     fn pb_write_all(&mut self, buf: &[u8]) -> Result<()>;
 }
 
-#[derive(Debug)]
 /// A writer backend for byte buffers
 pub struct BytesWriter<'a> {
     buf: &'a mut [u8],
