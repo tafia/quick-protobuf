@@ -874,7 +874,9 @@ impl Message {
     }
 
     fn is_unit(&self) -> bool {
-        self.fields.is_empty() && self.oneofs.is_empty()
+        self.fields.is_empty()
+            && self.oneofs.is_empty()
+            && self.messages.iter().all(|m| m.is_unit())
     }
 
     fn write_common_uses<W: Write>(
@@ -1341,9 +1343,7 @@ impl Message {
         // message will be the module 'a.mod_A', since we can't reuse the message name A as
         // the submodule containing nested items. Also, protos with empty packages always
         // have a module corresponding to the file name.
-        let (child_package, child_module) = if package.is_empty() && module.is_empty() {
-            (self.name.clone(), format!("mod_{}", self.name))
-        } else if package.is_empty() {
+        let (child_package, child_module) = if package.is_empty() {
             self.module = module.to_string();
             (self.name.clone(), format!("{}.mod_{}", module, self.name))
         } else {
@@ -1959,10 +1959,10 @@ impl FileDescriptor {
     /// Get messages and enums from imports
     fn fetch_imports(&mut self, in_file: &Path, import_search_path: &[PathBuf]) -> Result<()> {
         for m in &mut self.messages {
-            m.set_package("", &self.module);
+            m.set_package(&self.package, &self.module);
         }
         for m in &mut self.enums {
-            m.set_package("", &self.module);
+            m.set_package(&self.package, &self.module);
         }
 
         for import in &self.import_paths {
@@ -2153,9 +2153,9 @@ impl FileDescriptor {
         ) {
             m.index = index.clone();
             if m.package.is_empty() {
-                full_msgs.insert(m.name.clone(), index.clone());
+                full_msgs.entry(m.name.clone()).or_insert_with(|| index.clone());
             } else {
-                full_msgs.insert(format!("{}.{}", m.package, m.name), index.clone());
+                full_msgs.entry(format!("{}.{}", m.package, m.name)).or_insert_with(|| index.clone());
             }
             for (i, e) in m.enums.iter_mut().enumerate() {
                 let index = EnumIndex {
@@ -2163,7 +2163,7 @@ impl FileDescriptor {
                     index: i,
                 };
                 e.index = index.clone();
-                full_enums.insert(format!("{}.{}", e.package, e.name), index);
+                full_enums.entry(format!("{}.{}", e.package, e.name)).or_insert(index);
             }
             for (i, m) in m.messages.iter_mut().enumerate() {
                 index.push(i);
@@ -2187,9 +2187,9 @@ impl FileDescriptor {
             };
             e.index = index.clone();
             if e.package.is_empty() {
-                full_enums.insert(e.name.clone(), index.clone());
+                full_enums.entry(e.name.clone()).or_insert_with(|| index.clone());
             } else {
-                full_enums.insert(format!("{}.{}", e.package, e.name), index.clone());
+                full_enums.entry(format!("{}.{}", e.package, e.name)).or_insert_with(|| index.clone());
             }
         }
         (full_msgs, full_enums)
@@ -2223,13 +2223,17 @@ impl FileDescriptor {
                     let test_names: Vec<String> = if name.starts_with('.') {
                         vec![name.clone().split_off(1)]
                     } else if m.package.is_empty() {
-                        vec![name.clone(), format!("{}.{}", m.name, name)]
+                        vec![format!("{}.{}", m.name, name), name.clone()]
                     } else {
-                        vec![
-                            name.clone(),
-                            format!("{}.{}", m.package, name),
+                        let mut v = vec![
                             format!("{}.{}.{}", m.package, m.name, name),
-                        ]
+                            format!("{}.{}", m.package, name),
+                        ];
+                        for (index, _) in m.package.match_indices('.').rev() {
+                            v.push(format!("{}.{}", &m.package[..index], name));
+                        }
+                        v.push(name.clone());
+                        v
                     };
                     for name in &test_names {
                         if let Some(msg) = full_msgs.get(&*name) {
