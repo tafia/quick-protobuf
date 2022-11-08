@@ -75,13 +75,15 @@ fn main() {
     println!("Message written successfully! bytes={:?}", &out);
 
     let read_message_owned = FooMessageOwned::try_from(out.clone()).unwrap();
+    let read_message_owned = read_message_owned.proto();
 
     println!("{:?}", read_message_owned);
-    assert_eq!(&message, &*read_message_owned);
+    assert_eq!(&message, read_message_owned);
     println!("Message read back and everything matches!");
 
     // Test mutability works too
     let mut read_message_owned_mut = FooMessageOwned::try_from(out).unwrap();
+    let mut read_message_owned_mut = read_message_owned_mut.proto_mut();
     read_message_owned_mut.f_int32 += 1;
     assert_eq!(message.f_int32 + 1, read_message_owned_mut.f_int32);
     read_message_owned_mut.f_string = "I see you, too!".into();
