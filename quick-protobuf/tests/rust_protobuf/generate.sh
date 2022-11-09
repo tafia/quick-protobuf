@@ -19,6 +19,12 @@ must_fail["v2/test_expose_oneof_pb.proto"]="missing file"
 must_fail["v2/test_enum_invalid_default.proto"]="enum variant does not exist"
 must_fail["v3/test_enum_invalid_default.proto"]="enum variant does not exist"
 
+# Custom arguments to pass to `pb-rs` for generating files used in testing
+declare -A custom_pbrs_args
+
+custom_pbrs_args["v2/test_owned_pb.proto"]="--owned"
+custom_pbrs_args["v3/test_owned_pb.proto"]="--owned"
+
 # Combined stdout and stderr for codegen of unexpectedly failed file.
 declare -A outs
 
@@ -41,7 +47,7 @@ success_msg() {
 for f in v[23]/*.proto; do
 	ret=0
 	rm -f "${f%.proto}.rs"
-	out="$(cargo run -p pb-rs --quiet -- "$f" 2>&1)" || ret=$?
+	out="$(cargo run -p pb-rs --quiet -- ${custom_pbrs_args[$f]} "$f" 2>&1)" || ret=$?
 
 	if expecting_failure "$f" && [ "$ret" -eq 0 ]; then
 		outs["$f"]="$out"
@@ -59,7 +65,7 @@ done
 for f in common/*.proto; do
 	ret=0
 	rm -f "${f%.proto}.rs"
-	out="$(cargo run -p pb-rs --quiet -- "$f" 2>&1)" || ret=$?
+	out="$(cargo run -p pb-rs --quiet -- ${custom_pbrs_args[$f]} "$f" 2>&1)" || ret=$?
 
 	if expecting_failure "$f" && [ "$ret" -eq 0 ]; then
 		outs["$f"]="$out"

@@ -1166,11 +1166,23 @@ impl Message {
         write!(
             w,
             r#"
+            // IMPORTANT: For any future changes, note that the lifetime parameter
+            // of the `proto` field is set to 'static!!!
+            //
+            // This means that the internals of `proto` should at no point create a
+            // mutable reference to something using that lifetime parameter, on pain
+            // of UB. This applies even though it may be transmuted to a smaller
+            // lifetime later (through `proto()` or `proto_mut()`).
+            //
+            // At the time of writing, the only possible thing that uses the
+            // lifetime parameter is `Cow<'a, T>`, which never does this, so it's
+            // not UB.
+            //
             #[derive(Debug)]
             struct {name}OwnedInner {{
                 buf: Vec<u8>,
                 proto: Option<{name}<'static>>,
-                _pin: std::marker::PhantomPinned,
+                _pin: core::marker::PhantomPinned,
             }}
 
             impl {name}OwnedInner {{
@@ -1178,7 +1190,7 @@ impl Message {
                     let inner = Self {{
                         buf,
                         proto: None,
-                        _pin: std::marker::PhantomPinned,
+                        _pin: core::marker::PhantomPinned,
                     }};
                     let mut pinned = Box::pin(inner);
 
@@ -1186,7 +1198,7 @@ impl Message {
                     let proto = {name}::from_reader(&mut reader, &pinned.buf)?;
 
                     unsafe {{
-                        let proto = std::mem::transmute::<_, {name}<'_>>(proto);
+                        let proto = core::mem::transmute::<_, {name}<'_>>(proto);
                         pinned.as_mut().get_unchecked_mut().proto = Some(proto);
                     }}
                     Ok(pinned)
@@ -1204,19 +1216,19 @@ impl Message {
                 }}
 
                 pub fn proto<'a>(&'a self) -> &'a {name}<'a> {{
-                    unsafe {{ std::mem::transmute::<&{name}<'static>, &{name}<'a>>(self.inner.proto.as_ref().unwrap()) }}
+                    unsafe {{ core::mem::transmute::<&{name}<'static>, &{name}<'a>>(self.inner.proto.as_ref().unwrap()) }}
                 }}
 
                 pub fn proto_mut<'a>(&'a mut self) -> &'a mut {name}<'a> {{
                     unsafe {{
                         let proto = self.inner.as_mut().get_unchecked_mut().proto.as_mut().unwrap();
-                        std::mem::transmute::<_, &mut {name}<'a>>(proto)
+                        core::mem::transmute::<_, &mut {name}<'a>>(proto)
                     }}
                 }}
             }}
 
-            impl std::fmt::Debug for {name}Owned {{
-                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {{
+            impl core::fmt::Debug for {name}Owned {{
+                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {{
                     self.inner.proto.as_ref().unwrap().fmt(f)
                 }}
             }}
@@ -1246,7 +1258,7 @@ impl Message {
                         inner: Box::pin({name}OwnedInner {{
                             buf: Vec::new(),
                             proto: Some(proto),
-                            _pin: std::marker::PhantomPinned,
+                            _pin: core::marker::PhantomPinned,
                         }})
                     }}
                 }}
