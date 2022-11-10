@@ -39,7 +39,7 @@ enum Event {
 }
 
 fn word_ref(input: &str) -> IResult<&str, &str> {
-    recognize(many0(alt((alphanumeric1, tag("_"), tag(".")))))(input)
+    recognize(many1(alt((alphanumeric1, tag("_"), tag(".")))))(input)
 }
 
 fn word(input: &str) -> IResult<&str, String> {
@@ -607,7 +607,7 @@ mod test {
         message C {
         }
         message D {}
-        optional b = 1;
+        optional int32 b = 1;
     }"#;
 
         let desc = file_descriptor(msg).unwrap().1;
@@ -778,5 +778,131 @@ mod test {
             }
             other => panic!("Could not parse RPC Function Declaration: {:?}", other),
         }
+    }
+
+    #[test]
+    fn test_missing_tokens() {
+        fn test_missing_tokens_message() {
+            /* Check that base case is actually correct before we start deleting tokens */
+            assert!(message(
+                r#"message A {
+                    optional int32 a = 1;
+                }"#
+            )
+            .is_ok());
+
+            /* Empty message name */
+            assert!(message(
+                r#"message {
+                    optional int32 a = 1;
+                }"#
+            )
+            .is_err());
+
+            /* Empty message field name */
+            assert!(message(
+                r#"message A {
+                    optional int32 = 1;
+                }"#
+            )
+            .is_err());
+
+            /* Empty message field type */
+            assert!(message(
+                r#"message A {
+                    optional a = 1;
+                }"#
+            )
+            .is_err());
+
+            /* Empty message field number */
+            assert!(message(
+                r#"message A {
+                    optional int32 a = ;
+                }"#
+            )
+            .is_err());
+        }
+
+        fn test_missing_tokens_enum() {
+            /* Check that base case is actually correct before we start deleting tokens */
+            assert!(enumerator(
+                r#"enum A {
+                    FIELD_A = 0;
+                }"#
+            )
+            .is_ok());
+
+            /* Empty enum name */
+            assert!(enumerator(
+                r#"enum {
+                    FIELD_A = 0;
+                }"#
+            )
+            .is_err());
+
+            /* Empty enum field name */
+            assert!(enumerator(
+                r#"enum A {
+                    = 0;
+                }"#
+            )
+            .is_err());
+
+            /* Empty enum field number */
+            assert!(enumerator(
+                r#"enum A {
+                    FIELD_A = ;
+                }"#
+            )
+            .is_err());
+        }
+
+        fn test_missing_tokens_one_of() {
+            /* Check that base case is actually correct before we start deleting tokens */
+            assert!(one_of(
+                r#"oneof a {
+                    int32 field_a = 0;
+                }"#
+            )
+            .is_ok());
+
+            /* Empty oneof name */
+            assert!(one_of(
+                r#"oneof {
+                    int32 field_a = 0;
+                }"#
+            )
+            .is_err());
+
+            /* Empty oneof field name */
+            assert!(one_of(
+                r#"oneof a {
+                    int32 = 0;
+                }"#
+            )
+            .is_err());
+
+            /* Empty oneof field type */
+            assert!(one_of(
+                r#"oneof a {
+                    field_a = 0;
+                }"#
+            )
+            .is_err());
+
+            /* Empty oneof field number */
+            assert!(one_of(
+                r#"oneof a {
+                    int32 field_a = ;
+                }"#
+            )
+            .is_err());
+        }
+
+        // remember to actually call the test functions!
+        test_missing_tokens_message();
+        test_missing_tokens_enum();
+        test_missing_tokens_one_of();
     }
 }
