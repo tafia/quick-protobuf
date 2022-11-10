@@ -9,8 +9,10 @@ use crate::types::{
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until},
-    character::complete::{alphanumeric1, digit1, hex_digit1, multispace1, not_line_ending},
-    combinator::{map, map_res, opt, recognize, value},
+    character::complete::{
+        alpha1, alphanumeric1, digit1, hex_digit1, multispace1, not_line_ending,
+    },
+    combinator::{map, map_res, opt, recognize, value, verify},
     multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
     IResult,
@@ -38,8 +40,28 @@ enum Event {
     Ignore,
 }
 
+fn qualifiable_name(input: &str) -> IResult<&str, String> {
+    map(
+        verify(
+            recognize(pair(opt(tag(".")), separated_list1(tag("."), word))),
+            |s: &str| !s.ends_with('.') && !s.contains(".."),
+        ),
+        std::borrow::ToOwned::to_owned,
+    )(input)
+}
+
 fn word_ref(input: &str) -> IResult<&str, &str> {
-    recognize(many1(alt((alphanumeric1, tag("_"), tag(".")))))(input)
+    recognize(pair(
+        alt((
+            // I would really rather just take in 1 alphabetic
+            // character, but just using `alpha1()` is also technically
+            // correct for our use case and is simpler to implement in
+            // nom apparently
+            alpha1,
+            tag("_"),
+        )),
+        many0(alt((alphanumeric1, tag("_")))),
+    ))(input)
 }
 
 fn word(input: &str) -> IResult<&str, String> {
@@ -99,7 +121,7 @@ fn import(input: &str) -> IResult<&str, PathBuf> {
 fn package(input: &str) -> IResult<&str, String> {
     delimited(
         pair(tag("package"), many1(br)),
-        word,
+        qualifiable_name,
         pair(many0(br), tag(";")),
     )(input)
 }
@@ -175,7 +197,7 @@ fn field_type(input: &str) -> IResult<&str, FieldType> {
         value(FieldType::Float, tag("float")),
         value(FieldType::Double, tag("double")),
         map(map_field, |(k, v)| FieldType::Map(Box::new(k), Box::new(v))),
-        map(word, |w| FieldType::MessageOrEnum(w)),
+        map(qualifiable_name, FieldType::MessageOrEnum),
     ))(input)
 }
 
@@ -904,5 +926,171 @@ mod test {
         test_missing_tokens_message();
         test_missing_tokens_enum();
         test_missing_tokens_one_of();
+    }
+
+    #[test]
+    fn test_word_and_qualifiable_names() {
+        fn assert_qualifiable_name_but_not_word(str_to_parse: &str, qualifiable_name_res: &str) {
+            assert!(word(str_to_parse).is_err());
+            assert_eq!(
+                qualifiable_name_res,
+                qualifiable_name(str_to_parse).unwrap().1
+            );
+        }
+
+        fn assert_both_ok_same_res(str_to_parse: &str, res: &str) {
+            assert_eq!(res, word(str_to_parse).unwrap().1);
+            assert_eq!(res, qualifiable_name(str_to_parse).unwrap().1);
+        }
+
+        fn assert_both_ok_different_res(
+            str_to_parse: &str,
+            word_res: &str,
+            qualifiable_name_res: &str,
+        ) {
+            assert_eq!(word_res, word(str_to_parse).unwrap().1);
+            assert_eq!(
+                qualifiable_name_res,
+                qualifiable_name(str_to_parse).unwrap().1
+            );
+        }
+
+        fn assert_both_err(s: &str) {
+            assert!(word(s).is_err());
+            assert!(qualifiable_name(s).is_err());
+        }
+
+        assert_both_ok_same_res("_a@", "_a");
+        assert_both_ok_same_res("a_@", "a_");
+        assert_both_ok_same_res("TestTypesRepeatedPacked", "TestTypesRepeatedPacked");
+        assert_both_ok_same_res("_TestTypes_Repeated_Packed", "_TestTypes_Repeated_Packed");
+        assert_both_ok_same_res(
+            "____TestTypes__Repeated_Packed",
+            "____TestTypes__Repeated_Packed",
+        );
+        assert_both_ok_same_res("TestTypesRepeatedPacked_", "TestTypesRepeatedPacked_");
+        assert_both_ok_same_res("TestTypesRepeatedPacked____", "TestTypesRepeatedPacked____");
+        assert_both_ok_same_res("______", "______");
+        assert_both_ok_same_res("_1a.._2a@", "_1a");
+
+        assert_both_err("");
+        assert_both_err("@_a1");
+        assert_both_err("123a");
+        assert_both_err("1TestTypesRepeatedPacked");
+        assert_both_err(".1TestTypesRepeatedPacked");
+        assert_both_err(".1TestTypesRepeatedPacked_2hello");
+        assert_both_err("1_1a._2a@");
+
+        assert_qualifiable_name_but_not_word("._1a", "._1a");
+        assert_qualifiable_name_but_not_word("._a@", "._a");
+        assert_qualifiable_name_but_not_word("._1a.2_2a@", "._1a");
+        assert_qualifiable_name_but_not_word(".Test1._Test2.3Test3.Test4@", ".Test1._Test2");
+        assert_qualifiable_name_but_not_word("._1a._2a@", "._1a._2a");
+
+        assert_both_ok_different_res("_1a._2a@", "_1a", "_1a._2a");
+        assert_both_ok_different_res("Test1.Test2@", "Test1", "Test1.Test2");
+        assert_both_ok_different_res("Test1._Test2.3Test3.Test4@", "Test1", "Test1._Test2");
+    }
+
+    #[test]
+    fn test_which_names_can_be_qualified() {
+        fn test_which_names_can_be_qualified_message() {
+            /* Check that base case is actually correct before we start qualifying names */
+            assert!(message(
+                r#"message A {
+                    int32 a = 1;
+                }"#
+            )
+            .is_ok());
+
+            /* Message field types CAN be qualified */
+            assert!(message(
+                r#"message A {
+                    Qualified.Name a = 1;
+                }"#
+            )
+            .is_ok());
+
+            /* Message names CANNOT be qualified */
+            assert!(message(
+                r#"message Qualified.Name {
+                    int32 a = 1;
+                }"#
+            )
+            .is_err());
+
+            /* Message field names CANNOT be qualified */
+            assert!(message(
+                r#"message A {
+                    int32 qualified.name = 1;
+                }"#
+            )
+            .is_err());
+        }
+
+        fn test_which_names_can_be_qualified_enum() {
+            /* Check that base case is actually correct before we start qualifying names */
+            assert!(enumerator(
+                r#"enum A {
+                    enum_field = 1;
+                }"#
+            )
+            .is_ok());
+
+            /* Enum names CANNOT be qualified */
+            assert!(enumerator(
+                r#"enum Qualified.Name {
+                    enum_field = 1;
+                }"#
+            )
+            .is_err());
+
+            /* Enum field names CANNOT be qualified */
+            assert!(enumerator(
+                r#"enum A {
+                    QUALIFIED.NAME = 1;
+                }"#
+            )
+            .is_err());
+        }
+
+        fn test_which_names_can_be_qualified_oneof() {
+            /* Check that base case is actually correct before we start qualifying names */
+            assert!(one_of(
+                r#"oneof a {
+                    int32 field_name = 1;
+                }"#
+            )
+            .is_ok());
+
+            /* Oneof field types CAN be qualified */
+            assert!(one_of(
+                r#"oneof a {
+                    Qualified.Name field_name = 1;
+                }"#
+            )
+            .is_ok());
+
+            /* Oneof names CANNOT be qualified */
+            assert!(one_of(
+                r#"oneof qualified.name {
+                    int32 field_name = 1;
+                }"#
+            )
+            .is_err());
+
+            /* Oneof field names CANNOT be qualified */
+            assert!(one_of(
+                r#"oneof a {
+                    int32 qualified.name = 1;
+                }"#
+            )
+            .is_err());
+        }
+
+        // remember to actually call the test functions!
+        test_which_names_can_be_qualified_message();
+        test_which_names_can_be_qualified_enum();
+        test_which_names_can_be_qualified_oneof();
     }
 }
