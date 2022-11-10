@@ -454,9 +454,11 @@ mod test {
 
     #[test]
     fn empty_message() {
-        let mess = assert_complete(message("message Vec { }"));
+        let msg = r#"message Vec { }"#;
+        let mess = assert_complete(message(msg));
         assert_eq!("Vec", mess.name);
         assert_eq!(0, mess.fields.len());
+        assert_desc(msg);
     }
 
     #[test]
@@ -472,6 +474,7 @@ mod test {
         if let ::nom::IResult::Ok((_, mess)) = mess {
             assert_eq!(4, mess.fields.len());
         }
+        assert_desc(msg);
     }
 
     #[test]
@@ -490,19 +493,22 @@ mod test {
             ::nom::IResult::Ok(_) => (),
             e => panic!("Expecting done {:?}", e),
         }
+        assert_desc(msg);
     }
 
     #[test]
     fn test_comments() {
         assert_eq!("\nb", comment("// BOOM\nb").unwrap().0);
         assert_eq!("\nb", comment("//\nb").unwrap().0);
+        assert_eq!("", comment("//").unwrap().0);
+        assert_eq!("", block_comment("/**/").unwrap().0);
         assert_eq!("\nb", block_comment("/* BOOM */\nb").unwrap().0);
         let msg = r#"
             // BOOM
-
+            //
             /* BOOM */
-            package foo.bar;
-
+            package foo.bar;//
+            //
             // BOOM
 
             /* BOOM */
@@ -542,6 +548,7 @@ mod test {
         assert_eq!(1, desc.messages.len());
         assert_eq!(3, desc.messages[0].messages.len());
         assert_eq!(3, desc.messages[0].enums.len());
+        assert_desc(msg);
     }
 
     #[test]
@@ -560,6 +567,7 @@ mod test {
             vec![Path::new("test_import_nested_imported_pb.proto")],
             desc.import_paths
         );
+        assert_desc(msg);
     }
 
     #[test]
@@ -568,6 +576,9 @@ mod test {
         message Bar {}"#;
         let desc = assert_desc(msg);
         assert_eq!(1, desc.messages.len());
+        assert_eq!("Bar", desc.messages[0].name);
+        assert_eq!(0, desc.messages[0].fields.len());
+        assert_desc(msg);
     }
 
     #[test]
@@ -582,6 +593,7 @@ mod test {
     "#;
         let desc = file_descriptor(msg).unwrap().1;
         assert_eq!("foo.bar".to_string(), desc.package);
+        assert_desc(msg);
     }
 
     #[test]
@@ -602,6 +614,7 @@ mod test {
         dbg!(&desc);
         assert_eq!(1, desc.messages.len());
         assert_eq!(3, desc.messages[0].messages.len());
+        assert_desc(msg);
     }
 
     #[test]
@@ -628,6 +641,7 @@ mod test {
         } else {
             panic!("Could not parse map message");
         }
+        assert_desc(msg);
     }
 
     #[test]
@@ -648,6 +662,7 @@ mod test {
             assert_eq!(1, mess.oneofs.len());
             assert_eq!(3, mess.oneofs[0].fields.len());
         }
+        assert_desc(msg);
     }
 
     #[test]
@@ -671,6 +686,7 @@ mod test {
         } else {
             panic!("Could not parse reserved fields message");
         }
+        assert_desc(msg);
     }
 
     #[test]
@@ -683,13 +699,38 @@ mod test {
           }"#;
         let en = assert_complete(enumerator(msg));
         assert_eq!(2, en.fields.len());
+        assert_desc(msg);
     }
 
     #[test]
-    fn enum_semi() {
+    fn enum_semicolon() {
         let msg = r#"message Foo { enum Bar { BAZ = 1; }; Bar boop = 1; }"#;
         let desc = assert_desc(msg);
         assert_eq!(1, desc.messages.len());
+        assert_eq!(
+            FieldType::MessageOrEnum("Bar".to_owned()),
+            desc.messages[0].fields[0].typ
+        );
+
+        let msg2 = r#"
+        message TestMessage {
+            enum EnumWithSemicolon {
+                val_1                     = 0;
+                val_2                     = 1;
+                val_3                     = 2;
+            };
+            enum EnumWithoutSemicolon {
+                val_1                     = 0;
+                val_2                     = 1;
+                val_3                     = 2;
+            }
+            required EnumWithSemicolon       a    = 1;
+            required EnumWithoutSemicolon    b    = 2;
+            optional string                  c    = 3;
+            optional uint32                  d    = 4;
+        }
+        "#;
+        assert_desc(msg2);
     }
 
     #[test]
@@ -722,6 +763,7 @@ mod test {
             }
             other => panic!("Could not parse RPC Service: {:?}", other),
         }
+        assert_desc(msg);
     }
 
     #[test]
