@@ -14,6 +14,8 @@ use std::io::Read;
 #[cfg(feature = "std")]
 use std::path::Path;
 
+use core::convert::TryFrom;
+
 #[cfg(not(feature = "std"))]
 extern crate alloc;
 #[cfg(not(feature = "std"))]
@@ -107,35 +109,79 @@ impl BytesReader {
     /// Reads the next varint encoded u64
     #[cfg_attr(std, inline(always))]
     pub fn read_varint32(&mut self, bytes: &[u8]) -> Result<u32> {
-        let mut b = self.read_u8(bytes)?;
+        let mut b = self.read_u8(bytes)?; // byte0
         if b & 0x80 == 0 {
             return Ok(b as u32);
         }
         let mut r = (b & 0x7f) as u32;
 
-        b = self.read_u8(bytes)?;
+        b = self.read_u8(bytes)?; // byte1
         r |= ((b & 0x7f) as u32) << 7;
         if b & 0x80 == 0 {
             return Ok(r);
         }
 
-        b = self.read_u8(bytes)?;
+        b = self.read_u8(bytes)?; // byte2
         r |= ((b & 0x7f) as u32) << 14;
         if b & 0x80 == 0 {
             return Ok(r);
         }
 
-        b = self.read_u8(bytes)?;
+        b = self.read_u8(bytes)?; // byte3
         r |= ((b & 0x7f) as u32) << 21;
         if b & 0x80 == 0 {
             return Ok(r);
         }
 
-        b = self.read_u8(bytes)?;
-        r |= ((b & 0xf) as u32) << 28;
+        b = self.read_u8(bytes)?; // byte4
+        r |= ((b & 0xf) as u32) << 28; // silently prevent overflow; only mask 0xF
         if b & 0x80 == 0 {
+            // WARNING ABOUT TRUNCATION
+            //
+            // In this case, byte4 takes the form 0ZZZ_YYYY where:
+            //     Y: part of the resulting 32-bit number
+            //     Z: beyond 32 bits (excess bits,not used)
+            //
+            // If the Z bits were set, it might indicate that the number being
+            // decoded was intended to be bigger than 32 bits, suggesting an
+            // error somewhere else.
+            //
+            // However, for the sake of consistency with Google's own protobuf
+            // implementation, and also to allow for any efficient use of those
+            // extra bits by users if they wish (this crate is meant for speed
+            // optimization anyway) we shall not check for this here.
+            //
+            // Therefore, THIS FUNCTION SIMPLY IGNORES THE EXTRA BITS, WHICH IS
+            // ESSENTIALLY A SILENT TRUNCATION!
             return Ok(r);
         }
+
+        // ANOTHER WARNING ABOUT TRUNCATION
+        //
+        // Again, we do not check whether the byte representation fits within 32
+        // bits, and simply ignore extra bytes, CONSTITUTING A SILENT
+        // TRUNCATION!
+        //
+        // Therefore, if the user wants this function to avoid ignoring any
+        // bits/bytes, they need to ensure that the input is a varint
+        // representing a value within EITHER u32 OR i32 range. Since at this
+        // point we are beyond 5 bits, the only possible case is a negative i32
+        // (since negative numbers are always 10 bytes in protobuf). We must
+        // have exactly 5 bytes more to go.
+        //
+        // Since we know it must be a negative number, and this function is
+        // meant to read 32-bit ints (there is a different function for reading
+        // 64-bit ints), the user might want to take care to ensure that this
+        // negative number is within valid i32 range, i.e. at least
+        // -2,147,483,648. Otherwise, this function simply ignores the extra
+        // bits, essentially constituting a silent truncation!
+        //
+        // What this means in the end is that the user should ensure that the
+        // resulting number, once decoded from the varint format, takes such a
+        // form:
+        //
+        // 11111111_11111111_11111111_11111111_1XXXXXXX_XXXXXXXX_XXXXXXXX_XXXXXXXX
+        // ^(MSB bit 63)                       ^(bit 31 is set)                  ^(LSB bit 0)
 
         // discards extra bytes
         for _ in 0..5 {
@@ -208,6 +254,21 @@ impl BytesReader {
             return Ok((r0 as u64 | (r1 as u64) << 28) | (r2 as u64) << 56);
         }
 
+        // WARNING ABOUT TRUNCATION:
+        //
+        // For the number to be within valid 64 bit range, some conditions about
+        // this last byte must be met:
+        // 1. This must be the last byte (MSB not set)
+        // 2. No 64-bit overflow (middle 6 bits are beyond 64 bits for the
+        //    entire varint, so they cannot be set either)
+        //
+        // However, for the sake of consistency with Google's own protobuf
+        // implementation, and also to allow for any efficient use of those
+        // extra bits by users if they wish (this crate is meant for speed
+        // optimization anyway) we shall not check for this here.
+        //
+        // Therefore, THIS FUNCTION SIMPLY IGNORES THE EXTRA BITS, WHICH IS
+        // ESSENTIALLY A SILENT TRUNCATION!
         b = self.read_u8(bytes)?;
         r2 |= (b as u32) << 7;
         if b & 0x80 == 0 {
@@ -455,8 +516,9 @@ impl BytesReader {
     /// Reads unknown data, based on its tag value (which itself gives us the wire_type value)
     #[cfg_attr(std, inline)]
     pub fn read_unknown(&mut self, bytes: &[u8], tag_value: u32) -> Result<()> {
-        use std::convert::TryFrom;
-
+        // Since `read.varint64()` calls `read_u8()`, which increments
+        // `self.start`, we don't need to manually increment `self.start` in
+        // control flows that either call `read_varint64()` or error out.
         let offset = match (tag_value & 0x7) as u8 {
             WIRE_TYPE_VARINT => {
                 self.read_varint64(bytes)?;
@@ -465,8 +527,7 @@ impl BytesReader {
             WIRE_TYPE_FIXED64 => 8,
             WIRE_TYPE_FIXED32 => 4,
             WIRE_TYPE_LENGTH_DELIMITED => {
-                // FIXME: overflow here as well
-                self.read_varint64(bytes)?
+                usize::try_from(self.read_varint64(bytes)?).map_err(|_| Error::Varint)?
             }
             WIRE_TYPE_START_GROUP | WIRE_TYPE_END_GROUP => {
                 return Err(Error::Deprecated("group"));
@@ -476,11 +537,15 @@ impl BytesReader {
             }
         };
 
-        // make the safe conversion to platform dependent usize
-        let offset = usize::try_from(offset).map_err(|_| Error::SizeOverflow)?;
-
-        self.start = self.start.checked_add(offset).ok_or(Error::SizeOverflow)?;
-        Ok(())
+        // Meant to prevent overflowing. Comparison used is *strictly* lesser
+        // since `self.end` is given by `len()`; i.e. `self.end` is 1 more than
+        // highest index
+        if self.end - self.start < offset {
+            Err(Error::Varint)
+        } else {
+            self.start += offset;
+            Ok(())
+        }
     }
 
     /// Gets the remaining length of bytes not read yet
@@ -624,7 +689,19 @@ fn test_varint() {
 #[test]
 fn read_size_overflowing_unknown() {
     let bytes = &[
-        200, 250, 35, 47, 250, 36, 255, 255, 255, 255, 255, 255, 255, 255, 255, 3, 255, 255, 227,
+        200, 250, 35, // varint tag with WIRE_TYPE_VARINT -- 589128
+        //
+        //
+        47, // varint itself
+        //
+        //
+        250, 36, // varint tag with WIRE_TYPE_LENGTH_DELIMITED -- 4730
+        //
+        //
+        255, 255, 255, 255, 255, 255, 255, 255, 255, 3, // huge 10-byte length
+        //
+        //
+        255, 255, 227, // unused extra bytes
     ];
 
     let mut r = BytesReader::from_bytes(bytes);
@@ -637,5 +714,5 @@ fn read_size_overflowing_unknown() {
     assert_eq!(r.next_tag(bytes).unwrap(), 4730);
     let e = r.read_unknown(bytes, 4730).unwrap_err();
 
-    assert!(matches!(e, Error::SizeOverflow), "{:?}", e);
+    assert!(matches!(e, Error::Varint), "{:?}", e);
 }

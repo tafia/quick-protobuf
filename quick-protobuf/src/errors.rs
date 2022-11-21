@@ -26,8 +26,6 @@ pub enum Error {
     UnexpectedEndOfBuffer,
     /// The supplied output buffer is not large enough to serialize the message
     OutputBufferTooSmall,
-    /// Input requires larger than usize offsets
-    SizeOverflow,
 }
 
 /// A wrapper for `Result<T, Error>`
@@ -86,7 +84,6 @@ impl core::fmt::Display for Error {
             Error::Map(tag) => write!(f, "Unexpected map tag: '{}', expecting 1 or 2", tag),
             Error::UnexpectedEndOfBuffer => write!(f, "Unexpected end of buffer"),
             Error::OutputBufferTooSmall => write!(f, "Output buffer too small"),
-            Error::SizeOverflow => write!(f, "Input contained too large length"),
         }
     }
 }
