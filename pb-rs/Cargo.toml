@@ -1,6 +1,6 @@
 [package]
 name = "pb-rs"
-version = "0.9.3"
+version = "0.9.4"
 description = "A converter from proto files into quick-protobuf compatible Rust module"
 authors = ["Johann Tuffe <tafia973@gmail.com>"]
 keywords = ["protobuf", "parser", "quick-protobuf"]
