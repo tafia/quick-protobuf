@@ -11,5 +11,8 @@ mod test_map_pb;
 
 mod test_ident_pb;
 
+mod test_deprecated_lifetime;
+mod test_deprecated_lifetime_can_compile;
+mod test_deprecated_lifetime_pb;
 mod test_oneof;
 mod test_oneof_pb;
