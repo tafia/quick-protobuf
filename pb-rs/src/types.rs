@@ -1930,7 +1930,11 @@ impl FileDescriptor {
     /// Opens a proto file, reads it and returns raw parsed data
     pub fn read_proto(in_file: &Path, import_search_path: &[PathBuf]) -> Result<FileDescriptor> {
         let file = std::fs::read_to_string(in_file)?;
-        let (_, mut desc) = file_descriptor(&file).map_err(|e| Error::Nom(e))?;
+        let (rem, mut desc) = file_descriptor(&file).map_err(Error::Nom)?;
+        let rem = rem.trim();
+        if !rem.is_empty() {
+            return Err(Error::TrailingGarbage(rem.chars().take(50).collect()));
+        }
         for mut m in &mut desc.messages {
             if m.path.as_os_str().is_empty() {
                 m.path = in_file.to_path_buf();
