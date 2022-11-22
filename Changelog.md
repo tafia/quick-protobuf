@@ -16,6 +16,7 @@
 - fix: deprecated fields no longer propagate their lifetimes to containing message
 - fix: deprecated fields are now ignored in enums (previously would throw error)
 - fix: fix unsoundness in Owned variant (breaking change)
+- feat: impl `TryFrom` for lifetime-less messages when `--owned` flag is set
 
 ## quick-protobuf 0.8.1
 - fix: added overflow checking in `read_unknown()`
