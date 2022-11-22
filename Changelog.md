@@ -8,6 +8,19 @@
   - test: Adding missing tests
   - chore: Changes to the build process or auxiliary tools/libraries/documentation
 
+## pb-rs 0.10.0
+- fix: fix nested items and package name resolution
+- fix: parser now parses comments successfully
+- fix: parser now rejects missing names and types
+- fix: parser now enforces more variable naming/qualification rules
+- fix: deprecated fields no longer propagate their lifetimes to containing message
+- fix: deprecated fields are now ignored in enums (previously would throw error)
+- fix: fix unsoundness in Owned variant (breaking change)
+
+## quick-protobuf 0.8.1
+- fix: added overflow checking in `read_unknown()`
+- fix: fix buffer size check in `serialize_into_slice()`
+
 ## pb-rs 0.9.1
 - feat: allow hexadecimal tag numbers
 - fix: Fix empty bytes field checking when `--dont_use_cow` flag is used.
