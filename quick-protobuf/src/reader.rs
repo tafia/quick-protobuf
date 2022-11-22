@@ -77,7 +77,7 @@ const WIRE_TYPE_FIXED32: u8 = 5;
 ///     println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BytesReader {
     start: usize,
     end: usize,

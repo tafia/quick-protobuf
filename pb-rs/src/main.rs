@@ -139,7 +139,7 @@ fn run() -> Result<(), Error> {
     .owned(matches.is_present("OWNED"))
     .add_deprecated_fields(matches.is_present("ADD_DEPRECATED_FIELDS"));
 
-    FileDescriptor::run(&compiler.build()).map_err(|e| e.into())
+    FileDescriptor::run(&compiler.build())
 }
 
 fn extension_matches<P: AsRef<Path>>(path: P, expected: &str) -> std::result::Result<(), String> {

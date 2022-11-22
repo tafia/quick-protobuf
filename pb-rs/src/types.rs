@@ -20,7 +20,7 @@ fn sizeof_varint(v: u32) -> usize {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Syntax {
     Proto2,
     Proto3,
@@ -32,7 +32,7 @@ impl Default for Syntax {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Frequency {
     Optional,
     Repeated,
@@ -998,6 +998,8 @@ impl Message {
         if !custom_struct_derive.is_empty() {
             custom_struct_derive += ", ";
         }
+
+        writeln!(w, "#[allow(clippy::derive_partial_eq_without_eq)]")?;
 
         writeln!(
             w,
@@ -2249,10 +2251,10 @@ impl FileDescriptor {
                         v
                     };
                     for name in &test_names {
-                        if let Some(msg) = full_msgs.get(&*name) {
+                        if let Some(msg) = full_msgs.get(name) {
                             *typ = FieldType::Message(msg.clone());
                             continue 'types;
-                        } else if let Some(e) = full_enums.get(&*name) {
+                        } else if let Some(e) = full_enums.get(name) {
                             *typ = FieldType::Enum(e.clone());
                             continue 'types;
                         }

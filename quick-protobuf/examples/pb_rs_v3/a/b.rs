@@ -13,6 +13,7 @@ use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer
 use quick_protobuf::sizeofs::*;
 use super::super::*;
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct ImportedMessage {
     pub i: bool,
