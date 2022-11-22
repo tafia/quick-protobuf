@@ -375,7 +375,28 @@ fn enum_field(input: &str) -> IResult<&str, (String, i32)> {
             tuple((many0(br), tag("="), many0(br))),
             alt((hex_integer, integer)),
         ),
-        pair(many0(br), tag(";")),
+        pair(
+            many0(alt((
+                br,
+                // TODO: add proper deprecation later. We ignore deprecated enum
+                // fields for now
+                value(
+                    (),
+                    tuple((
+                        tag("["),
+                        many0(multispace1),
+                        tag("deprecated"),
+                        many0(multispace1),
+                        tag("="),
+                        many0(multispace1),
+                        word,
+                        many0(multispace1),
+                        tag("]"),
+                    )),
+                ),
+            ))),
+            tag(";"),
+        ),
     )(input)
 }
 
@@ -1092,5 +1113,40 @@ mod test {
         test_which_names_can_be_qualified_message();
         test_which_names_can_be_qualified_enum();
         test_which_names_can_be_qualified_oneof();
+    }
+
+    #[test]
+    fn enum_deprecated() {
+        let e = enumerator(
+            r#"enum Reason {
+            HELLO                               = 0;
+
+            SOME_FIELD                          = 1;
+
+            SOME_OTHER_FIELD                    = 2;
+            BLA_BLA_BLA                         = 3;
+            THING                               = 9;    // comment
+            OTHER_THING                         = 10;   // comment & comment
+            ANOTHER_THING                       = 11;
+            AGAIN_A_THING                       = 12;
+            THINGY                              = 13;
+            THINGYTHINGY                        = 14; // comment
+            // comment
+            THINGYTHINGYTHINGY                  = 15 [deprecated=true];    // comment
+            THINGYTHINGYTHINGYTHINGY            = 16;
+            THINGYTHINGYTHINGYTHINGYTHINGY      = 17;
+            BLAB                                = 34;
+            BLABBLAB                            = 35;   // comment
+            BLABBLABBLAB                        = 36 [deprecated=true];   // comment
+            BLABBLABBLABBLAB                    = 37;   // comment
+
+            BLABBLABBLABBLABBLAB                = 100;
+            HA                                  = 101;
+            HAHA                                = 102 [deprecated=true];
+            HAHAHA                              = 103;
+            HAHAHAHA                            = 104 [deprecated=true];
+            HAHAHAHAHA                          = 105 [deprecated=true];
+        }"#);
+        assert!(e.is_ok());
     }
 }
