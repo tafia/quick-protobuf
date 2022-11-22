@@ -956,9 +956,14 @@ impl Message {
             writeln!(w)?;
         }
 
-        if desc.owned && self.has_lifetime(desc, config, &mut Vec::new()) {
+        if desc.owned {
             writeln!(w)?;
-            self.write_impl_owned(w, config)?;
+
+            if self.has_lifetime(desc, config, &mut Vec::new()) {
+                self.write_impl_owned(w, config)?;
+            } else {
+                self.write_impl_try_from(w)?;
+            }
         }
 
         if !(self.messages.is_empty() && self.enums.is_empty() && self.oneofs.is_empty()) {
@@ -1222,14 +1227,15 @@ impl Message {
                 }}
 
                 pub fn proto<'a>(&'a self) -> &'a {name}<'a> {{
-                    unsafe {{ core::mem::transmute::<&{name}<'static>, &{name}<'a>>(self.inner.proto.as_ref().unwrap()) }}
+                    let proto = self.inner.proto.as_ref().unwrap();
+                    unsafe {{ core::mem::transmute::<&{name}<'static>, &{name}<'a>>(proto) }}
                 }}
 
                 pub fn proto_mut<'a>(&'a mut self) -> &'a mut {name}<'a> {{
-                    unsafe {{
-                        let proto = self.inner.as_mut().get_unchecked_mut().proto.as_mut().unwrap();
-                        core::mem::transmute::<_, &mut {name}<'a>>(proto)
-                    }}
+                    let inner = self.inner.as_mut();
+                    let inner = unsafe {{ inner.get_unchecked_mut() }};
+                    let proto = inner.proto.as_mut().unwrap();
+                    unsafe {{ core::mem::transmute::<_, &mut {name}<'a>>(proto) }}
                 }}
             }}
 
@@ -1253,7 +1259,7 @@ impl Message {
                 fn try_into(self) -> Result<Vec<u8>> {{
                     let mut buf = Vec::new();
                     let mut writer = Writer::new(&mut buf);
-                    self.proto().write_message(&mut writer)?;
+                    self.inner.proto.as_ref().unwrap().write_message(&mut writer)?;
                     Ok(buf)
                 }}
             }}
@@ -1293,6 +1299,24 @@ impl Message {
             o.write_get_size(w, desc, config)?;
         }
         writeln!(w, "    }}")?;
+        Ok(())
+    }
+
+    fn write_impl_try_from<W: Write>(&self, w: &mut W) -> Result<()> {
+        write!(
+            w,
+            r#"
+            impl TryFrom<&[u8]> for {name} {{
+                type Error=quick_protobuf::Error;
+
+                fn try_from(buf: &[u8]) -> Result<Self> {{
+                    let mut reader = BytesReader::from_bytes(&buf);
+                    Ok({name}::from_reader(&mut reader, &buf)?)
+                }}
+            }}
+            "#,
+            name = self.name
+        )?;
         Ok(())
     }
 
@@ -2327,6 +2351,9 @@ impl FileDescriptor {
                 w,
                 "use quick_protobuf::{{BytesReader, Result, MessageInfo, MessageRead, MessageWrite}};"
             )?;
+            if self.owned {
+                writeln!(w, "use core::convert::{{TryFrom, TryInto}};")?;
+            }
             return Ok(());
         }
 
