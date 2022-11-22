@@ -16,3 +16,5 @@ mod test_deprecated_lifetime_can_compile;
 mod test_deprecated_lifetime_pb;
 mod test_oneof;
 mod test_oneof_pb;
+mod test_owned;
+mod test_owned_pb;

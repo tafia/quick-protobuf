@@ -22,6 +22,8 @@ must_fail["v3/test_enum_invalid_default.proto"]="enum variant does not exist"
 # Custom arguments to pass to `pb-rs` for generating files used in testing
 declare -A custom_pbrs_args
 
+custom_pbrs_args["v2/test_owned_pb.proto"]="--owned"
+custom_pbrs_args["v3/test_owned_pb.proto"]="--owned"
 custom_pbrs_args["v2/test_deprecated_lifetime_can_compile.proto"]="--add-deprecated-fields"
 custom_pbrs_args["v3/test_deprecated_lifetime_can_compile.proto"]="--add-deprecated-fields"
 

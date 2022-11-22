@@ -40,6 +40,8 @@ pub mod test_nested_package_dir_alt;
 pub mod test_nonunique_enum_pb;
 pub mod test_oneof;
 pub mod test_oneof_pb;
+pub mod test_owned;
+pub mod test_owned_pb;
 pub mod test_required;
 pub mod test_required_test;
 pub mod test_sanitize_file_name_pb;

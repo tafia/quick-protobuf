@@ -36,6 +36,8 @@ quick-protobuf/tests/rust_protobuf/v3/basic.rs
 quick-protobuf/tests/rust_protobuf/v3/test_ident_pb.rs
 quick-protobuf/tests/rust_protobuf/v3/test_map_pb.rs
 quick-protobuf/tests/rust_protobuf/v3/test_oneof_pb.rs
+quick-protobuf/tests/rust_protobuf/v2/test_owned_pb.rs
+quick-protobuf/tests/rust_protobuf/v3/test_owned_pb.rs
 quick-protobuf/tests/rust_protobuf/v2/test_comments.rs
 quick-protobuf/tests/rust_protobuf/v3/test_comments.rs
 quick-protobuf/tests/rust_protobuf/v2/test_name_resolution_p0.rs
