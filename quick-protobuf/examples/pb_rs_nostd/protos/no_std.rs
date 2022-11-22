@@ -47,6 +47,7 @@ impl<'a> From<&'a str> for MyEnum {
     }
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct EmbeddedMessage {
     pub val: i32,
@@ -82,6 +83,7 @@ impl MessageWrite for EmbeddedMessage {
     }
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct NoStdMessage<'a> {
     pub num: u32,

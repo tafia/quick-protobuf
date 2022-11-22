@@ -48,6 +48,7 @@ impl<'a> From<&'a str> for FooEnum {
     }
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct BarMessage {
     pub b_int32: i32,
@@ -79,6 +80,7 @@ impl MessageWrite for BarMessage {
     }
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct FooMessage<'a> {
     pub f_int32: i32,
@@ -258,6 +260,7 @@ impl<'a> Default for OneOftest_oneof<'a> {
 
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct BazMessage<'a> {
     pub nested: Option<mod_BazMessage::Nested>,
@@ -301,6 +304,7 @@ pub mod mod_BazMessage {
 
 use super::*;
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct Nested {
     pub f_nested: Option<mod_BazMessage::mod_Nested::NestedMessage>,
@@ -336,6 +340,7 @@ pub mod mod_Nested {
 
 use super::*;
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct NestedMessage {
     pub f_nested: i32,
@@ -406,6 +411,7 @@ impl<'a> From<&'a str> for NestedEnum {
 
 }
 
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct RepeatedMessage {
     pub bar_message: Vec<BarMessage>,
