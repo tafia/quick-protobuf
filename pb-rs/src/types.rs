@@ -502,7 +502,7 @@ impl Field {
             Frequency::Repeated
                 if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow =>
             {
-                writeln!(w, "Cow<'a, [{}]>,", rust_type)?;
+                writeln!(w, "PackedFixed<'a, {}>,", rust_type)?;
             }
             Frequency::Repeated => writeln!(w, "Vec<{}>,", rust_type)?,
             Frequency::Required | Frequency::Optional => writeln!(w, "{},", rust_type)?,
@@ -546,10 +546,10 @@ impl Field {
                 writeln!(w, "msg.{} = Some({}),", name, val_cow)?
             }
             Frequency::Required | Frequency::Optional => {
-                writeln!(w, "msg.{} = {},", name, val_cow)?
+                writeln!(w, "msg.{} = {},", name, val_cow)?;
             }
             Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
-                writeln!(w, "msg.{} = r.read_packed_fixed(bytes)?.into(),", name)?;
+                writeln!(w, "msg.{} = r.read_packed_fixed(bytes)?,", name)?;
             }
             Frequency::Repeated if self.packed() => {
                 writeln!(
@@ -2344,7 +2344,7 @@ impl FileDescriptor {
 
         writeln!(
             w,
-            "use quick_protobuf::{{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result}};"
+            "use quick_protobuf::{{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result, PackedFixed, PackedFixedIntoIter, PackedFixedRefIter}};"
         )?;
 
         if self.owned {

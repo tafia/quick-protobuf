@@ -142,7 +142,14 @@ fn test_types_repeated_packed() {
     message.string_field = vec!["thirty two".into(), "thirty three".into()];
     message.bytes_field = vec![vec![33u8, 34].into(), vec![35u8].into()];
     message.enum_field = vec![TestEnumDescriptor::BLUE, TestEnumDescriptor::GREEN];
-    test_serialize_deserialize_length_delimited!(&message, TestTypesRepeatedPacked);
+    test_serialize_deserialize_packed_fixed!(&message, TestTypesRepeatedPacked, parsed, {
+        parsed.double_field.own();
+        parsed.float_field.own();
+        parsed.fixed32_field.own();
+        parsed.fixed64_field.own();
+        parsed.sfixed32_field.own();
+        parsed.sfixed64_field.own();
+    });
 }
 
 // #[test]

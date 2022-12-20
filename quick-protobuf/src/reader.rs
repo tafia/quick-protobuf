@@ -7,6 +7,9 @@
 //!
 //! It is advised, for convenience to directly work with a `Reader`.
 
+use core::iter::FusedIterator;
+#[cfg(feature = "std")]
+use std::borrow::ToOwned;
 #[cfg(feature = "std")]
 use std::fs::File;
 #[cfg(feature = "std")]
@@ -18,6 +21,10 @@ use core::convert::TryFrom;
 
 #[cfg(not(feature = "std"))]
 extern crate alloc;
+#[cfg(not(feature = "std"))]
+use alloc::borrow::Cow;
+#[cfg(not(feature = "std"))]
+use alloc::borrow::ToOwned;
 #[cfg(not(feature = "std"))]
 use alloc::vec::Vec;
 
@@ -445,20 +452,25 @@ impl BytesReader {
     /// Note: packed field are stored as a variable length chunk of data, while regular repeated
     /// fields behaves like an iterator, yielding their tag everytime
     #[cfg_attr(std, inline)]
-    pub fn read_packed_fixed<'a, M>(&mut self, bytes: &'a [u8]) -> Result<&'a [M]> {
+    pub fn read_packed_fixed<'a, M: Copy + PartialEq>(
+        &mut self,
+        bytes: &'a [u8],
+    ) -> Result<PackedFixed<'a, M>>
+    where
+        [M]: ToOwned,
+    {
         let len = self.read_varint32(bytes)? as usize;
         if self.len() < len {
             return Err(Error::UnexpectedEndOfBuffer);
         }
+
+        // Note the floor divide; we rely on this to guarantee
+        // correctness in the rest of this function
         let n = len / ::core::mem::size_of::<M>();
-        let slice = unsafe {
-            ::core::slice::from_raw_parts(
-                bytes.get_unchecked(self.start) as *const u8 as *const M,
-                n,
-            )
-        };
+        let target = &bytes[self.start..self.start + (n * ::core::mem::size_of::<M>())];
+
         self.start += len;
-        Ok(slice)
+        Ok(PackedFixed::from(target))
     }
 
     /// Reads a nested message
@@ -678,6 +690,270 @@ pub fn deserialize_from_slice<'a, M: MessageRead<'a>>(bytes: &'a [u8]) -> Result
     reader.read_message::<M>(bytes)
 }
 
+/// Wrapper enum over packed fixed data, similar to `Cow`.
+///
+/// When we read packed fixed data, the raw bytes are often misaligned to the
+/// data type they represent. We don't want to have to align all the data before
+/// reading (especially if we're only accessing a few elements), as this
+/// involves lengthy allocations. This enum provides the `Borrowed` variant as a
+/// wrapper for such data, holding a reference to the (possibly) misaligned raw
+/// bytes and providing methods to read and iterate that are alignment-safe.
+///
+/// However, it is also convenient for the user to be able to use a
+/// `PackedFixed` variant that owns its own data (perhaps when setting the data
+/// themselves). It is mainly for this reason that the `Owned` variant is
+/// provided, which owns a `Vec<T>`.
+/// 
+/// One implementation detail is that the `Owned` variant is always aligned, so
+/// no use of `read_unaligned` is necessary. Methods are provided to convert
+/// from `Borrowed` to `Owned`, if it is found that it helps compiler
+/// optimization (not fully benchmarked at time of writing, seems
+/// temperamental).
+#[derive(Debug, Clone, Default)]
+pub enum PackedFixed<'a, T: Copy + PartialEq> {
+    /// Default when no data has been received yet; e.g. when just initialized.
+    #[default]
+    NoDataYet,
+    /// Variant that carries a reference to raw bytes that may or may not be
+    /// aligned, representing a packed set of fixed numbers.
+    ///
+    /// `PackedFixed` methods called on `Borrowed` will use `read_unaligned()`
+    /// to interact with the data without copying all bytes to an aligned buffer
+    /// in order to avoid delay from that memory allocation. So far, I can't
+    /// think of any way to take advantage of the situations when it is
+    /// coincidentally aligned.
+    Borrowed(&'a [u8]),
+    /// Variant that contains an owned vector of numbers.
+    Owned(Vec<T>),
+}
+
+impl<'a, T: Copy + PartialEq> PackedFixed<'a, T> {
+    /// Return the length of the DATA (not the bytes).
+    pub fn len(&self) -> usize {
+        match self {
+            PackedFixed::Borrowed(bytes) => bytes.len() / ::core::mem::size_of::<T>(),
+            PackedFixed::Owned(v) => v.len(),
+            PackedFixed::NoDataYet => 0,
+        }
+    }
+
+    /// Mutate in place to `Owned` variant. In the case of `Borrowed`, this
+    /// performs a bitwise copy of the entire slice.
+    pub fn own(&mut self) {
+        match self {
+            PackedFixed::NoDataYet => *self = PackedFixed::Owned(Vec::new()),
+            PackedFixed::Borrowed(_) => {
+                *self = self.make_owned_variant_from_unaligned_buf();
+            }
+            PackedFixed::Owned(_) => {} // no-op for PackedFixed::Owned, just like Cow
+        }
+    }
+
+    /// Get a `Vec<T>` of the internal data, moving `self` in the process. The
+    /// reason we move `self` is so that calling this on an `Owned` variant
+    /// will not require copying data. `Borrowed` variants will trigger a
+    /// bitwise copy.
+    ///
+    /// It would be really nice if this could instead return `&[T]` without
+    /// moving `self`, but we can't do this for the `Borrowed` variant, so
+    /// we have no such method on `PackedFixed` as a whole. And anyway, this is
+    /// what `at()` on `Borrowed` is for.
+    pub fn into_vec(self) -> Vec<T> {
+        match self {
+            PackedFixed::NoDataYet => Vec::new(),
+            PackedFixed::Borrowed(_) => self.make_vec_from_unaligned_buf(),
+            PackedFixed::Owned(v) => v,
+        }
+    }
+
+    /// Get the element at index `index`.
+    ///
+    /// Note that `index` refers to the index of the type `T`, and NOT the byte
+    /// index. In the case of `Borrowed`, this index is calculated during
+    /// runtime, as if the underlying data was already in form `Vec<T>`.
+    pub fn at(&self, index: usize) -> T {
+        match self {
+            PackedFixed::Borrowed(bytes) => {
+                let byte_offset = index * core::mem::size_of::<T>();
+                if byte_offset >= bytes.len() {
+                    panic!("PackedFixed::at(): Index out of range!");
+                }
+
+                let mut ptr = bytes.as_ptr();
+                unsafe {
+                    ptr = ptr.add(byte_offset);
+                    (ptr as *const T).read_unaligned()
+                }
+            }
+            PackedFixed::Owned(v) => v[index],
+            PackedFixed::NoDataYet => panic!("Cannot call at() on PackedFixed::NoDataYet!"),
+        }
+    }
+
+    /// Mutate `self` to `Owned` variant before returning immutable slice
+    pub fn to_slice(&mut self) -> &[T] {
+        self.own();
+        if let PackedFixed::Owned(ref contents) = *self {
+            contents
+        } else {
+            unreachable!();
+        }
+    }
+
+    /// Mutate `self` to `Owned` variant before returning mutable slice
+    pub fn to_mut_slice(&mut self) -> &mut [T] {
+        self.own();
+        if let PackedFixed::Owned(ref mut contents) = *self {
+            contents
+        } else {
+            unreachable!();
+        }
+    }
+
+    /// Returns `true` if no data is contained in the enum.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            PackedFixed::NoDataYet => true,
+            PackedFixed::Borrowed(bytes) => bytes.is_empty(),
+            PackedFixed::Owned(contents) => contents.is_empty(),
+        }
+    }
+
+    // This method is private and mainly to avoid repetition in code.
+    fn make_vec_from_unaligned_buf(&self) -> Vec<T> {
+        match &self {
+            PackedFixed::Borrowed(bytes) => unsafe {
+                let src = bytes.as_ptr();
+                let mut buf = Vec::<T>::with_capacity(self.len());
+                let dst = buf.as_mut_ptr() as *mut u8;
+                ::core::ptr::copy(src, dst, bytes.len()); // careful to use length in bytes here
+                buf.set_len(self.len());
+                buf
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    // This method is private and mainly to avoid repetition in code.
+    fn make_owned_variant_from_unaligned_buf(&self) -> Self {
+        match &self {
+            PackedFixed::Borrowed(_) => {
+                PackedFixed::Owned(self.make_vec_from_unaligned_buf())
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+/// Iterator over `PackedFixed`.
+pub struct PackedFixedIntoIter<'a, T: Copy + PartialEq> {
+    packed_fixed: PackedFixed<'a, T>,
+    index: usize,
+}
+
+impl<'a, T: Copy + PartialEq> FusedIterator for PackedFixedIntoIter<'a, T> {}
+
+impl<'a, T: Copy + PartialEq> Iterator for PackedFixedIntoIter<'a, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.packed_fixed.len() {
+            None
+        } else {
+            let res = Some(self.packed_fixed.at(self.index));
+            self.index += 1;
+            res
+        }
+    }
+}
+
+impl<'a, T: Copy + PartialEq> IntoIterator for PackedFixed<'a, T> {
+    type Item = T;
+
+    type IntoIter = PackedFixedIntoIter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            packed_fixed: self,
+            index: 0,
+        }
+    }
+}
+
+/// Iterator over `&'a PackedFixed`. Note: This does NOT return references to
+/// the iterated elements (which is why we aren't following the convention of
+/// calling it `PackedFixedIter`), because:
+/// - Due to limitations of `read_unaligned()` (must always copy), we cannot get
+///   references to elements of the `Borrowed` variant
+/// - The only data types expected to be handled by `PackedFixed` are primitive
+///   numeral types anyway.
+///
+/// This is purely for convenience, so we can iterate over `&PackedFixed`
+/// without moving it.
+pub struct PackedFixedRefIter<'a, T: Copy + PartialEq> {
+    packed_fixed: &'a PackedFixed<'a, T>,
+    index: usize,
+}
+
+impl<'a, T: Copy + PartialEq> FusedIterator for PackedFixedRefIter<'a, T> {}
+
+impl<'a, T: Copy + PartialEq> Iterator for PackedFixedRefIter<'a, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.packed_fixed.len() {
+            None
+        } else {
+            let res = Some(self.packed_fixed.at(self.index));
+            self.index += 1;
+            res
+        }
+    }
+}
+
+impl<'a, T: Copy + PartialEq> IntoIterator for &'a PackedFixed<'a, T> {
+    type Item = T;
+
+    type IntoIter = PackedFixedRefIter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            packed_fixed: self,
+            index: 0,
+        }
+    }
+}
+
+impl<'a, T: Copy + PartialEq, const N: usize> From<&'a [u8; N]> for PackedFixed<'a, T> {
+    fn from(value: &'a [u8; N]) -> Self {
+        Self::Borrowed(value)
+    }
+}
+
+impl<'a, T: Copy + PartialEq> From<&'a [u8]> for PackedFixed<'a, T> {
+    fn from(value: &'a [u8]) -> Self {
+        Self::Borrowed(value)
+    }
+}
+
+impl<'a, T: Copy + PartialEq> From<&'a Vec<u8>> for PackedFixed<'a, T> {
+    fn from(value: &'a Vec<u8>) -> Self {
+        Self::Borrowed(value)
+    }
+}
+
+impl<'a, T: Copy + PartialEq> From<Vec<T>> for PackedFixed<'a, T> {
+    fn from(value: Vec<T>) -> Self {
+        Self::Owned(value)
+    }
+}
+
+impl<'a, T: Copy + PartialEq> PartialEq for PackedFixed<'a, T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.into_iter().eq(other)
+    }
+}
+
 #[test]
 fn test_varint() {
     let data = [0x96, 0x01];
@@ -715,4 +991,50 @@ fn read_size_overflowing_unknown() {
     let e = r.read_unknown(bytes, 4730).unwrap_err();
 
     assert!(matches!(e, Error::Varint), "{:?}", e);
+}
+
+#[test]
+fn test_packed_fixed_iter() {
+    let pf: PackedFixed<i32> = vec![1, 2, 3, 4, 5].into();
+
+    let mut total = 0;
+
+    for _ in 0..10 {
+        for i in &pf {
+            total += i;
+        }
+    }
+
+    for i in pf {
+        total += i;
+    }
+
+    assert_eq!(total, (1 + 2 + 3 + 4 + 5) * (10 + 1));
+}
+
+#[test]
+fn test_packed_fixed_eq() {
+    let v = vec![0x01u8, 0x00u8, 0x00u8, 0x00u8, 0x02u8, 0x00u8, 0x00u8, 0x00u8, 0x03u8, 0x00u8, 0x00u8, 0x00u8];
+    let borrowed: PackedFixed<i32> = PackedFixed::Borrowed(&v);
+    let mut owned: PackedFixed<i32> = borrowed.clone();
+    owned.own();
+
+    let owned_reversed: PackedFixed<i32> = vec![3,2,1].into();
+
+    let v_reversed = vec![0x03u8, 0x00u8, 0x00u8, 0x00u8, 0x02u8, 0x00u8, 0x00u8, 0x00u8, 0x01u8, 0x00u8, 0x00u8, 0x00u8];
+    let borrowed_reversed: PackedFixed<i32> = PackedFixed::Borrowed(&v_reversed);
+
+    let ndy: PackedFixed<i32> = PackedFixed::NoDataYet;
+    let ndy2: PackedFixed<i32> = PackedFixed::NoDataYet;
+    let def: PackedFixed<i32> = PackedFixed::default();
+
+    assert_eq!(borrowed, owned);
+    assert_eq!(borrowed_reversed, owned_reversed);
+    assert_eq!(ndy, ndy2);
+    assert_eq!(ndy, def);
+
+    assert_ne!(borrowed, owned_reversed);
+    assert_ne!(owned, owned_reversed);
+    assert_ne!(owned, borrowed_reversed);
+    assert_ne!(borrowed, borrowed_reversed);
 }

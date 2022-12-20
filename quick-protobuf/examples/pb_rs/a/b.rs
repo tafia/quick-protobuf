@@ -9,7 +9,7 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
+use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result, PackedFixed, PackedFixedIntoIter, PackedFixedRefIter};
 use quick_protobuf::sizeofs::*;
 use super::super::*;
 

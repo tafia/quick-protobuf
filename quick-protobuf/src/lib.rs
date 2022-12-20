@@ -14,7 +14,9 @@ pub mod writer;
 
 pub use crate::errors::{Error, Result};
 pub use crate::message::{MessageInfo, MessageRead, MessageWrite};
-pub use crate::reader::{deserialize_from_slice, BytesReader};
+pub use crate::reader::{
+    deserialize_from_slice, BytesReader, PackedFixed, PackedFixedIntoIter, PackedFixedRefIter,
+};
 pub use crate::writer::{serialize_into_slice, BytesWriter, Writer, WriterBackend};
 
 #[cfg(feature = "std")]
