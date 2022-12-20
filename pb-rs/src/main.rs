@@ -47,6 +47,7 @@ fn run() -> Result<(), Error> {
         ).arg(
             Arg::with_name("INPUT")
                 .multiple(true)
+                .required(true)
                 .help("The .proto files used to generate quick-protobuf code")
                 .validator(|x| extension_matches(x, "proto")),
         ).arg(
@@ -93,9 +94,9 @@ fn run() -> Result<(), Error> {
                 .help("Generate no_std compliant code"),
         ).arg(
             Arg::with_name("HASHBROWN")
-                .long("hashrown")
+                .long("hashbrown")
                 .required(false)
-                .help("Use hashrown for HashMap implementation"),
+                .help("Use the hashbrown crate as the HashMap implementation"),
         ).arg(
             Arg::with_name("GEN_INFO")
                 .long("gen-info")
