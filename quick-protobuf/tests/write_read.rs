@@ -1,7 +1,10 @@
 extern crate quick_protobuf;
 
 use quick_protobuf::sizeofs::*;
-use quick_protobuf::{deserialize_from_slice, serialize_into_slice, serialize_into_vec};
+use quick_protobuf::{
+    deserialize_from_slice, deserialize_from_slice_without_len, serialize_into_slice,
+    serialize_into_slice_without_len, serialize_into_vec,
+};
 use quick_protobuf::{
     BytesReader, MessageRead, MessageWrite, Reader, Result, Writer, WriterBackend,
 };
@@ -164,6 +167,22 @@ fn wr_message_slice() {
     serialize_into_slice(&v, &mut buf).unwrap();
 
     assert_eq!(v, deserialize_from_slice(&buf).unwrap());
+}
+
+#[test]
+fn wr_message_slice_without_len() {
+    let original = TestMessage {
+        id: Some(63),
+        val: vec![53, 5, 76, 743, 23, 753],
+    };
+
+    let len = original.get_size();
+    let mut serialized = vec![0u8; len];
+    let serialized_len = serialize_into_slice_without_len(&original, &mut serialized).unwrap();
+
+    let deserialized = deserialize_from_slice_without_len(&serialized).unwrap();
+    assert_eq!(len, serialized_len);
+    assert_eq!(original, deserialized);
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Default)]
