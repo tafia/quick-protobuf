@@ -3,8 +3,8 @@ syntax = "proto3";
 import "data_types_import.proto";
 
 enum FooEnum {
-    FIRST_VALUE = 1;
-    SECOND_VALUE = 2;
+    FIRST_VALUE = 0;
+    SECOND_VALUE = 1;
 }
     
 message BarMessage {
@@ -17,12 +17,12 @@ message FooMessage {
     uint32 f_uint32 = 3;
     uint64 f_uint64 = 4;
     sint32 f_sint32 = 5;
-    sint64 f_sint64 = 6 [default=4];
-    bool f_bool = 7 [default=true];
+    sint64 f_sint64 = 6;
+    bool f_bool = 7;
     FooEnum f_FooEnum = 8;
     fixed64 f_fixed64 = 9;
     sfixed64 f_sfixed64 = 10;
-    fixed32 f_fixed32 = 11 [default=0];
+    fixed32 f_fixed32 = 11;
     sfixed32 f_sfixed32 = 12;
     double f_double = 13;
     float f_float = 14;

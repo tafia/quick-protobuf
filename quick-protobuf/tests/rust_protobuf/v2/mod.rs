@@ -19,6 +19,7 @@ pub mod special;
 pub mod struct_pb;
 pub mod test_basic;
 pub mod test_default_values;
+pub mod test_default_values_dont_use_cow;
 pub mod test_default_values_test;
 pub mod test_deprecated_lifetime;
 pub mod test_deprecated_lifetime_can_compile;

@@ -64,6 +64,8 @@ fn main() {
     let out_vec = serialize_into_vec(&message).expect("Cannot write message!");
     assert_eq!(out, out_vec);
 
+    println!("{:?}", out);
+
     // Try to read it back and confirm that we still have the exact same message
     //
     // In general, if we had written the data to say, a file, or if someone else

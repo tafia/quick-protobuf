@@ -31,12 +31,12 @@ fn main() {
         f_bytes: Cow::Borrowed(b"I see you!"),
 
         // imported fields work as expected
-        f_imported: Some(ImportedMessage { i: true }),
+        f_imported: ImportedMessage { i: true },
 
         // nested messages are encapsulated into a rust module mod_Message
-        f_nested: Some(data_types::mod_BazMessage::Nested {
-            f_nested: Some(data_types::mod_BazMessage::mod_Nested::NestedMessage { f_nested: 2 }),
-        }),
+        f_nested: data_types::mod_BazMessage::Nested {
+            f_nested: data_types::mod_BazMessage::mod_Nested::NestedMessage { f_nested: 2 },
+        },
 
         // nested enums too
         f_nested_enum: data_types::mod_BazMessage::mod_Nested::NestedEnum::Baz,
@@ -51,11 +51,11 @@ fn main() {
 
         f_repeated_string: vec![Cow::Borrowed("goat"), Cow::Borrowed("running")],
         f_repeated_baz_message: vec![BazMessage {
-            nested: Some(data_types::mod_BazMessage::Nested {
-                f_nested: Some(data_types::mod_BazMessage::mod_Nested::NestedMessage {
+            nested: data_types::mod_BazMessage::Nested {
+                f_nested: data_types::mod_BazMessage::mod_Nested::NestedMessage {
                     f_nested: 2,
-                }),
-            }),
+                },
+            },
             b_int64: 10,
             b_string: Cow::Borrowed("boom\n"),
         }],

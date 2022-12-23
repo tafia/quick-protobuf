@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use quick_protobuf::*;
 
 use super::basic::*;
@@ -22,7 +24,7 @@ fn test3() {
     let mut test1 = Test1::default();
     test1.a = 150;
     let mut test3 = Test3::default();
-    test3.c = Some(test1);
+    test3.c = test1;
     test_serialize_deserialize!("1a 03 08 96 01", &test3, Test3);
 }
 
@@ -156,7 +158,7 @@ fn test_types_repeated_packed() {
 #[test]
 fn test_default_instance() {
     let d = TestDefaultInstance::default();
-    assert_eq!(None, d.field.and_then(|f| Some(f.s)));
+    assert_eq!("", d.field.s);
 }
 
 // #[test]
@@ -238,4 +240,70 @@ fn test_bug_sint() {
         x.s64 = -2;
         test_serialize_deserialize!("10 03", &x, TestBugSint);
     }
+}
+
+#[test]
+fn test_defaults() {
+    let a = TestTypesSingular::default();
+    assert_eq!(
+        a,
+        TestTypesSingular {
+            double_field: 0f64,
+            float_field: 0f32,
+            int32_field: 0i32,
+            int64_field: 0i64,
+            uint32_field: 0u32,
+            uint64_field: 0u64,
+            sint32_field: 0i32,
+            sint64_field: 0i64,
+            fixed32_field: 0u32,
+            fixed64_field: 0u64,
+            sfixed32_field: 0i32,
+            sfixed64_field: 0i64,
+            bool_field: false,
+            string_field: Cow::Borrowed(""),
+            bytes_field: Cow::Borrowed(b""),
+            enum_field: TestEnumDescriptor::UNKNOWN,
+        }
+    );
+
+    let b = TestTypesSingularOptional::default();
+    assert_eq!(
+        b,
+        TestTypesSingularOptional {
+            double_field: None,
+            float_field: None,
+            int32_field: None,
+            int64_field: None,
+            uint32_field: None,
+            uint64_field: None,
+            sint32_field: None,
+            sint64_field: None,
+            fixed32_field: None,
+            fixed64_field: None,
+            sfixed32_field: None,
+            sfixed64_field: None,
+            bool_field: None,
+            string_field: None,
+            bytes_field: None,
+            enum_field: None,
+        }
+    );
+    
+    assert_eq!(a.double_field, b.double_field.unwrap_or_default());
+    assert_eq!(a.float_field, b.float_field.unwrap_or_default());
+    assert_eq!(a.int32_field, b.int32_field.unwrap_or_default());
+    assert_eq!(a.int64_field, b.int64_field.unwrap_or_default());
+    assert_eq!(a.uint32_field, b.uint32_field.unwrap_or_default());
+    assert_eq!(a.uint64_field, b.uint64_field.unwrap_or_default());
+    assert_eq!(a.sint32_field, b.sint32_field.unwrap_or_default());
+    assert_eq!(a.sint64_field, b.sint64_field.unwrap_or_default());
+    assert_eq!(a.fixed32_field, b.fixed32_field.unwrap_or_default());
+    assert_eq!(a.fixed64_field, b.fixed64_field.unwrap_or_default());
+    assert_eq!(a.sfixed32_field, b.sfixed32_field.unwrap_or_default());
+    assert_eq!(a.sfixed64_field, b.sfixed64_field.unwrap_or_default());
+    assert_eq!(a.bool_field, b.bool_field.unwrap_or_default());
+    assert_eq!(a.string_field, b.string_field.unwrap_or_default());
+    assert_eq!(a.bytes_field, b.bytes_field.unwrap_or_default());
+    assert_eq!(a.enum_field, b.enum_field.unwrap_or_default());
 }

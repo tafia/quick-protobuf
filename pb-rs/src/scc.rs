@@ -25,7 +25,7 @@ fn scc(
     for &v in vertices[u]
         .get_message(desc)
         .all_fields()
-        .filter(|f| !f.boxed && f.frequency != Frequency::Repeated)
+        .filter(|f| !f.boxed && !f.frequency.is_repeated())
         .filter_map(|f| f.typ.message())
         .filter_map(|m| ids.get(m))
     {

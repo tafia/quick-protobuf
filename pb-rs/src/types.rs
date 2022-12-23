@@ -32,11 +32,59 @@ impl Default for Syntax {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Frequency {
+    Proto2Frequency(Proto2Frequency),
+    Proto3Frequency(Proto3Frequency),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Proto2Frequency {
     Optional,
     Repeated,
     Required,
+    Map,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Proto3Frequency {
+    Optional,
+    Repeated,
+    Default,
+    Map,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeneratedType {
+    SingularType,
+    ArrayLikeType,
+    Map,
+}
+
+impl Frequency {
+    pub fn is_map(&self) -> bool {
+        matches!(self, Frequency::Proto2Frequency(Proto2Frequency::Map) | Frequency::Proto3Frequency(Proto3Frequency::Map))
+    }
+
+    pub fn is_optional(&self) -> bool {
+        matches!(self, Frequency::Proto2Frequency(Proto2Frequency::Optional) | Frequency::Proto3Frequency(Proto3Frequency::Optional))
+    }
+
+    pub fn is_repeated(&self) -> bool {
+        matches!(self, Frequency::Proto2Frequency(Proto2Frequency::Repeated) | Frequency::Proto3Frequency(Proto3Frequency::Repeated))
+    }
+}
+
+impl From<Frequency> for GeneratedType {
+    fn from(value: Frequency) -> Self {
+        if value.is_map() {
+            GeneratedType::Map
+        } else if value.is_repeated() {
+            GeneratedType::ArrayLikeType
+        } else {
+            GeneratedType::SingularType
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Default)]
@@ -128,6 +176,39 @@ pub enum FieldType {
 }
 
 impl FieldType {
+    fn is_cow(&self) -> bool {
+        matches!(self, FieldType::StringCow | FieldType::BytesCow,)
+    }
+
+    fn is_non_cow_string_or_byte(&self) -> bool {
+        matches!(self, FieldType::String_ | FieldType::Bytes_,)
+    }
+
+    // Some writer functions (such as `write_string()`, etc.) take references to
+    // their arguments, and some take the argument type itself (when it's a
+    // primitive type, like `i32`). This means that our codegen sometimes
+    // sometimes needs to dereference an argument to avoid passing a reference
+    // when we should not. This function allows us to check for this case.
+    fn need_to_dereference(&self) -> bool {
+        matches!(
+            self,
+            FieldType::Enum(_)
+                | FieldType::Int32
+                | FieldType::Sint32
+                | FieldType::Int64
+                | FieldType::Sint64
+                | FieldType::Uint32
+                | FieldType::Uint64
+                | FieldType::Bool
+                | FieldType::Fixed64
+                | FieldType::Sfixed64
+                | FieldType::Double
+                | FieldType::Fixed32
+                | FieldType::Sfixed32
+                | FieldType::Float,
+        )
+    }
+
     pub fn is_primitive(&self) -> bool {
         !matches!(*self, FieldType::Message(_)
             | FieldType::Map(_, _)
@@ -221,32 +302,35 @@ impl FieldType {
         matches!(self.wire_type_num_non_packed(), 1 | 5)
     }
 
-    fn regular_default<'a, 'b>(&'a self, desc: &'b FileDescriptor) -> Option<&'b str> {
+    fn singular_field_defaults(&self, desc: &FileDescriptor) -> String {
         match *self {
-            FieldType::Int32 => Some("0i32"),
-            FieldType::Sint32 => Some("0i32"),
-            FieldType::Int64 => Some("0i64"),
-            FieldType::Sint64 => Some("0i64"),
-            FieldType::Uint32 => Some("0u32"),
-            FieldType::Uint64 => Some("0u64"),
-            FieldType::Bool => Some("false"),
-            FieldType::Fixed32 => Some("0u32"),
-            FieldType::Sfixed32 => Some("0i32"),
-            FieldType::Float => Some("0f32"),
-            FieldType::Fixed64 => Some("0u64"),
-            FieldType::Sfixed64 => Some("0i64"),
-            FieldType::Double => Some("0f64"),
-            FieldType::StringCow => Some("\"\""),
-            FieldType::BytesCow => Some("Cow::Borrowed(b\"\")"),
-            FieldType::String_ => Some("String::default()"),
-            FieldType::Bytes_ => Some("vec![]"),
+            FieldType::Int32 => "0i32".to_owned(),
+            FieldType::Sint32 => "0i32".to_owned(),
+            FieldType::Int64 => "0i64".to_owned(),
+            FieldType::Sint64 => "0i64".to_owned(),
+            FieldType::Uint32 => "0u32".to_owned(),
+            FieldType::Uint64 => "0u64".to_owned(),
+            FieldType::Bool => "false".to_owned(),
+            FieldType::Fixed32 => "0u32".to_owned(),
+            FieldType::Sfixed32 => "0i32".to_owned(),
+            FieldType::Float => "0f32".to_owned(),
+            FieldType::Fixed64 => "0u64".to_owned(),
+            FieldType::Sfixed64 => "0i64".to_owned(),
+            FieldType::Double => "0f64".to_owned(),
+            FieldType::StringCow => "Cow::Borrowed(\"\")".to_owned(),
+            FieldType::String_ => "\"\".to_string()".to_owned(),
+            FieldType::BytesCow => "Cow::Borrowed(b\"\")".to_owned(),
+            FieldType::Bytes_ => "Vec::<u8>::new()".to_owned(),
             FieldType::Enum(ref e) => {
                 let e = e.get_enum(desc);
-                Some(&*e.fully_qualified_fields[0].0)
+                e.fully_qualified_fields[0].0.to_owned()
             }
-            FieldType::Message(_) => None,
-            FieldType::Map(_, _) => None,
-            FieldType::MessageOrEnum(_) => unreachable!("Message / Enum not resolved"),
+            FieldType::Message(ref m) => {
+                let m = m.get_message(desc);
+                format!("{}{}::default()", m.get_modules(desc), m.name)
+            }
+            // FieldType::Map(..) => "HashMap::new()".to_owned(),
+            _ => unreachable!(),
         }
     }
 
@@ -361,9 +445,9 @@ impl FieldType {
             | FieldType::Uint32
             | FieldType::Uint64
             | FieldType::Bool
-            | FieldType::Enum(_) => format!("sizeof_varint(*({}) as u64)", s),
-            FieldType::Sint32 => format!("sizeof_sint32(*({}))", s),
-            FieldType::Sint64 => format!("sizeof_sint64(*({}))", s),
+            | FieldType::Enum(_) => format!("sizeof_varint(({}) as u64)", s),
+            FieldType::Sint32 => format!("sizeof_sint32(({}))", s),
+            FieldType::Sint64 => format!("sizeof_sint64(({}))", s),
 
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
@@ -383,7 +467,7 @@ impl FieldType {
 
     fn get_write(&self, s: &str, boxed: bool) -> String {
         match *self {
-            FieldType::Enum(_) => format!("write_enum(*{} as i32)", s),
+            FieldType::Enum(_) => format!("write_enum({} as i32)", s),
 
             FieldType::Int32
             | FieldType::Sint32
@@ -397,14 +481,14 @@ impl FieldType {
             | FieldType::Double
             | FieldType::Fixed32
             | FieldType::Sfixed32
-            | FieldType::Float => format!("write_{}(*{})", self.proto_type(), s),
+            | FieldType::Float => format!("write_{}({})", self.proto_type(), s),
 
-            FieldType::StringCow => format!("write_string(&**{})", s),
-            FieldType::BytesCow => format!("write_bytes(&**{})", s),
-            FieldType::String_ => format!("write_string(&**{})", s),
-            FieldType::Bytes_ => format!("write_bytes(&**{})", s),
+            FieldType::StringCow => format!("write_string({})", s),
+            FieldType::BytesCow => format!("write_bytes({})", s),
+            FieldType::String_ => format!("write_string({})", s),
+            FieldType::Bytes_ => format!("write_bytes({})", s),
 
-            FieldType::Message(_) if boxed => format!("write_message(&**{})", s),
+            FieldType::Message(_) if boxed => format!("write_message(&*({}))", s),
             FieldType::Message(_) => format!("write_message({})", s),
 
             FieldType::Map(ref k, ref v) => format!(
@@ -433,6 +517,140 @@ pub struct Field {
 }
 
 impl Field {
+    fn can_write_default_const(&self, desc: &FileDescriptor, config: &Config) -> bool {
+        // Proto3 doesn't allow custom defaults, and its standard defaults line
+        // up with Rust's, so we don't need to add custom defaults.
+        let is_proto3 = desc.syntax == Syntax::Proto3;
+
+        let is_message_or_map = !self.typ.need_to_dereference()
+            && !self.typ.is_cow()
+            && !self.typ.is_non_cow_string_or_byte();
+
+        let no_custom_default = self.default.is_none();
+
+        let absent_due_to_deprecation = self.deprecated && !config.add_deprecated_fields;
+
+        !(is_proto3 || is_message_or_map || no_custom_default || absent_due_to_deprecation || !self.frequency.is_optional())
+    }
+    
+    fn write_custom_default<W: Write>(
+        &self,
+        w: &mut W,
+        deconflict_list: &mut Vec<String>,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
+        if !self.can_write_default_const(desc, config) {
+            return Ok(());
+        }
+
+        const DECONFLICT_SUFFIX: &str = "_DECONFLICT";
+
+        // We need to convert to uppercase and also deconflict
+        let processed_name = {
+            let capitalized = self.name.to_ascii_uppercase();
+            if deconflict_list.contains(&capitalized) {
+                let new_name = capitalized + DECONFLICT_SUFFIX;
+                deconflict_list.push(new_name.clone());
+                new_name
+            } else {
+                capitalized
+            }
+        };
+
+        let got_type = if self.typ.is_non_cow_string_or_byte() {
+            match self.typ {
+                FieldType::String_ => "&str".to_owned(),
+                FieldType::Bytes_ => "&[u8]".to_owned(),
+                _ => unreachable!(),
+            }
+        } else {
+            self.typ.rust_type(desc, config)?
+        };
+
+        let custom_default = self.default.as_ref().unwrap();
+
+        writeln!(
+            w,
+            "    pub const DEFAULT_{processed_name}: {got_type} = {custom_default};"
+        )?;
+        Ok(())
+    }
+
+    fn write_default<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
+        if self.deprecated && !config.add_deprecated_fields {
+            return Ok(());
+        }
+
+        writeln!(
+            w,
+            "            {}: {},",
+            self.name,
+            self.write_impl_default_field(desc, config)
+        )?;
+        Ok(())
+    }
+
+    fn write_impl_default_field(&self, desc: &FileDescriptor, config: &Config) -> String {
+        match self.frequency.into() {
+            GeneratedType::SingularType => {
+                if self.boxed {
+                    return "None".to_owned();
+                }
+                if self.frequency.is_optional() {
+                    // No matter whether there is a custom or standard default,
+                    // the field will still be initialized to `None`, since we
+                    // rely on `is_some()` as a hazzer. User must retrieve
+                    // default themselves.
+                    "None".to_owned()
+                } else {
+                    match &self.default {
+                        Some(custom_default) => {
+                            // If the command line option `--dont_use_cow` is
+                            // set, `String` and `Vec<u8>` will be used instead
+                            // of `Cow<'a, str>` and `Cow<'a, [u8]>`
+                            // respectively. However, custom defaults are
+                            // represented using `const` variables, and neither
+                            // `String` nor `Vec<u8>` are able to be `const`.
+                            // Thus, we need to be able to generate:
+                            //
+                            //      1) for string fields, both `&str` as well as
+                            //          `String` versions
+                            //      2) for byte fields, both `[u8; N]` as well
+                            //          as `Vec<u8>` versions
+                            //
+                            // For convenience, we start with the `const`
+                            // versions, and add on methods to convert to
+                            // non-`const` versions below.
+                            if self.typ.is_non_cow_string_or_byte() {
+                                return match self.typ {
+                                    FieldType::String_ => format!("{custom_default}.to_string()"),
+                                    FieldType::Bytes_ => format!("{custom_default}.to_vec()"),
+                                    _ => unreachable!(),
+                                };
+                            }
+                            custom_default.clone()
+                        }
+                        None => self.typ.singular_field_defaults(desc),
+                    }
+                }
+            }
+            GeneratedType::ArrayLikeType => {
+                if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow {
+                    "Cow::from(Vec::new())".to_owned()
+                } else {
+                    "Vec::new()".to_owned()
+                }
+            }
+            GeneratedType::Map => "HashMap::new()".to_owned(),
+        }
+    }
+
     fn packed(&self) -> bool {
         self.packed.unwrap_or(false)
     }
@@ -456,11 +674,11 @@ impl Field {
                     "nan" => "::core::f64::NAN".to_string(),
                     _ => format!("{}f64", *d),
                 },
-                "Cow<'a, str>" => format!("Cow::Borrowed({})", d),
-                "Cow<'a, [u8]>" => format!("Cow::Borrowed(b{})", d),
-                "String" => format!("String::from({})", d),
-                "Bytes" => format!(r#"b{}"#, d),
-                "Vec<u8>" => format!("b{}.to_vec()", d),
+                "Cow<'a, str>" => format!("Cow::Borrowed(\"{}\")", d),
+                "Cow<'a, [u8]>" => format!("Cow::Borrowed(b\"{}\")", d),
+                "String" => format!("\"{}\"", d),
+                "Bytes" => format!("b\"{}\"", d),
+                "Vec<u8>" => format!("b\"{}\"", d),
                 "bool" => format!("{}", d.parse::<bool>().unwrap()),
                 e => format!("{}::{}", e, d), // enum, as message and map do not have defaults
             }
@@ -468,12 +686,35 @@ impl Field {
         Ok(())
     }
 
-    fn has_regular_default(&self, desc: &FileDescriptor) -> bool {
-        self.default.is_none() || self.default.as_deref() == self.typ.regular_default(desc)
-    }
-
     fn tag(&self) -> u32 {
         tag(self.number as u32, &self.typ, self.packed())
+    }
+
+    pub fn get_type(&self, desc: &FileDescriptor, config: &Config) -> String {
+        let rust_type = self.typ.rust_type(desc, config).unwrap();
+        if self.boxed {
+            return format!("Option<Box<{}>>", rust_type);
+        }
+
+        match self.frequency.into() {
+            GeneratedType::SingularType => {
+                if self.frequency.is_optional() {
+                    format!("Option<{}>", rust_type)
+                } else {
+                    rust_type
+                }
+            }
+            GeneratedType::ArrayLikeType => {
+                if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow {
+                    format!("Cow<'a, [{}]>", rust_type)
+                } else {
+                    format!("Vec<{}>", rust_type)
+                }
+            }
+            GeneratedType::Map => {
+                rust_type // rust_type is already KVMap<{}, {}>
+            }
+        }
     }
 
     fn write_definition<W: Write>(
@@ -489,24 +730,8 @@ impl Field {
                 return Ok(());
             }
         }
-        write!(w, "    pub {}: ", self.name)?;
-        let rust_type = self.typ.rust_type(desc, config)?;
-        match self.frequency {
-            _ if self.boxed => writeln!(w, "Option<Box<{}>>,", rust_type)?,
-            Frequency::Optional
-                if desc.syntax == Syntax::Proto2 && self.default.is_none()
-                    || self.typ.message().is_some() =>
-            {
-                writeln!(w, "Option<{}>,", rust_type)?
-            }
-            Frequency::Repeated
-                if self.packed() && self.typ.is_fixed_size() && !config.dont_use_cow =>
-            {
-                writeln!(w, "Cow<'a, [{}]>,", rust_type)?;
-            }
-            Frequency::Repeated => writeln!(w, "Vec<{}>,", rust_type)?,
-            Frequency::Required | Frequency::Optional => writeln!(w, "{},", rust_type)?,
-        }
+        writeln!(w, "    pub {}: {},", self.name, self.get_type(desc, config))?;
+
         Ok(())
     }
 
@@ -515,51 +740,73 @@ impl Field {
             return Ok(());
         }
 
-        // special case for FieldType::Map: destructure tuple before inserting in HashMap
-        if let FieldType::Map(ref key, ref value) = self.typ {
-            writeln!(w, "                Ok({}) => {{", self.tag())?;
-            writeln!(
-                w,
-                "                    let (key, value) = \
-                 r.read_map(bytes, |r, bytes| Ok({}), |r, bytes| Ok({}))?;",
-                key.read_fn(desc)?.1,
-                value.read_fn(desc)?.1
-            )?;
-            writeln!(
-                w,
-                "                    msg.{}.insert(key, value);",
-                self.name
-            )?;
-            writeln!(w, "                }}")?;
+        let (val, val_cow) = if self.frequency.is_map() {
+            ("".to_owned(), "".to_owned()) // ignore if is map
+        } else {
+            self.typ.read_fn(desc)?
+        };
+
+        let name = &self.name;
+        write!(w, "                Ok({}) => ", self.tag())?;
+
+        if self.boxed {
+            writeln!(w, "msg.{} = Some(Box::new({})),", name, val)?;
             return Ok(());
         }
 
-        let (val, val_cow) = self.typ.read_fn(desc)?;
-        let name = &self.name;
-        write!(w, "                Ok({}) => ", self.tag())?;
-        match self.frequency {
-            _ if self.boxed => writeln!(w, "msg.{} = Some(Box::new({})),", name, val)?,
-            Frequency::Optional
-                if desc.syntax == Syntax::Proto2 && self.default.is_none()
-                    || self.typ.message().is_some() =>
-            {
-                writeln!(w, "msg.{} = Some({}),", name, val_cow)?
+        match self.frequency.into() {
+            GeneratedType::SingularType => match &self.frequency {
+                Frequency::Proto2Frequency(freq) => match freq {
+                    Proto2Frequency::Optional => writeln!(w, "msg.{} = Some({}),", name, val_cow)?,
+                    Proto2Frequency::Required => writeln!(w, "msg.{} = {},", name, val_cow)?,
+                    _ => unreachable!(),
+                },
+                Frequency::Proto3Frequency(freq) => match freq {
+                    Proto3Frequency::Optional => writeln!(w, "msg.{} = Some({}),", name, val_cow)?,
+                    Proto3Frequency::Default => writeln!(w, "msg.{} = {},", name, val_cow)?,
+                    _ => unreachable!(),
+                },
+            },
+            GeneratedType::ArrayLikeType => {
+                if self.packed() {
+                    if self.typ.is_fixed_size() {
+                        writeln!(w, "msg.{} = r.read_packed_fixed(bytes)?.into(),", name)?;
+                    } else {
+                        writeln!(
+                            w,
+                            "msg.{} = r.read_packed(bytes, |r, bytes| Ok({}))?,",
+                            name, val_cow
+                        )?;
+                    }
+                } else {
+                    writeln!(w, "msg.{}.push({}),", name, val_cow)?;
+                }
             }
-            Frequency::Required | Frequency::Optional => {
-                writeln!(w, "msg.{} = {},", name, val_cow)?
+            GeneratedType::Map => {
+                // TODO: Is there any way of doing this without `if let`? `let`
+                // by itself requires "irrefutable types".
+                if let FieldType::Map(ref key, ref value) = self.typ {
+                    writeln!(w, "{{")?;
+                    writeln!(
+                        w,
+                        "                    let (key, value) = \
+                        r.read_map(bytes, |r, bytes| Ok({}), |r, bytes| Ok({}))?;",
+                        key.read_fn(desc)?.1,
+                        value.read_fn(desc)?.1
+                    )?;
+                    writeln!(
+                        w,
+                        "                    msg.{}.insert(key, value);",
+                        self.name
+                    )?;
+                    writeln!(w, "                }}")?;
+                    return Ok(());
+                } else {
+                    unreachable!();
+                }
             }
-            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => {
-                writeln!(w, "msg.{} = r.read_packed_fixed(bytes)?.into(),", name)?;
-            }
-            Frequency::Repeated if self.packed() => {
-                writeln!(
-                    w,
-                    "msg.{} = r.read_packed(bytes, |r, bytes| Ok({}))?,",
-                    name, val_cow
-                )?;
-            }
-            Frequency::Repeated => writeln!(w, "msg.{}.push({}),", name, val_cow)?,
         }
+
         Ok(())
     }
 
@@ -570,68 +817,99 @@ impl Field {
 
         write!(w, "        + ")?;
         let tag_size = sizeof_varint(self.tag());
-        match self.frequency {
-            Frequency::Optional
-                if desc.syntax == Syntax::Proto2 || self.typ.message().is_some() =>
-            {
-                // TODO this might be incorrect behavior for proto2
-                match self.default.as_ref() {
-                    None => {
-                        write!(w, "self.{}.as_ref().map_or(0, ", self.name)?;
-                        if self.typ.is_fixed_size() {
-                            writeln!(w, "|_| {} + {})", tag_size, self.typ.get_size(""))?;
+
+        match self.frequency.into() {
+            GeneratedType::SingularType => {
+                /*
+                NOTE: This section might look similar to the one in
+                `write_write()`, but it's not exactly the same! Because code
+                generation is rather case-specific, I've decided not to try and
+                refactor this with the one in `write_write()` in case
+                alterations need to be made later on for some specific
+                situation
+
+                There's some convoluted conditionals and string stitching
+                here in order to tackle all the different possible
+                combinations of `Option`, `Box`, has presence, no presence,
+                etc. It's mostly to satisfy the fiddly code syntax, and does
+                not have much impact on the big idea.
+
+                Logic-wise, it just generates code that checks for any
+                necessary conditions for serialization, before adding its
+                size to the tally.
+                */
+
+                // Piece of code to get the actual type ready to pass to their
+                // respective sizer functions; i.e. if it's an `Option`, unwrap
+                // it, if it's a `Box`, dereference it etc. Some types need
+                // extra references, or dereferences.
+                let core = {
+                    let mut core = format!("self.{}", self.name);
+
+                    // handle `Option`
+                    if self.frequency.is_optional() {
+                        // types whose writer functions DON'T take a reference
+                        // need an extra `*`
+                        if self.typ.need_to_dereference() {
+                            core = format!("*({core}.as_ref().unwrap())");
                         } else {
-                            writeln!(w, "|m| {} + {})", tag_size, self.typ.get_size("m"))?;
+                            core = format!("{core}.as_ref().unwrap()");
                         }
                     }
-                    Some(d) => {
-                        writeln!(
-                            w,
-                            "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
-                            self.name,
-                            d,
-                            tag_size,
-                            self.typ.get_size(&format!("&self.{}", self.name))
-                        )?;
+
+                    // `Box` needs an extra `*` to dereference
+                    if self.boxed {
+                        core = format!("*({core})");
                     }
-                }
+
+                    core
+                };
+
+                let size_addition = format!(
+                    "{tag_size} + {actual_size}",
+                    actual_size = self.typ.get_size(if self.typ.is_fixed_size() {
+                        ""
+                    } else {
+                        core.as_str()
+                    })
+                );
+
+                // Check for conditions if necessary
+                let conditions_checked = if !self.frequency.is_optional() && self.has_presence() {
+                    size_addition
+                } else {
+                    format!(
+                        "if {conditions} {{ {size_addition} }} else {{ 0 }}",
+                        // List of conditions to check before serializing
+                        conditions = {
+                            let mut v = Vec::<String>::new();
+
+                            // If `None`, it's unset, so don't serialize
+                            if self.frequency.is_optional() {
+                                v.push(format!("self.{}.is_some()", self.name))
+                            }
+
+                            // If the type doesn't have explicit presence, don't
+                            // serialize if same as default value
+                            if !self.has_presence() {
+                                // Proto3 default
+                                v.push(format!(
+                                    "{} != {}",
+                                    core,
+                                    // We know we're dealing with Proto3 default
+                                    // here, which cannot take custom defaults
+                                    self.typ.singular_field_defaults(desc),
+                                ))
+                            }
+
+                            v.join("&&")
+                        },
+                    )
+                };
+
+                writeln!(w, "{}", conditions_checked.as_str(),)?;
             }
-            Frequency::Required if self.typ.is_map() => {
-                writeln!(
-                    w,
-                    "self.{}.iter().map(|(k, v)| {} + sizeof_len({})).sum::<usize>()",
-                    self.name,
-                    tag_size,
-                    self.typ.get_size("")
-                )?;
-            }
-            Frequency::Optional => match self.typ {
-                FieldType::Bytes_ => writeln!(
-                    w,
-                    "if self.{}.is_empty() {{ 0 }} else {{ {} + {} }}",
-                    self.name,
-                    tag_size,
-                    self.typ.get_size(&format!("&self.{}", self.name))
-                )?,
-                _ => writeln!(
-                    w,
-                    "if self.{} == {} {{ 0 }} else {{ {} + {} }}",
-                    self.name,
-                    self.default.as_ref().map_or_else(
-                        || self.typ.regular_default(desc).unwrap_or("None"),
-                        |s| s.as_str()
-                    ),
-                    tag_size,
-                    self.typ.get_size(&format!("&self.{}", self.name))
-                )?,
-            },
-            Frequency::Required => writeln!(
-                w,
-                "{} + {}",
-                tag_size,
-                self.typ.get_size(&format!("&self.{}", self.name))
-            )?,
-            Frequency::Repeated => {
+            GeneratedType::ArrayLikeType => {
                 if self.packed() {
                     write!(
                         w,
@@ -643,7 +921,7 @@ impl Field {
                         5 => writeln!(w, "sizeof_len(self.{}.len() * 4) }}", self.name)?,
                         _ => writeln!(
                             w,
-                            "sizeof_len(self.{}.iter().map(|s| {}).sum::<usize>()) }}",
+                            "sizeof_len(self.{}.iter().map(|&s| {}).sum::<usize>()) }}",
                             self.name,
                             self.typ.get_size("s")
                         )?,
@@ -654,16 +932,59 @@ impl Field {
                         5 => writeln!(w, "({} + 4) * self.{}.len()", tag_size, self.name)?,
                         _ => writeln!(
                             w,
-                            "self.{}.iter().map(|s| {} + {}).sum::<usize>()",
-                            self.name,
-                            tag_size,
-                            self.typ.get_size("s")
+                            "self.{name}.iter().map(|{maybe_ampersand}s| {tag_size} + {got_size}).sum::<usize>()",
+                            maybe_ampersand = if self.typ.need_to_dereference() { "&" } else { "" },
+                            name = self.name,
+                            got_size = self.typ.get_size("s")
                         )?,
                     }
                 }
             }
+            GeneratedType::Map => {
+                if let FieldType::Map(k, v) = &self.typ {
+                    writeln!(
+                        w,
+                        "self.{name}.iter().map(|({maybe_ampersand_k}k, {maybe_ampersand_v}v)| {tag_size} + sizeof_len({got_size})).sum::<usize>()",
+                        maybe_ampersand_k = if k.need_to_dereference() { "&" } else { "" },
+                        maybe_ampersand_v = if v.need_to_dereference() { "&" } else { "" },
+                        name = self.name,
+                        got_size = self.typ.get_size(""),
+                    )?;
+                } else {
+                    unreachable!();
+                }
+            }
         }
         Ok(())
+    }
+
+    fn has_presence(&self) -> bool {
+        match &self.frequency {
+            Frequency::Proto2Frequency(ref f) => {
+                if let Proto2Frequency::Repeated = f {
+                    return false;
+                }
+                if let FieldType::Map(..) = self.typ {
+                    return false;
+                }
+                true
+            }
+            Frequency::Proto3Frequency(ref f) => {
+                if let Proto3Frequency::Repeated = f {
+                    return false;
+                }
+                if let FieldType::Map(..) = self.typ {
+                    return false;
+                }
+                if let FieldType::Message(_) = self.typ {
+                    return true;
+                }
+                if let Proto3Frequency::Optional = f {
+                    return true;
+                }
+                false
+            }
+        }
     }
 
     fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
@@ -671,100 +992,162 @@ impl Field {
             return Ok(());
         }
 
-        match self.frequency {
-            Frequency::Optional
-                if desc.syntax == Syntax::Proto2 || self.typ.message().is_some() =>
-            {
-                match self.default.as_ref() {
-                    None => {
-                        writeln!(
-                            w,
-                            "        if let Some(ref s) = \
-                             self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                            self.name,
-                            self.tag(),
-                            self.typ.get_write("s", self.boxed)
-                        )?;
+        match self.frequency.into() {
+            GeneratedType::SingularType => {
+                /*
+                NOTE: This section might look similar to the one in
+                `get_write()`, but it's not exactly the same! Because code
+                generation is rather case-specific, I've decided not to try
+                and refactor this with the one in `get_write()`, in case
+                alterations need to be made later on for some specific
+                situation.
+
+                There's some convoluted conditionals and string stitching
+                here in order to tackle all the different possible
+                combinations of `Option`, `Box`, has presence, no presence,
+                etc. It's mostly to satisfy the fiddly code syntax, and does
+                not have much impact on the big idea.
+
+                Logic-wise, it just generates code that checks for any
+                necessary conditions for serialization, before calling
+                `write_with_tag()`.
+                */
+
+                // Piece of code to get the actual type ready to pass to their
+                // respective writer functions; i.e. if it's an `Option`, unwrap
+                // it, if it's a `Box`, dereference it etc. Some types need
+                // extra references, or dereferences.
+                let core = {
+                    let mut core = format!("self.{}", self.name);
+
+                    // handle `Option`
+                    if self.frequency.is_optional() {
+                        // types whose writer functions DON'T take a reference
+                        // need an extra `*`
+                        if self.typ.need_to_dereference() {
+                            core = format!("*({core}.as_ref().unwrap())");
+                        } else {
+                            core = format!("{core}.as_ref().unwrap()");
+                        }
                     }
-                    Some(d) => {
-                        writeln!(
-                            w,
-                            "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                            self.name,
-                            d,
-                            self.tag(),
-                            self.typ
-                                .get_write(&format!("&self.{}", self.name), self.boxed)
-                        )?;
+
+                    // `Box` needs an extra `*` to dereference
+                    if self.boxed {
+                        core = format!("*({core})");
                     }
-                }
-            }
-            Frequency::Optional => match self.typ {
-                FieldType::Bytes_ => {
-                    writeln!(
-                        w,
-                        "        if !self.{}.is_empty() {{ w.write_with_tag({}, |w| w.{})?; }}",
-                        self.name,
-                        self.tag(),
-                        self.typ
-                            .get_write(&format!("&self.{}", self.name), self.boxed)
-                    )?;
-                }
-                _ => {
-                    writeln!(
-                        w,
-                        "        if self.{} != {} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                        self.name,
-                        self.default.as_ref().map_or_else(
-                            || self.typ.regular_default(desc).unwrap_or("None"),
-                            |s| s.as_str()
-                        ),
-                        self.tag(),
-                        self.typ
-                            .get_write(&format!("&self.{}", self.name), self.boxed)
-                    )?;
-                }
-            },
-            Frequency::Required if self.typ.is_map() => {
-                writeln!(
-                    w,
-                    "        for (k, v) in self.{}.iter() {{ w.write_with_tag({}, |w| w.{})?; }}",
-                    self.name,
-                    self.tag(),
-                    self.typ.get_write("", false)
-                )?;
-            }
-            Frequency::Required => {
-                writeln!(
-                    w,
-                    "        w.write_with_tag({}, |w| w.{})?;",
+
+                    // Required message, map and byte_ fields
+                    if !self.typ.need_to_dereference()
+                        && !self.typ.is_cow()
+                        && !self.frequency.is_optional()
+                        && !self.typ.is_non_cow_string_or_byte()
+                    {
+                        core = format!("&{core}");
+                    }
+
+                    core
+                };
+
+                // We want to keep `core` without this last check for something
+                // else, so create a new variable that has this check
+                let core_added_reference_for_cow =
+                    if self.typ.is_cow() || self.typ.is_non_cow_string_or_byte() {
+                        format!("&{core}")
+                    } else {
+                        core.clone()
+                    };
+
+                let write_method = format!(
+                    "w.write_with_tag({}, |w| w.{})?;",
                     self.tag(),
                     self.typ
-                        .get_write(&format!("&self.{}", self.name), self.boxed)
-                )?;
+                        .get_write(core_added_reference_for_cow.as_str(), self.boxed)
+                );
+
+                // Check for conditions if necessary
+                let conditions_checked = if !self.frequency.is_optional() && self.has_presence() {
+                    format!("        {write_method}")
+                } else {
+                    format!(
+                        "        if {conditions} {{ {write_method} }}",
+                        // List of conditions to check before serializing
+                        conditions = {
+                            let mut v = Vec::<String>::new();
+
+                            // If `None`, it's unset, so don't serialize
+                            if self.frequency.is_optional() {
+                                v.push(format!("self.{}.is_some()", self.name))
+                            }
+
+                            // If the type doesn't have explicit presence, don't
+                            // serialize if same as default value
+                            if !self.has_presence() {
+                                // Proto3 default
+                                v.push(format!(
+                                    "{} != {}",
+                                    core,
+                                    // We know we're dealing with Proto3 default
+                                    // here, which cannot take custom defaults
+                                    self.typ.singular_field_defaults(desc),
+                                ))
+                            }
+
+                            v.join("&&")
+                        },
+                    )
+                };
+
+                writeln!(w, "{}", conditions_checked.as_str(),)?;
             }
-            Frequency::Repeated if self.packed() && self.typ.is_fixed_size() => writeln!(
-                w,
-                "        w.write_packed_fixed_with_tag({}, &self.{})?;",
-                self.tag(),
-                self.name
-            )?,
-            Frequency::Repeated if self.packed() => writeln!(
-                w,
-                "        w.write_packed_with_tag({}, &self.{}, |w, m| w.{}, &|m| {})?;",
-                self.tag(),
-                self.name,
-                self.typ.get_write("m", self.boxed),
-                self.typ.get_size("m")
-            )?,
-            Frequency::Repeated => {
-                writeln!(
-                    w,
-                    "        for s in &self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
-                    self.name,
-                    self.tag(),
-                    self.typ.get_write("s", self.boxed)
-                )?;
+            GeneratedType::ArrayLikeType => {
+                if self.packed() {
+                    if self.typ.is_fixed_size() {
+                        writeln!(
+                            w,
+                            "        w.write_packed_fixed_with_tag({}, &self.{})?;",
+                            self.tag(),
+                            self.name
+                        )?;
+                    } else {
+                        writeln!(
+                            w,
+                            "        w.write_packed_with_tag({}, &self.{}, |w, &m| w.{}, &|&m| {})?;",
+                            self.tag(),
+                            self.name,
+                            self.typ
+                                .get_write("m", self.boxed),
+                            self.typ.get_size("m")
+                        )?
+                    }
+                } else {
+                    let maybe_deref_s = if self.typ.need_to_dereference() {
+                        "*s"
+                    } else {
+                        "s"
+                    };
+                    writeln!(
+                        w,
+                        "        for s in &self.{} {{ w.write_with_tag({}, |w| w.{})?; }}",
+                        self.name,
+                        self.tag(),
+                        self.typ.get_write(maybe_deref_s, self.boxed)
+                    )?;
+                }
+            }
+            GeneratedType::Map => {
+                if let FieldType::Map(k, v) = &self.typ {
+                    writeln!(
+                        w,
+                        "        for ({maybe_ampersand_k}k, {maybe_ampersand_v}v) in self.{name}.iter() {{ w.write_with_tag({tag}, |w| w.{got_write})?; }}",
+                        maybe_ampersand_k = if k.need_to_dereference() { "&" } else { "" },
+                        maybe_ampersand_v = if v.need_to_dereference() { "&" } else { "" },
+                        name = self.name,
+                        tag = self.tag(),
+                        got_write = self.typ.get_write("", false),
+                    )?;
+                } else {
+                    unreachable!();
+                }
             }
         }
         Ok(())
@@ -799,6 +1182,58 @@ pub struct Message {
 }
 
 impl Message {
+    fn write_default_consts<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
+        // Proto3 doesn't allow custom defaults, so we only need the list of
+        // custom default consts for Proto2
+        if desc.syntax != Syntax::Proto2 {
+            return Ok(());
+        }
+
+        // If there are no showable fields with custom defaults, nothing to
+        // write; this is a more thorough version of `is_unit()`, which this
+        // replaces. Oneofs don't have custom defaults, so we don't need to
+        // check for that.
+        if self
+            .fields
+            .iter()
+            .filter(|f| {
+                ((config.add_deprecated_fields || !f.deprecated) && f.default.is_some())
+                    && f.can_write_default_const(desc, config)
+            })
+            .count()
+            == 0
+        {
+            return Ok(());
+        }
+
+        let mut ignore = Vec::new();
+        if config.dont_use_cow {
+            ignore.push(self.index.clone());
+        }
+        if self.has_lifetime(desc, config, &mut ignore) {
+            writeln!(w, "impl<'a> {}<'a> {{", self.name)?;
+        } else {
+            writeln!(w, "impl {} {{", self.name)?;
+        }
+
+        let mut deconflict_list = Vec::<String>::new();
+        for f in &self.fields {
+            f.write_custom_default(w, &mut deconflict_list, desc, config)?;
+        }
+
+        // Oneofs don't have custom defaults, no need to cycle through them like
+        // we did for fields
+
+        writeln!(w, "}}")?;
+
+        Ok(())
+    }
+
     fn convert_field_types(&mut self, from: &FieldType, to: &FieldType) {
         for f in self.all_fields_mut().filter(|f| f.typ == *from) {
             f.typ = to.clone();
@@ -930,6 +1365,10 @@ impl Message {
 
         self.write_definition(w, desc, config)?;
         writeln!(w)?;
+        self.write_default_consts(w, desc, config)?;
+        writeln!(w)?;
+        self.write_impl_default(w, desc, config)?;
+        writeln!(w)?;
         self.write_impl_message_read(w, desc, config)?;
         writeln!(w)?;
         self.write_impl_message_write(w, desc, config)?;
@@ -991,7 +1430,7 @@ impl Message {
 
         writeln!(
             w,
-            "#[derive({}Debug, Default, PartialEq, Clone)]",
+            "#[derive({}Debug, PartialEq, Clone)]",
             custom_struct_derive
         )?;
 
@@ -1019,6 +1458,45 @@ impl Message {
         for o in &self.oneofs {
             o.write_message_definition(w, desc, config)?;
         }
+        writeln!(w, "}}")?;
+        Ok(())
+    }
+
+    fn write_impl_default<W: Write>(
+        &self,
+        w: &mut W,
+        desc: &FileDescriptor,
+        config: &Config,
+    ) -> Result<()> {
+        if self.is_unit() {
+            writeln!(w, "impl Default for {} {{", self.name)?;
+            writeln!(w, "    fn default() -> Self {{")?;
+            writeln!(w, "        Self {{}}")?;
+            writeln!(w, "        ")?;
+            writeln!(w, "    }}")?;
+            writeln!(w, "}}")?;
+            return Ok(());
+        }
+
+        let mut ignore = Vec::new();
+        if config.dont_use_cow {
+            ignore.push(self.index.clone());
+        }
+        if self.has_lifetime(desc, config, &mut ignore) {
+            writeln!(w, "impl<'a> Default for {}<'a> {{", self.name)?;
+        } else {
+            writeln!(w, "impl Default for {} {{", self.name)?;
+        }
+        writeln!(w, "    fn default() -> Self {{")?;
+        writeln!(w, "        Self {{")?;
+        for f in &self.fields {
+            f.write_default(w, desc, config)?;
+        }
+        for o in &self.oneofs {
+            o.write_default(w, desc)?;
+        }
+        writeln!(w, "        }}")?;
+        writeln!(w, "    }}")?;
         writeln!(w, "}}")?;
         Ok(())
     }
@@ -1084,26 +1562,7 @@ impl Message {
             )?;
         }
 
-        let unregular_defaults = self
-            .fields
-            .iter()
-            .filter(|f| !f.has_regular_default(desc))
-            .collect::<Vec<_>>();
-        if unregular_defaults.is_empty() {
-            writeln!(w, "        let mut msg = Self::default();")?;
-        } else {
-            writeln!(w, "        let mut msg = {} {{", self.name)?;
-            for f in unregular_defaults {
-                writeln!(
-                    w,
-                    "            {}: {},",
-                    f.name,
-                    f.default.as_ref().unwrap()
-                )?;
-            }
-            writeln!(w, "            ..Self::default()")?;
-            writeln!(w, "        }};")?;
-        }
+        writeln!(w, "        let mut msg = Self::default();")?;
         writeln!(w, "        while !r.is_eof() {{")?;
         writeln!(w, "            match r.next_tag(bytes) {{")?;
         for f in &self.fields {
@@ -1122,9 +1581,6 @@ impl Message {
         writeln!(w, "        Ok(msg)")?;
         writeln!(w, "    }}")?;
         writeln!(w, "}}")?;
-
-        // TODO: write impl default when special default?
-        // alternatively set the default value directly when reading
 
         Ok(())
     }
@@ -1382,23 +1838,10 @@ impl Message {
         }
     }
 
-    fn set_map_required(&mut self) {
-        for f in self.all_fields_mut() {
-            if let FieldType::Map(_, _) = f.typ {
-                f.frequency = Frequency::Required;
-            }
-        }
-        for m in &mut self.messages {
-            m.set_map_required();
-        }
-    }
-
     fn set_repeated_as_packed(&mut self) {
         for f in self.all_fields_mut() {
-            if f.packed.is_none() {
-                if let Frequency::Repeated = f.frequency {
-                    f.packed = Some(true);
-                }
+            if f.packed.is_none() && f.frequency.is_repeated() {
+                f.packed = Some(true);
             }
         }
     }
@@ -1600,6 +2043,20 @@ pub struct OneOf {
 }
 
 impl OneOf {
+    pub fn write_default<W: Write>(&self, w: &mut W, desc: &FileDescriptor) -> Result<()> {
+        writeln!(
+            w,
+            "            {}: {},",
+            self.name,
+            self.write_impl_default_field(desc)
+        )?;
+        Ok(())
+    }
+
+    fn write_impl_default_field(&self, desc: &FileDescriptor) -> String {
+        format!("{}OneOf{}::None", self.get_modules(desc), self.name)
+    }
+
     fn has_lifetime(&self, desc: &FileDescriptor, config: &Config) -> bool {
         self.fields.iter().any(|f| {
             f.typ
@@ -1756,7 +2213,7 @@ impl OneOf {
     }
 
     fn write_get_size<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
-        writeln!(w, "        + match self.{} {{", self.name)?;
+        writeln!(w, "        + match &self.{} {{", self.name)?;
         for f in self.fields.iter().filter(|f| !f.deprecated || config.add_deprecated_fields) {
             let tag_size = sizeof_varint(f.tag());
             if f.typ.is_fixed_size() {
@@ -1768,6 +2225,16 @@ impl OneOf {
                     f.name,
                     tag_size,
                     f.typ.get_size("")
+                )?;
+            } else if f.typ.need_to_dereference() {
+                writeln!(
+                    w,
+                    "            {}OneOf{}::{}(m) => {} + {},",
+                    self.get_modules(desc),
+                    self.name,
+                    f.name,
+                    tag_size,
+                    f.typ.get_size("*m")
                 )?;
             } else {
                 writeln!(
@@ -1787,22 +2254,38 @@ impl OneOf {
             self.get_modules(desc),
             self.name
         )?;
-        write!(w, "    }}")?;
+        writeln!(w, "        }}")?;
         Ok(())
     }
 
     fn write_write<W: Write>(&self, w: &mut W, desc: &FileDescriptor, config: &Config) -> Result<()> {
-        write!(w, "        match self.{} {{", self.name)?;
-        for f in self.fields.iter().filter(|f| !f.deprecated || config.add_deprecated_fields) {
-            writeln!(
-                w,
-                "            {}OneOf{}::{}(ref m) => {{ w.write_with_tag({}, |w| w.{})? }},",
-                self.get_modules(desc),
-                self.name,
-                f.name,
-                f.tag(),
-                f.typ.get_write("m", f.boxed)
-            )?;
+        writeln!(w, "        match &self.{} {{", self.name)?;
+        for f in self
+            .fields
+            .iter()
+            .filter(|f| !f.deprecated || config.add_deprecated_fields)
+        {
+            if f.typ.need_to_dereference() || f.boxed {
+                writeln!(
+                    w,
+                    "            {}OneOf{}::{}(m) => {{ w.write_with_tag({}, |w| w.{})? }},",
+                    self.get_modules(desc),
+                    self.name,
+                    f.name,
+                    f.tag(),
+                    f.typ.get_write("*m", f.boxed)
+                )?;
+            } else {
+                writeln!(
+                    w,
+                    "            {}OneOf{}::{}(m) => {{ w.write_with_tag({}, |w| w.{})? }},",
+                    self.get_modules(desc),
+                    self.name,
+                    f.name,
+                    f.tag(),
+                    f.typ.get_write("m", f.boxed)
+                )?;
+            }
         }
         writeln!(
             w,
@@ -1810,7 +2293,7 @@ impl OneOf {
             self.get_modules(desc),
             self.name
         )?;
-        write!(w, "    }}")?;
+        writeln!(w, "        }}")?;
         Ok(())
     }
 }
@@ -2048,10 +2531,6 @@ impl FileDescriptor {
     }
 
     fn set_defaults(&mut self, config: &Config) -> Result<()> {
-        // set map fields as required (they are equivalent to repeated message)
-        for m in &mut self.messages {
-            m.set_map_required();
-        }
         // if proto3, then changes several defaults
         if let Syntax::Proto3 = self.syntax {
             for m in &mut self.messages {
@@ -2121,7 +2600,7 @@ impl FileDescriptor {
                         for f in v
                             .get_message_mut(self)
                             .all_fields_mut()
-                            .filter(|f| f.frequency == Frequency::Optional)
+                            .filter(|f| f.frequency.is_optional())
                             .filter(|f| f.typ.message().map_or(false, |m| cycle.contains(m)))
                         {
                             f.boxed = true;
@@ -2149,13 +2628,22 @@ impl FileDescriptor {
                                 for f in v
                                     .get_message_mut(self)
                                     .all_fields_mut()
-                                    .filter(|f| f.frequency == Frequency::Required)
+                                    .filter(|f| {
+                                        !(f.frequency.is_optional() || f.frequency.is_repeated())
+                                    })
                                     .filter(|f| {
                                         f.typ.message().map_or(false, |m| cycle.contains(m))
                                     })
                                 {
                                     f.boxed = true;
-                                    f.frequency = Frequency::Optional;
+                                    f.frequency = match f.frequency {
+                                        Frequency::Proto2Frequency(_) => {
+                                            Frequency::Proto2Frequency(Proto2Frequency::Optional)
+                                        }
+                                        Frequency::Proto3Frequency(_) => {
+                                            Frequency::Proto3Frequency(Proto3Frequency::Optional)
+                                        }
+                                    }
                                 }
                             }
                         }
