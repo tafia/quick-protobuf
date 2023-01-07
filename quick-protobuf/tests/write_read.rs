@@ -1,6 +1,6 @@
 extern crate quick_protobuf;
 
-use quick_protobuf::sizeofs::*;
+use quick_protobuf::{sizeofs::*, PackedFixed};
 use quick_protobuf::{deserialize_from_slice, serialize_into_slice, serialize_into_vec};
 use quick_protobuf::{
     BytesReader, MessageRead, MessageWrite, Reader, Result, Writer, WriterBackend,
@@ -305,14 +305,15 @@ fn wr_packed_uint32() {
 
 #[test]
 fn wr_packed_float() {
-    let v = vec![43, 54, 64, 234, 6123, 643];
+    let pf: PackedFixed<i32> = vec![43, 54, 64, 234, 6123, 643].into();
     let mut buf = Vec::new();
     {
         let mut w = Writer::new(&mut buf);
-        w.write_packed_fixed(&v).unwrap();
+        w.write_packed_fixed(&pf).unwrap();
     }
     let mut r = BytesReader::from_bytes(&buf);
-    assert_eq!(v, r.read_packed_fixed(&buf).unwrap());
+    let res: Vec<i32> = r.read_packed_fixed(&buf).unwrap().into_vec();
+    assert_eq!(pf.into_vec(), res);
 }
 
 #[test]

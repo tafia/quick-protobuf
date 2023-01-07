@@ -11,7 +11,7 @@
 
 use alloc::vec::Vec;
 use alloc::borrow::Cow;
-use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
+use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result, PackedFixed, PackedFixedIntoIter, PackedFixedRefIter};
 use quick_protobuf::sizeofs::*;
 use super::super::*;
 
@@ -87,7 +87,7 @@ impl MessageWrite for EmbeddedMessage {
 #[derive(Debug, Default, PartialEq, Clone)]
 pub struct NoStdMessage<'a> {
     pub num: u32,
-    pub nums: Cow<'a, [u32]>,
+    pub nums: PackedFixed<'a, u32>,
     pub message: Option<protos::no_std::EmbeddedMessage>,
     pub messages: Vec<protos::no_std::EmbeddedMessage>,
 }
@@ -98,7 +98,7 @@ impl<'a> MessageRead<'a> for NoStdMessage<'a> {
         while !r.is_eof() {
             match r.next_tag(bytes) {
                 Ok(13) => msg.num = r.read_fixed32(bytes)?,
-                Ok(18) => msg.nums = r.read_packed_fixed(bytes)?.into(),
+                Ok(18) => msg.nums = r.read_packed_fixed(bytes)?,
                 Ok(26) => msg.message = Some(r.read_message::<protos::no_std::EmbeddedMessage>(bytes)?),
                 Ok(34) => msg.messages.push(r.read_message::<protos::no_std::EmbeddedMessage>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }

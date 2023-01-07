@@ -41,6 +41,23 @@ macro_rules! test_serialize_deserialize_length_delimited {
     };
 }
 
+macro_rules! test_serialize_deserialize_packed_fixed {
+    ($msg:expr, $name:ident, $parsed:ident, $modification:block) => {
+        let mut serialized = Vec::new();
+        {
+            let mut writer = Writer::new(&mut serialized);
+            writer.write_message($msg).unwrap();
+        }
+        let mut reader = BytesReader::from_bytes(&serialized);
+        let mut $parsed: $name = reader.read_message(&serialized).unwrap();
+
+        $modification
+
+        println!("{:#?}, {:#?}", $msg, $parsed);
+        assert!($msg.eq(&$parsed));
+    };
+}
+
 macro_rules! test_serialize_deserialize {
     ($hex:expr, $msg:expr, $name:ident) => {
         let expected_bytes = decode_hex($hex);

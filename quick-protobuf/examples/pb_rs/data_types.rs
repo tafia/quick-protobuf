@@ -12,7 +12,7 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 type KVMap<K, V> = HashMap<K, V>;
-use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
+use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result, PackedFixed, PackedFixedIntoIter, PackedFixedRefIter};
 use quick_protobuf::sizeofs::*;
 use super::*;
 
@@ -103,7 +103,7 @@ pub struct FooMessage<'a> {
     pub f_bar_message: Option<BarMessage>,
     pub f_repeated_int32: Vec<i32>,
     pub f_repeated_packed_int32: Vec<i32>,
-    pub f_repeated_packed_float: Cow<'a, [f32]>,
+    pub f_repeated_packed_float: PackedFixed<'a, f32>,
     pub f_imported: Option<a::b::ImportedMessage>,
     pub f_baz: Option<BazMessage>,
     pub f_nested: Option<mod_BazMessage::Nested>,
@@ -141,7 +141,7 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
                 Ok(146) => msg.f_bar_message = Some(r.read_message::<BarMessage>(bytes)?),
                 Ok(152) => msg.f_repeated_int32.push(r.read_int32(bytes)?),
                 Ok(162) => msg.f_repeated_packed_int32 = r.read_packed(bytes, |r, bytes| Ok(r.read_int32(bytes)?))?,
-                Ok(170) => msg.f_repeated_packed_float = r.read_packed_fixed(bytes)?.into(),
+                Ok(170) => msg.f_repeated_packed_float = r.read_packed_fixed(bytes)?,
                 Ok(178) => msg.f_imported = Some(r.read_message::<a::b::ImportedMessage>(bytes)?),
                 Ok(186) => msg.f_baz = Some(r.read_message::<BazMessage>(bytes)?),
                 Ok(194) => msg.f_nested = Some(r.read_message::<mod_BazMessage::Nested>(bytes)?),
