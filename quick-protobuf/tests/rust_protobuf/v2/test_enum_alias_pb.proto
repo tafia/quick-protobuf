@@ -1,3 +1,7 @@
+
+// Enum aliases are parsed but not compiled.
+// Currently not tested.
+
 syntax = "proto2";
 
 package test_enum_alias;

@@ -13,8 +13,6 @@ have_failures=""
 declare -A must_fail
 
 must_fail["v2/test_group_pb.proto"]="expected failure (empty read)"
-must_fail["v3/test_enum_alias_pb.proto"]="enum alias not implemented"
-must_fail["v2/test_enum_alias_pb.proto"]="enum alias not implemented"
 must_fail["v2/test_expose_oneof_pb.proto"]="missing file"
 must_fail["v2/test_enum_invalid_default.proto"]="enum variant does not exist"
 must_fail["v3/test_enum_invalid_default.proto"]="enum variant does not exist"

@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::str;
 
 use crate::types::{
-    Enumerator, Field, FieldType, FileDescriptor, Frequency, Message, OneOf,
-    RpcFunctionDeclaration, RpcService, Syntax,
+    Enumerator, Extend, Field, FieldType, FileDescriptor, Frequency, Message, OneOf,
+    RpcFunctionDeclaration, RpcService, Syntax, Extensions,
 };
 
 use nom::{
@@ -13,7 +13,7 @@ use nom::{
         alpha1, alphanumeric1, digit1, hex_digit1, multispace1, not_line_ending,
     },
     combinator::{map, map_res, opt, recognize, value, verify},
-    multi::{many0, many1, separated_list0, separated_list1},
+    multi::{many0, many1, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
     IResult,
 };
@@ -26,6 +26,13 @@ enum MessageEvent {
     ReservedNums(Vec<i32>),
     ReservedNames(Vec<String>),
     OneOf(OneOf),
+    Extensions(Extensions),
+    Ignore,
+}
+
+#[derive(Debug, Clone)]
+enum EnumEvent {
+    Field((String, i32)),
     Ignore,
 }
 
@@ -37,6 +44,7 @@ enum Event {
     Message(Message),
     Enum(Enumerator),
     RpcService(RpcService),
+    Extend(Extend),
     Ignore,
 }
 
@@ -126,8 +134,27 @@ fn package(input: &str) -> IResult<&str, String> {
     )(input)
 }
 
-fn extensions(input: &str) -> IResult<&str, ()> {
-    value((), delimited(tag("extensions"), take_until(";"), tag(";")))(input)
+fn extensions(input: &str) -> IResult<&str, Extensions> {
+    map(
+        delimited(
+            pair(tag("extensions"), many1(br)),
+            pair(
+                integer,
+                preceded(pair(many0(br), pair(tag("to"), many1(br))), take_until(";")),
+            ),
+            tag(";"),
+        ),
+        |(from, to)| {
+            // TODO: is there a better way to parse "max" or a number?
+            let s = to.trim();
+            let to = if s == "max" {
+                Extensions::max()
+            } else {
+                s.parse().unwrap()
+            };
+            Extensions { from, to }
+        },
+    )(input)
 }
 
 fn num_range(input: &str) -> IResult<&str, Vec<i32>> {
@@ -333,10 +360,12 @@ fn message_event(input: &str) -> IResult<&str, MessageEvent> {
         map(message, MessageEvent::Message),
         map(enumerator, MessageEvent::Enumerator),
         map(one_of, MessageEvent::OneOf),
-        value(MessageEvent::Ignore, extensions),
+        map(extensions, MessageEvent::Extensions),
+        value(MessageEvent::Ignore, option_ignore),
         value(MessageEvent::Ignore, br),
     ))(input)
 }
+
 
 fn message(input: &str) -> IResult<&str, Message> {
     map(
@@ -360,6 +389,7 @@ fn message(input: &str) -> IResult<&str, Message> {
                     MessageEvent::Message(m) => msg.messages.push(m),
                     MessageEvent::Enumerator(e) => msg.enums.push(e),
                     MessageEvent::OneOf(o) => msg.oneofs.push(o),
+                    MessageEvent::Extensions(e) => msg.extensions = Some(e),
                     MessageEvent::Ignore => (),
                 }
             }
@@ -400,29 +430,54 @@ fn enum_field(input: &str) -> IResult<&str, (String, i32)> {
     )(input)
 }
 
+fn enum_event(input: &str) -> IResult<&str, EnumEvent> {
+    alt((
+        map(enum_field, EnumEvent::Field),
+        value(EnumEvent::Ignore, option_ignore),
+        value(EnumEvent::Ignore, br),
+    ))(input)
+}
+
 fn enumerator(input: &str) -> IResult<&str, Enumerator> {
     map(
         terminated(
             pair(
                 delimited(pair(tag("enum"), many1(br)), word, many0(br)),
-                delimited(
-                    pair(tag("{"), many0(br)),
-                    separated_list0(many0(br), enum_field),
-                    pair(many0(br), tag("}")),
-                ),
+                delimited(tag("{"), many0(enum_event), tag("}")),
             ),
             opt(pair(many0(br), tag(";"))),
         ),
-        |(name, fields)| Enumerator {
+        |(name, events)| {
+            let mut enumerator = Enumerator {
             name,
-            fields,
             ..Default::default()
+        };
+        for event in events {
+            if let EnumEvent::Field(f) = event {
+                enumerator.fields.push(f);
+            }
+        }
+        enumerator
         },
     )(input)
 }
 
 fn option_ignore(input: &str) -> IResult<&str, ()> {
-    value((), delimited(tag("option"), take_until(";"), tag(";")))(input)
+    value((), delimited(pair(tag("option"), many1(br)), take_until(";"), tag(";")))(input)
+}
+
+fn extend(input: &str) -> IResult<&str, Extend> {
+    map(terminated(
+            pair(
+                delimited(pair( tag("extend"), many1(br)), qualifiable_name, many0(br)),
+                delimited(tag("{"), many1(delimited(many0(br), message_field, many0(br))), tag("}")),
+            ),
+            opt(pair(many0(br), tag(";"))),
+        ), |(name, fields)| {
+            Extend {
+                name, fields
+            }
+        })(input)
 }
 
 pub fn file_descriptor(input: &str) -> IResult<&str, FileDescriptor, nom::error::Error<String>> {
@@ -434,6 +489,7 @@ pub fn file_descriptor(input: &str) -> IResult<&str, FileDescriptor, nom::error:
             map(message, Event::Message),
             map(enumerator, Event::Enum),
             map(rpc_service, Event::RpcService),
+            map(extend, Event::Extend),
             value(Event::Ignore, option_ignore),
             value(Event::Ignore, br),
         ))),
@@ -447,6 +503,7 @@ pub fn file_descriptor(input: &str) -> IResult<&str, FileDescriptor, nom::error:
                     Event::Message(m) => desc.messages.push(m),
                     Event::Enum(e) => desc.enums.push(e),
                     Event::RpcService(r) => desc.rpc_services.push(r),
+                    Event::Extend(e) => desc.message_extends.push(e),
                     Event::Ignore => (),
                 }
             }
@@ -536,7 +593,15 @@ mod test {
             ::nom::IResult::Ok(_) => (),
             e => panic!("Expecting done {:?}", e),
         }
+
+        let msg2 = r#"option (parenthesized) = 123;"#;
+
+        match option_ignore(msg2) {
+            ::nom::IResult::Ok(_) => (),
+            e => panic!("Expecting done {:?}", e),
+        }
         assert_desc(msg);
+        assert_desc(msg2);
     }
 
     #[test]
@@ -632,11 +697,110 @@ mod test {
     message ContainsImportedNested {
         optional ContainerForNested.NestedMessage m = 1;
         optional ContainerForNested.NestedEnum e = 2;
-    }
-    "#;
+    }"#;
         let desc = file_descriptor(msg).unwrap().1;
         assert_eq!("foo.bar".to_string(), desc.package);
         assert_desc(msg);
+    }
+
+    #[test]
+    fn test_message_option() {
+        let msg = r#"message A {
+            option (extension_option) = "hello, world!";
+            option non_extension_option = 12345;
+
+            optional int32 field = 1;
+        }"#;
+
+        let desc = file_descriptor(msg).unwrap().1;
+        assert_eq!(1, desc.messages.len());
+    }
+
+    #[test]
+    fn test_enum_option() {
+        let msg = r#"enum A {
+            option (an_extension_option) = "value";
+            option a_non_extension_option = 12345;
+            TEST_FIELD = 0;
+        }"#;
+        let desc = file_descriptor(msg).unwrap().1;
+        assert_eq!(1, desc.enums.len());
+    }
+
+    #[test]
+    fn test_extend() {
+        let msg = r#"message A {
+            optional int32 a = 1;
+            extensions 12000 to 12500;
+        }
+        extend A {
+            optional int32 g = 12123;
+            optional int32 h = 12123;
+            optional int32 t = 12123;
+        }
+        "#;
+        let desc = file_descriptor(msg).unwrap().1;
+        assert_eq!(1, desc.messages.len());
+        assert_eq!(1, desc.message_extends.len());
+        let extend = &desc.message_extends[0];
+        assert_eq!("A", &extend.name);
+        assert_eq!(3, extend.fields.len());
+        let g = &extend.fields[0];
+        let h = &extend.fields[1];
+        let t = &extend.fields[2];
+        assert_eq!("g", &g.name);
+        assert_eq!("h", &h.name);
+        assert_eq!("t", &t.name);
+    }
+
+    #[test]
+    fn test_extend_some_other() {
+        let msg = r#"
+        extend .foo.bar.Baz {
+            optional int32 b = 12123;
+        }
+        "#;
+        let desc = file_descriptor(msg).unwrap().1;
+        assert_eq!(0, desc.messages.len());
+        assert_eq!(1, desc.message_extends.len());
+        let extend = &desc.message_extends[0];
+        assert_eq!(".foo.bar.Baz", &extend.name);
+        assert_eq!(1, extend.fields.len());
+        let field = &extend.fields[0];
+        assert_eq!("b", &field.name);
+    }
+
+
+    #[test]
+    fn test_extensions() {
+        let msg = r#"message A {
+            optional int32 a = 1;
+
+            extensions 1300 to max;
+        }
+        message B {
+            optional int32 b = 1;
+
+            extensions 10321 to 11000;
+        }
+        message c {
+            optional int32 c = 1;
+        }"#;
+
+        let desc = file_descriptor(msg).unwrap().1;
+        assert_eq!(3, desc.messages.len());
+        let a = &desc.messages[0].extensions;
+        let b = &desc.messages[1].extensions;
+        let c = &desc.messages[2].extensions;
+        assert!(a.is_some());
+        assert!(b.is_some());
+        assert!(c.is_none());
+        let a = a.as_ref().unwrap();
+        let b = b.as_ref().unwrap();
+        assert_eq!(a.from, 1300);
+        assert_eq!(a.to, Extensions::max());
+        assert_eq!(b.from, 10321);
+        assert_eq!(b.to, 11000);
     }
 
     #[test]
@@ -654,7 +818,6 @@ mod test {
     }"#;
 
         let desc = file_descriptor(msg).unwrap().1;
-        dbg!(&desc);
         assert_eq!(1, desc.messages.len());
         assert_eq!(3, desc.messages[0].messages.len());
         assert_desc(msg);
@@ -718,7 +881,6 @@ mod test {
     }"#;
 
         let mess = message(msg);
-        dbg!(&mess);
         if let ::nom::IResult::Ok((_, mess)) = mess {
             assert_eq!(Some(vec![4, 15, 17, 18, 19, 20, 30]), mess.reserved_nums);
             assert_eq!(
@@ -823,8 +985,10 @@ mod test {
         }
     }
 
-    #[test]
-    fn test_missing_tokens() {
+    mod missing_tokens {
+        use crate::parser::{one_of, enumerator, message};
+
+        #[test]
         fn test_missing_tokens_message() {
             /* Check that base case is actually correct before we start deleting tokens */
             assert!(message(
@@ -867,6 +1031,7 @@ mod test {
             .is_err());
         }
 
+        #[test]
         fn test_missing_tokens_enum() {
             /* Check that base case is actually correct before we start deleting tokens */
             assert!(enumerator(
@@ -901,6 +1066,7 @@ mod test {
             .is_err());
         }
 
+        #[test]
         fn test_missing_tokens_one_of() {
             /* Check that base case is actually correct before we start deleting tokens */
             assert!(one_of(
@@ -943,10 +1109,6 @@ mod test {
             .is_err());
         }
 
-        // remember to actually call the test functions!
-        test_missing_tokens_message();
-        test_missing_tokens_enum();
-        test_missing_tokens_one_of();
     }
 
     #[test]
@@ -1013,8 +1175,10 @@ mod test {
         assert_both_ok_different_res("Test1._Test2.3Test3.Test4@", "Test1", "Test1._Test2");
     }
 
-    #[test]
-    fn test_which_names_can_be_qualified() {
+    mod test_which_names_can_be_qualified {
+        use crate::parser::{message, enumerator, one_of};
+
+        #[test]
         fn test_which_names_can_be_qualified_message() {
             /* Check that base case is actually correct before we start qualifying names */
             assert!(message(
@@ -1049,6 +1213,7 @@ mod test {
             .is_err());
         }
 
+        #[test]
         fn test_which_names_can_be_qualified_enum() {
             /* Check that base case is actually correct before we start qualifying names */
             assert!(enumerator(
@@ -1075,6 +1240,7 @@ mod test {
             .is_err());
         }
 
+        #[test]
         fn test_which_names_can_be_qualified_oneof() {
             /* Check that base case is actually correct before we start qualifying names */
             assert!(one_of(
@@ -1108,11 +1274,6 @@ mod test {
             )
             .is_err());
         }
-
-        // remember to actually call the test functions!
-        test_which_names_can_be_qualified_message();
-        test_which_names_can_be_qualified_enum();
-        test_which_names_can_be_qualified_oneof();
     }
 
     #[test]

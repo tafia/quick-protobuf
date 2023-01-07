@@ -782,6 +782,16 @@ fn get_modules(module: &str, imported: bool, desc: &FileDescriptor) -> String {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct Extend {
+    /// The message being extended.
+    pub name: String,
+    /// All fields that are being added to the extended message.
+    pub fields: Vec<Field>,
+}
+
+impl Extend {}
+
+#[derive(Debug, Clone, Default)]
 pub struct Message {
     pub name: String,
     pub fields: Vec<Field>,
@@ -796,6 +806,8 @@ pub struct Message {
     pub path: PathBuf,
     pub import: PathBuf,
     pub index: MessageIndex,
+    /// Allowed extensions for this message, None if no extensions.
+    pub extensions: Option<Extensions>,
 }
 
 impl Message {
@@ -885,13 +897,10 @@ impl Message {
                     writeln!(w, "use std::borrow::Cow;")?;
                 }
             }
-        } else if config.nostd {
-            if messages
+        } else if config.nostd && messages
                 .iter()
-                .any(|m| m.all_fields().any(|f| (f.typ.has_bytes_and_string())))
-            {
-                writeln!(w, "use alloc::borrow::ToOwned;")?;
-            }
+                .any(|m| m.all_fields().any(|f| (f.typ.has_bytes_and_string()))) {
+            writeln!(w, "use alloc::borrow::ToOwned;")?;
         }
 
         if config.nostd
@@ -1477,6 +1486,22 @@ impl RpcService {
 pub type RpcGeneratorFunction = Box<dyn Fn(&RpcService, &mut dyn Write) -> Result<()>>;
 
 #[derive(Debug, Clone, Default)]
+pub struct Extensions {
+    pub from: i32,
+    /// Max number is 536,870,911 (2^29 - 1), as defined in the
+    /// protobuf docs
+    pub to: i32,
+}
+
+impl Extensions {
+    /// The max field number that can be used as an extension.
+    pub fn max() -> i32 {
+        536870911
+    }
+
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct Enumerator {
     pub name: String,
     pub fields: Vec<(String, i32)>,
@@ -1841,6 +1866,7 @@ pub struct FileDescriptor {
     pub package: String,
     pub syntax: Syntax,
     pub messages: Vec<Message>,
+    pub message_extends: Vec<Extend>,
     pub enums: Vec<Enumerator>,
     pub module: String,
     pub rpc_services: Vec<RpcService>,
