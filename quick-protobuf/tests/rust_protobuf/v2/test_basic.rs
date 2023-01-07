@@ -1,4 +1,7 @@
+use std::borrow::Cow;
+
 use quick_protobuf::*;
+use quickcheck::Arbitrary;
 
 use super::basic::*;
 use crate::rust_protobuf::hex::{decode_hex, encode_hex};
@@ -237,4 +240,69 @@ fn test_bug_sint() {
         x.s64 = Some(-2);
         test_serialize_deserialize!("10 03", &x, TestBugSint);
     }
+}
+
+impl Arbitrary for TestTypesSingular<'static> {
+    fn arbitrary(g: &mut quickcheck::Gen) -> Self {
+        Self {
+            // In case of any confusion with the docs (which says "fixed32 [has]
+            // wire type I32"):
+            //
+            // Reminder that fixed32/64 is unsigned! The documentation at
+            // https://developers.google.com/protocol-buffers/docs/encoding#non-varint-nums
+            // refers to I32/I64 types, but this isn't Rust's i32/i64 (it's
+            // actually Protoscope's types, which they use for describing wire
+            // formats). We have dedicated types sfixed32/64 for signed fixed
+            // numbers.
+            double_field: Some(f64::arbitrary(g)),
+            float_field: Some(f32::arbitrary(g)),
+            int32_field: Some(i32::arbitrary(g)),
+            int64_field: Some(i64::arbitrary(g)),
+            uint32_field: Some(u32::arbitrary(g)),
+            uint64_field: Some(u64::arbitrary(g)),
+            sint32_field: Some(i32::arbitrary(g)),
+            sint64_field: Some(i64::arbitrary(g)),
+            fixed32_field: Some(u32::arbitrary(g)),
+            fixed64_field: Some(u64::arbitrary(g)),
+            sfixed32_field: Some(i32::arbitrary(g)),
+            sfixed64_field: Some(i64::arbitrary(g)),
+            bool_field: Some(bool::arbitrary(g)),
+            string_field: Some(Cow::from(String::arbitrary(g))),
+            bytes_field: {
+                // generate random size vec filled with random vals
+                
+                // cap capacity / len of generated vec, we don't want to have
+                // huge memory usage
+                const CAP: usize = 10000;
+                let arr_size = usize::arbitrary(g) % CAP;
+                let mut v = Vec::<u8>::with_capacity(arr_size);
+                for _ in 0..arr_size {
+                    v.push(u8::arbitrary(g));
+                }
+                Some(Into::into(v))
+            },
+            enum_field: {
+                let tds = [
+                    TestEnumDescriptor::BLUE,
+                    TestEnumDescriptor::GREEN,
+                    TestEnumDescriptor::RED,
+                ];
+                // essentially select one at random
+                Some(tds[usize::arbitrary(g) % 3])
+            },
+        }
+    }
+}
+
+#[test]
+fn test_get_size() {
+    fn get_size_same_as_actual_size(t: TestTypesSingular) -> bool {
+        let get_size_res = t.get_size();
+        let mut serialized = Vec::new();
+        let mut writer = Writer::new(&mut serialized);
+        t.write_message(&mut writer).unwrap();
+        get_size_res == serialized.len()
+    }
+
+    quickcheck::quickcheck(get_size_same_as_actual_size as fn(TestTypesSingular<'static>) -> bool);
 }
