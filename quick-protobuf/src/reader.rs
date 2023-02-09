@@ -480,8 +480,9 @@ impl BytesReader {
     pub fn read_message<'a, M>(&mut self, bytes: &'a [u8]) -> Result<M>
     where
         M: MessageRead<'a>,
-    {
-        self.read_len_varint(bytes, M::from_reader)
+    {        
+        let len = bytes.len();
+        self.read_len(bytes, M::from_reader, len)
     }
 
     /// Reads a nested message

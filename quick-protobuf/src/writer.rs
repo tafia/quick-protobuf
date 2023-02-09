@@ -217,8 +217,6 @@ impl<W: WriterBackend> Writer<W> {
     /// Writes a message which implements `MessageWrite`
     #[cfg_attr(std, inline)]
     pub fn write_message<M: MessageWrite>(&mut self, m: &M) -> Result<()> {
-        let len = m.get_size();
-        self.write_varint(len as u64)?;
         m.write_message(self)
     }
 
@@ -331,7 +329,7 @@ pub fn serialize_into_vec<M: MessageWrite>(message: &M) -> Result<Vec<u8>> {
 /// Serialize a `MessageWrite` into a byte slice
 pub fn serialize_into_slice<M: MessageWrite>(message: &M, out: &mut [u8]) -> Result<()> {
     let len = message.get_size();
-    if out.len() < crate::sizeofs::sizeof_len(len) {
+    if out.len() < len {
         return Err(Error::OutputBufferTooSmall);
     }
     {
