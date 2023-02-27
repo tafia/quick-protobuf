@@ -1,22 +1,30 @@
-use std::path::PathBuf;
+use std::convert::TryInto;
+use std::{path::PathBuf, convert::TryFrom};
 use std::str;
 
 use crate::types::{
-    Enumerator, Extend, Field, FieldType, FileDescriptor, Frequency, Message, OneOf,
-    RpcFunctionDeclaration, RpcService, Syntax, Extensions,
+    Enumerator, Extend, Field, FieldType, FileDescriptor, Frequency, Message, OneOf, Proto2Frequency,
+    Proto3Frequency, RpcFunctionDeclaration, RpcService, Syntax, Extensions,
 };
 
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until},
     character::complete::{
-        alpha1, alphanumeric1, digit1, hex_digit1, multispace1, not_line_ending,
+        alpha1, alphanumeric1, anychar, digit1, hex_digit1, multispace1, not_line_ending
     },
     combinator::{map, map_res, opt, recognize, value, verify},
-    multi::{many0, many1, separated_list1},
+    multi::{many0, many1, separated_list0, separated_list1},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
     IResult,
 };
+
+#[derive(Debug, Clone)]
+enum ParsingStageFrequencyToken {
+    Optional,
+    Repeated,
+    Required,
+}
 
 #[derive(Debug, Clone)]
 enum MessageEvent {
@@ -198,11 +206,11 @@ fn key_val(input: &str) -> IResult<&str, (&str, &str)> {
     )(input)
 }
 
-fn frequency(input: &str) -> IResult<&str, Frequency> {
+fn frequency(input: &str) -> IResult<&str, ParsingStageFrequencyToken> {
     alt((
-        value(Frequency::Optional, tag("optional")),
-        value(Frequency::Repeated, tag("repeated")),
-        value(Frequency::Required, tag("required")),
+        value(ParsingStageFrequencyToken::Optional, tag("optional")),
+        value(ParsingStageFrequencyToken::Repeated, tag("repeated")),
+        value(ParsingStageFrequencyToken::Required, tag("required")),
     ))(input)
 }
 
@@ -240,70 +248,122 @@ fn map_field(input: &str) -> IResult<&str, (FieldType, FieldType)> {
     )(input)
 }
 
-fn message_field(input: &str) -> IResult<&str, Field> {
-    map(
-        tuple((
-            opt(terminated(frequency, many1(br))),
-            terminated(field_type, many1(br)),
-            separated_pair(
-                word,
-                delimited(many0(br), tag("="), many0(br)),
-                alt((integer, hex_integer)),
-            ),
-            delimited(many0(br), many0(key_val), pair(many0(br), tag(";"))),
-        )),
-        |(freq, typ, (name, number), key_vals)| Field {
-            name,
-            frequency: freq.unwrap_or(Frequency::Optional),
-            number,
-            default: key_vals.iter().find_map(|&(k, v)| {
-                if k == "default" {
-                    Some(v.to_string())
-                } else {
-                    None
-                }
-            }),
-            packed: key_vals.iter().find_map(|&(k, v)| {
-                if k == "packed" {
-                    Some(v.parse().expect("Cannot parse Packed value"))
-                } else {
-                    None
-                }
-            }),
-            boxed: false,
-            typ,
-            deprecated: key_vals
-                .iter()
-                .find_map(|&(k, v)| {
-                    if k == "deprecated" {
-                        Some(v.parse().expect("Cannot parse Deprecated value"))
+fn default_check<'a>(syntax: Syntax, typ: FieldType, key_vals: &[(&'a str, &'a str)]) -> Result<Option<String>, &'a str> {
+    for &(k, v) in key_vals.iter() {
+        if k == "default" {
+            return match (syntax, typ) {
+                (Syntax::Proto2, FieldType::StringCow | FieldType::BytesCow) => {
+                    let remove_compulsory_inverted_commas: IResult<&str, &str>  = alt((
+                        delimited(tag("\""), take_until("\""), tag("\"")),
+                        delimited(tag("\'"), take_until("\'"), tag("\'")),
+                    ))(v);
+                    remove_compulsory_inverted_commas
+                        .map(|(_, s)| Some(s.to_owned()))
+                        .map_err(|_| "Default value must be wrapped in inverted commas!")
+                },
+                (Syntax::Proto2, _) => Ok(Some(v.to_owned())),
+                (Syntax::Proto3, _) => Ok(Some(v.to_owned())),
+            };
+        }
+    }
+    Ok(None)
+}
+
+impl TryFrom<(Syntax, FieldType, Option<ParsingStageFrequencyToken>)> for Frequency {
+    type Error = &'static str;
+
+    fn try_from(value: (Syntax, FieldType, Option<ParsingStageFrequencyToken>)) -> Result<Self, Self::Error> {
+        match value {
+            (Syntax::Proto2, FieldType::Map(..), _) => Ok(Frequency::Proto2Frequency(Proto2Frequency::Map)),
+            (Syntax::Proto2, _, Some(ParsingStageFrequencyToken::Required)) => Ok(Frequency::Proto2Frequency(Proto2Frequency::Required)),
+            (Syntax::Proto2, _, Some(ParsingStageFrequencyToken::Optional)) => Ok(Frequency::Proto2Frequency(Proto2Frequency::Optional)),
+            (Syntax::Proto2, _, Some(ParsingStageFrequencyToken::Repeated)) => Ok(Frequency::Proto2Frequency(Proto2Frequency::Repeated)),
+            (Syntax::Proto2, _, None) => Ok(Frequency::Proto2Frequency(Proto2Frequency::Optional)),
+            (Syntax::Proto3, FieldType::Map(..), _) => Ok(Frequency::Proto3Frequency(Proto3Frequency::Map)),
+            (Syntax::Proto3, _, Some(ParsingStageFrequencyToken::Required)) => Ok(Frequency::Proto3Frequency(Proto3Frequency::Optional)),
+            (Syntax::Proto3, _, Some(ParsingStageFrequencyToken::Optional)) => Ok(Frequency::Proto3Frequency(Proto3Frequency::Optional)),
+            (Syntax::Proto3, _, Some(ParsingStageFrequencyToken::Repeated)) => Ok(Frequency::Proto3Frequency(Proto3Frequency::Repeated)),
+            (Syntax::Proto3, _, None) => Ok(Frequency::Proto3Frequency(Proto3Frequency::Default)),
+        }
+    }
+}
+
+fn field_generic<F>(syntax: Syntax, freq_func: F) -> impl FnMut(&str) -> IResult<&str, Field>
+where
+    F: Fn((Syntax, FieldType, Option<ParsingStageFrequencyToken>)) -> Result<Frequency, &'static str>,
+{
+    move |input| -> IResult<&str, Field> {
+        map_res(
+            tuple((
+                opt(terminated(frequency, many1(br))),
+                terminated(field_type, many1(br)),
+                separated_pair(
+                    word,
+                    delimited(many0(br), tag("="), many0(br)),
+                    alt((integer, hex_integer)),
+                ),
+                delimited(many0(br), many0(key_val), pair(many0(br), tag(";"))),
+            )),
+            |(freq, typ, (name, number), key_vals)| Ok::<Field, &str>(Field {
+                name,
+                frequency: freq_func((syntax, typ.clone(), freq))?,
+                number,
+                default: default_check(syntax, typ.clone(), &key_vals)?,
+                packed: key_vals.iter().find_map(|&(k, v)| {
+                    if k == "packed" {
+                        Some(v.parse().expect("Cannot parse Packed value"))
                     } else {
                         None
                     }
-                })
-                .unwrap_or(false),
-        },
-    )(input)
+                }),
+                boxed: false,
+                typ,
+                deprecated: key_vals
+                    .iter()
+                    .find_map(|&(k, v)| {
+                        if k == "deprecated" {
+                            Some(v.parse().expect("Cannot parse Deprecated value"))
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or(false),
+            }),
+        )(input)
+    }
 }
 
-fn one_of(input: &str) -> IResult<&str, OneOf> {
-    map(
-        pair(
-            preceded(pair(tag("oneof"), many1(br)), word),
-            delimited(
-                pair(many0(br), tag("{")),
-                many1(delimited(many0(br), message_field, many0(br))),
-                tag("}"),
+fn message_field(syntax: Syntax) -> impl FnMut(&str) -> IResult<&str, Field> {
+    field_generic(syntax, TryInto::try_into)
+}
+
+fn oneof_message_field(syntax: Syntax) -> impl FnMut(&str) -> IResult<&str, Field> {
+    field_generic(syntax, |(syntax,_,_)| Ok(match syntax {
+        Syntax::Proto2 => Frequency::Proto2Frequency(Proto2Frequency::Required),
+        Syntax::Proto3 => Frequency::Proto3Frequency(Proto3Frequency::Optional),
+    }))
+}
+
+fn one_of(syntax: Syntax) -> impl FnMut (&str) -> IResult<&str, OneOf> {
+    move |input| {
+        map(
+            pair(
+                preceded(pair(tag("oneof"), many1(br)), word),
+                delimited(
+                    pair(many0(br), tag("{")),
+                    many1(delimited(many0(br), oneof_message_field(syntax), many0(br))),
+                    tag("}"),
+                ),
             ),
-        ),
-        |(name, fields)| OneOf {
-            name,
-            fields,
-            package: "".to_string(),
-            module: "".to_string(),
-            imported: false,
-        },
-    )(input)
+            |(name, fields)| OneOf {
+                name,
+                fields,
+                package: "".to_string(),
+                module: "".to_string(),
+                imported: false,
+            },
+        )(input)
+    }
 }
 
 fn rpc_function_declaration(input: &str) -> IResult<&str, RpcFunctionDeclaration> {
@@ -352,50 +412,53 @@ fn rpc_service(input: &str) -> IResult<&str, RpcService> {
     )(input)
 }
 
-fn message_event(input: &str) -> IResult<&str, MessageEvent> {
-    alt((
-        map(reserved_nums, MessageEvent::ReservedNums),
-        map(reserved_names, MessageEvent::ReservedNames),
-        map(message_field, MessageEvent::Field),
-        map(message, MessageEvent::Message),
-        map(enumerator, MessageEvent::Enumerator),
-        map(one_of, MessageEvent::OneOf),
-        map(extensions, MessageEvent::Extensions),
-        value(MessageEvent::Ignore, option_ignore),
-        value(MessageEvent::Ignore, br),
-    ))(input)
+fn message_event(syntax: Syntax) -> impl FnMut(&str) -> IResult<&str, MessageEvent> {
+    move |input | {
+        alt((
+            map(reserved_nums, MessageEvent::ReservedNums),
+            map(reserved_names, MessageEvent::ReservedNames),
+            map(message_field(syntax), MessageEvent::Field),
+            map(message(syntax), MessageEvent::Message),
+            map(enumerator, MessageEvent::Enumerator),
+            map(one_of(syntax), MessageEvent::OneOf),
+            map(extensions, MessageEvent::Extensions),
+            value(MessageEvent::Ignore, option_ignore),
+            value(MessageEvent::Ignore, br),
+        ))(input)
+    }
 }
 
-
-fn message(input: &str) -> IResult<&str, Message> {
-    map(
-        terminated(
-            pair(
-                delimited(pair(tag("message"), many1(br)), word, many0(br)),
-                delimited(tag("{"), many0(message_event), tag("}")),
+fn message(syntax: Syntax) -> impl FnMut(&str) -> IResult<&str, Message> {
+    move |input| {
+        map(
+            terminated(
+                pair(
+                    delimited(pair(tag("message"), many1(br)), word, many0(br)),
+                    delimited(tag("{"), many0(message_event(syntax)), tag("}")),
+                ),
+                opt(pair(many0(br), tag(";"))),
             ),
-            opt(pair(many0(br), tag(";"))),
-        ),
-        |(name, events)| {
-            let mut msg = Message {
-                name,
-                ..Default::default()
-            };
-            for e in events {
-                match e {
-                    MessageEvent::Field(f) => msg.fields.push(f),
-                    MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
-                    MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
-                    MessageEvent::Message(m) => msg.messages.push(m),
-                    MessageEvent::Enumerator(e) => msg.enums.push(e),
-                    MessageEvent::OneOf(o) => msg.oneofs.push(o),
-                    MessageEvent::Extensions(e) => msg.extensions = Some(e),
-                    MessageEvent::Ignore => (),
+            |(name, events)| {
+                let mut msg = Message {
+                    name,
+                    ..Default::default()
+                };
+                for e in events {
+                    match e {
+                        MessageEvent::Field(f) => msg.fields.push(f),
+                        MessageEvent::ReservedNums(r) => msg.reserved_nums = Some(r),
+                        MessageEvent::ReservedNames(r) => msg.reserved_names = Some(r),
+                        MessageEvent::Message(m) => msg.messages.push(m),
+                        MessageEvent::Enumerator(e) => msg.enums.push(e),
+                        MessageEvent::OneOf(o) => msg.oneofs.push(o),
+                        MessageEvent::Extensions(e) => msg.extensions = Some(e),
+                        MessageEvent::Ignore => (),
+                    }
                 }
-            }
-            msg
-        },
-    )(input)
+                msg
+            },
+        )(input)
+    }
 }
 
 fn enum_field(input: &str) -> IResult<&str, (String, i32)> {
@@ -439,38 +502,67 @@ fn enum_event(input: &str) -> IResult<&str, EnumEvent> {
 }
 
 fn enumerator(input: &str) -> IResult<&str, Enumerator> {
-    map(
+    map_res(
         terminated(
             pair(
                 delimited(pair(tag("enum"), many1(br)), word, many0(br)),
                 delimited(tag("{"), many0(enum_event), tag("}")),
+
             ),
             opt(pair(many0(br), tag(";"))),
         ),
         |(name, events)| {
             let mut enumerator = Enumerator {
-            name,
-            ..Default::default()
-        };
-        for event in events {
-            if let EnumEvent::Field(f) = event {
-                enumerator.fields.push(f);
+                name,
+                ..Default::default()
+            };
+            for event in events {
+                if let EnumEvent::Field(f) = event {
+                    enumerator.fields.push(f);
+                }
             }
+            Ok::<Enumerator, &str>(enumerator)
         }
-        enumerator
-        },
     )(input)
 }
+
+// fn enumerator() -> impl FnMut(&str) -> IResult<&str, Enumerator> {
+//     move |input| {
+//         map_res(
+//             terminated(
+//                 pair(
+//                     delimited(pair(tag("enum"), many1(br)), word, many0(br)),
+//                     delimited(tag("{"), many0(enum_event), tag("}")),
+
+//                 ),
+//                 opt(pair(many0(br), tag(";"))),
+//             ),
+//             |(name, events)| {
+//                 let mut enumerator = Enumerator {
+//                     name,
+//                     ..Default::default()
+//                 };
+//                 for event in events {
+//                     if let EnumEvent::Field(f) = event {
+//                         enumerator.fields.push(f);
+//                     }
+//                 }
+//                 Ok::<Enumerator, &str>(enumerator)
+//             }
+//         )(input)
+//     }
+// }
 
 fn option_ignore(input: &str) -> IResult<&str, ()> {
     value((), delimited(pair(tag("option"), many1(br)), take_until(";"), tag(";")))(input)
 }
 
-fn extend(input: &str) -> IResult<&str, Extend> {
-    map(terminated(
+fn extend(syntax: Syntax) -> impl FnMut(&str) -> IResult<&str, Extend> {
+    move |input| {
+        map(terminated(
             pair(
                 delimited(pair( tag("extend"), many1(br)), qualifiable_name, many0(br)),
-                delimited(tag("{"), many1(delimited(many0(br), message_field, many0(br))), tag("}")),
+                delimited(tag("{"), many1(delimited(many0(br), message_field(syntax), many0(br))), tag("}")),
             ),
             opt(pair(many0(br), tag(";"))),
         ), |(name, fields)| {
@@ -478,38 +570,55 @@ fn extend(input: &str) -> IResult<&str, Extend> {
                 name, fields
             }
         })(input)
+    }
 }
 
-pub fn file_descriptor(input: &str) -> IResult<&str, FileDescriptor, nom::error::Error<String>> {
-    map(
-        many0(alt((
-            map(syntax, Event::Syntax),
-            map(import, Event::Import),
-            map(package, Event::Package),
-            map(message, Event::Message),
-            map(enumerator, Event::Enum),
-            map(rpc_service, Event::RpcService),
-            map(extend, Event::Extend),
-            value(Event::Ignore, option_ignore),
-            value(Event::Ignore, br),
-        ))),
-        |events| {
-            let mut desc = FileDescriptor::default();
-            for event in events {
-                match event {
-                    Event::Syntax(s) => desc.syntax = s,
-                    Event::Import(i) => desc.import_paths.push(i),
-                    Event::Package(p) => desc.package = p,
-                    Event::Message(m) => desc.messages.push(m),
-                    Event::Enum(e) => desc.enums.push(e),
-                    Event::RpcService(r) => desc.rpc_services.push(r),
-                    Event::Extend(e) => desc.message_extends.push(e),
-                    Event::Ignore => (),
+fn scan_syntax(input: &str) -> IResult<&str, Syntax> {
+    map_res(separated_list0(many0(anychar), syntax), |v| {
+        Ok::<Syntax, &str>(if v.is_empty() {
+            Syntax::Proto2
+        } else {
+            v[0]
+        })
+    })(input)
+}
+
+pub fn file_descriptor<'a>(input: &'a str) -> IResult<&'a str, FileDescriptor, nom::error::Error<String>> {
+    let got_syntax = scan_syntax(input).unwrap().1;
+
+    let parser = move |input: &'a str| -> IResult<&'a str, FileDescriptor, nom::error::Error<&str>> {
+        map(
+            many0(alt((
+                map(syntax, Event::Syntax),
+                map(import, Event::Import),
+                map(package, Event::Package),
+                map(message(got_syntax), Event::Message),
+                map(enumerator, Event::Enum),
+                map(rpc_service, Event::RpcService),
+                map(extend(got_syntax), Event::Extend),
+                value(Event::Ignore, option_ignore),
+                value(Event::Ignore, br),
+            ))),
+            |events| {
+                let mut desc = FileDescriptor::default();
+                for event in events {
+                    match event {
+                        Event::Syntax(s) => desc.syntax = s,
+                        Event::Import(i) => desc.import_paths.push(i),
+                        Event::Package(p) => desc.package = p,
+                        Event::Message(m) => desc.messages.push(m),
+                        Event::Enum(e) => desc.enums.push(e),
+                        Event::RpcService(r) => desc.rpc_services.push(r),
+                        Event::Extend(e) => desc.message_extends.push(e),
+                        Event::Ignore => (),
+                    }
                 }
-            }
-            desc
-        },
-    )(input).map_err(|e: nom::Err<nom::error::Error<&str>>| e.to_owned())
+                desc
+            },
+        )(input)
+    };
+    
+    parser(input).map_err(|e: nom::Err<nom::error::Error<&str>>| e.to_owned())
 }
 
 #[cfg(test)]
@@ -518,63 +627,89 @@ mod test {
 
     use std::path::Path;
 
-    fn assert_complete<T>(parse: nom::IResult<&str, T>) -> T {
-        let (rem, obj) = parse.expect("valid parse");
-        assert_eq!(rem, "", "expected no trailing data");
-        obj
+    fn result_assert(cond: bool, msg: Option<&str>) -> Result<(), &str> {
+        if cond {
+            Ok(())
+        } else {
+            Err(msg.unwrap_or(""))
+        }
     }
 
-    fn assert_desc(msg: &str) -> FileDescriptor {
+    fn result_assert_eq<T: PartialEq>(o1: T, o2:T, msg: Option<&str>) -> Result<(), &str> {
+        result_assert(o1 == o2, msg)
+    }
+
+    fn test_syntaxes<F>(test_func: F) where F: Fn(Syntax) -> Result<(), &'static str> {
+        test_func(Syntax::Proto2).unwrap_or_else(|msg| panic!("Proto 2 version failed\n{}", msg));
+        test_func(Syntax::Proto3).unwrap_or_else(|msg| panic!("Proto 3 version failed\n{}", msg));
+    }
+
+    fn assert_complete<T>(parse: nom::IResult<&str, T>) -> Result<T, &str> {
+        let (rem, obj) = parse.expect("valid parse");
+        result_assert_eq(rem, "", Some("expected no trailing data"))?;
+        Ok(obj)
+    }
+
+    fn assert_desc(msg: &str) -> Result<FileDescriptor, &str> {
         let (rem, obj) = file_descriptor(msg).expect("valid parse");
-        assert_eq!("", rem, "expected no trailing data");
-        obj
+        result_assert_eq("", rem, Some("expected no trailing data"))?;
+        Ok(obj)
     }
 
     #[test]
     fn test_message() {
-        let msg = r#"message ReferenceData
-    {
-        repeated ScenarioInfo  scenarioSet = 1;
-        repeated CalculatedObjectInfo calculatedObjectSet = 2;
-        repeated RiskFactorList riskFactorListSet = 3;
-        repeated RiskMaturityInfo riskMaturitySet = 4;
-        repeated IndicatorInfo indicatorSet = 5;
-        repeated RiskStrikeInfo riskStrikeSet = 6;
-        repeated FreeProjectionList freeProjectionListSet = 7;
-        repeated ValidationProperty ValidationSet = 8;
-        repeated CalcProperties calcPropertiesSet = 9;
-        repeated MaturityInfo maturitySet = 10;
-    }"#;
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            let msg = r#"message ReferenceData
+            {
+                repeated ScenarioInfo  scenarioSet = 1;
+                repeated CalculatedObjectInfo calculatedObjectSet = 2;
+                repeated RiskFactorList riskFactorListSet = 3;
+                repeated RiskMaturityInfo riskMaturitySet = 4;
+                repeated IndicatorInfo indicatorSet = 5;
+                repeated RiskStrikeInfo riskStrikeSet = 6;
+                repeated FreeProjectionList freeProjectionListSet = 7;
+                repeated ValidationProperty ValidationSet = 8;
+                repeated CalcProperties calcPropertiesSet = 9;
+                repeated MaturityInfo maturitySet = 10;
+            }"#;
 
-        let mess = message(msg);
-        if let ::nom::IResult::Ok((_, mess)) = mess {
-            assert_eq!(10, mess.fields.len());
-        }
+            let mess = message(syntax)(msg);
+            if let ::nom::IResult::Ok((_, mess)) = mess {
+                result_assert_eq(10, mess.fields.len(), None)?;
+            }
+            Ok(())
+        });
     }
 
     #[test]
     fn empty_message() {
-        let msg = r#"message Vec { }"#;
-        let mess = assert_complete(message(msg));
-        assert_eq!("Vec", mess.name);
-        assert_eq!(0, mess.fields.len());
-        assert_desc(msg);
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            let msg = r#"message Vec { }"#;
+            let mess = assert_complete(message(syntax)(msg))?;
+            result_assert_eq("Vec", &mess.name, None)?;
+            result_assert_eq(0, mess.fields.len(), None)?;
+            assert_desc(msg)?;
+            Ok(())
+        });
     }
 
     #[test]
     fn test_enum() {
-        let msg = r#"enum PairingStatus {
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            let msg = r#"enum PairingStatus {
                 DEALPAIRED        = 0;
                 INVENTORYORPHAN   = 1;
                 CALCULATEDORPHAN  = 2;
                 CANCELED          = 3;
-    }"#;
+            }"#;
 
-        let mess = enumerator(msg);
-        if let ::nom::IResult::Ok((_, mess)) = mess {
-            assert_eq!(4, mess.fields.len());
-        }
-        assert_desc(msg);
+            let mess = enumerator(msg);
+            if let ::nom::IResult::Ok((_, mess)) = mess {
+                result_assert_eq(4, mess.fields.len(), None)?;
+            }
+            assert_desc(msg)?;
+            Ok(())
+        })
     }
 
     #[test]
@@ -611,6 +746,8 @@ mod test {
         assert_eq!("", comment("//").unwrap().0);
         assert_eq!("", block_comment("/**/").unwrap().0);
         assert_eq!("\nb", block_comment("/* BOOM */\nb").unwrap().0);
+        assert_eq!("*/", block_comment("/*/* hi */*/").unwrap().0); // nested block comments not supported
+
         let msg = r#"
             // BOOM
             //
@@ -656,7 +793,7 @@ mod test {
         assert_eq!(1, desc.messages.len());
         assert_eq!(3, desc.messages[0].messages.len());
         assert_eq!(3, desc.messages[0].enums.len());
-        assert_desc(msg);
+        assert_desc(msg).unwrap();
     }
 
     #[test]
@@ -675,18 +812,18 @@ mod test {
             vec![Path::new("test_import_nested_imported_pb.proto")],
             desc.import_paths
         );
-        assert_desc(msg);
+        assert_desc(msg).unwrap();
     }
 
     #[test]
     fn leading_comment() {
         let msg = r#"//foo
         message Bar {}"#;
-        let desc = assert_desc(msg);
+        let desc = assert_desc(msg).unwrap();
         assert_eq!(1, desc.messages.len());
         assert_eq!("Bar", desc.messages[0].name);
         assert_eq!(0, desc.messages[0].fields.len());
-        assert_desc(msg);
+        assert_desc(msg).unwrap();
     }
 
     #[test]
@@ -700,7 +837,7 @@ mod test {
     }"#;
         let desc = file_descriptor(msg).unwrap().1;
         assert_eq!("foo.bar".to_string(), desc.package);
-        assert_desc(msg);
+        assert_desc(msg).unwrap();
     }
 
     #[test]
@@ -820,97 +957,112 @@ mod test {
         let desc = file_descriptor(msg).unwrap().1;
         assert_eq!(1, desc.messages.len());
         assert_eq!(3, desc.messages[0].messages.len());
-        assert_desc(msg);
+        assert_desc(msg).unwrap();
     }
 
     #[test]
     fn test_map() {
-        let msg = r#"message A
-    {
-        optional map<string, int32> b = 1;
-    }"#;
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            let msg = r#"message A
+            {
+                optional map<string, int32> b = 1;
+            }"#;
 
-        let mess = message(msg);
-        if let ::nom::IResult::Ok((_, mess)) = mess {
-            assert_eq!(1, mess.fields.len());
-            match mess.fields[0].typ {
-                FieldType::Map(ref key, ref value) => match (&**key, &**value) {
-                    (&FieldType::String_, &FieldType::Int32) => (),
-                    (&FieldType::StringCow, &FieldType::Int32) => (),
-                    _ => panic!(
-                        "Expecting Map<String, Int32> found Map<{:?}, {:?}>",
-                        key, value
-                    ),
-                },
-                ref f => panic!("Expecting map, got {:?}", f),
+            let mess = message(syntax)(msg);
+            if let ::nom::IResult::Ok((_, mess)) = mess {
+                result_assert_eq(1, mess.fields.len(), None)?;
+                match mess.fields[0].typ {
+                    FieldType::Map(ref key, ref value) => match (&**key, &**value) {
+                        (&FieldType::String_, &FieldType::Int32) => (),
+                        (&FieldType::StringCow, &FieldType::Int32) => (),
+                        _ => panic!(
+                            "Expecting Map<String, Int32> found Map<{:?}, {:?}>",
+                            key, value
+                        ),
+                    },
+                    ref f => panic!("Expecting map, got {:?}", f),
+                }
+            } else {
+                panic!("Could not parse map message");
             }
-        } else {
-            panic!("Could not parse map message");
-        }
-        assert_desc(msg);
+            assert_desc(msg)?;
+            Ok(())
+        })
     }
 
     #[test]
     fn test_oneof() {
-        let msg = r#"message A
-    {
-        optional int32 a1 = 1;
-        oneof a_oneof {
-            string a2 = 2;
-            int32 a3 = 3;
-            bytes a4 = 4;
-        }
-        repeated bool a5 = 5;
-    }"#;
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            let msg = r#"message A
+            {
+                optional int32 a1 = 1;
+                oneof a_oneof {
+                    string a2 = 2;
+                    int32 a3 = 3;
+                    bytes a4 = 4;
+                }
+                repeated bool a5 = 5;
+            }"#;
 
-        let mess = message(msg);
-        if let ::nom::IResult::Ok((_, mess)) = mess {
-            assert_eq!(1, mess.oneofs.len());
-            assert_eq!(3, mess.oneofs[0].fields.len());
-        }
-        assert_desc(msg);
+            let mess = message(syntax)(msg);
+            if let ::nom::IResult::Ok((_, mess)) = mess {
+                result_assert_eq(1, mess.oneofs.len(), None)?;
+                result_assert_eq(3, mess.oneofs[0].fields.len(), None)?;
+            }
+            assert_desc(msg)?;
+            Ok(())
+        });
+        
     }
 
     #[test]
     fn test_reserved() {
-        let msg = r#"message Sample {
-       reserved 4, 15, 17 to 20, 30;
-       reserved "foo", "bar";
-       uint64 age =1;
-       bytes name =2;
-    }"#;
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            let msg = r#"message Sample {
+                reserved 4, 15, 17 to 20, 30;
+                reserved "foo", "bar";
+                optional uint64 age =1;
+                optional bytes name =2;
+            }"#;
 
-        let mess = message(msg);
-        if let ::nom::IResult::Ok((_, mess)) = mess {
-            assert_eq!(Some(vec![4, 15, 17, 18, 19, 20, 30]), mess.reserved_nums);
-            assert_eq!(
-                Some(vec!["foo".to_string(), "bar".to_string()]),
-                mess.reserved_names
-            );
-            assert_eq!(2, mess.fields.len());
-        } else {
-            panic!("Could not parse reserved fields message");
-        }
-        assert_desc(msg);
+            let mess = message(syntax)(msg);
+            dbg!(&mess);
+            if let ::nom::IResult::Ok((_, mess)) = mess {
+                result_assert_eq(Some(vec![4, 15, 17, 18, 19, 20, 30]), mess.reserved_nums, None)?;
+                result_assert_eq(
+                    Some(vec!["foo".to_string(), "bar".to_string()]),
+                    mess.reserved_names,
+                    None
+                )?;
+                result_assert_eq(2, mess.fields.len(), None)?;
+            } else {
+                panic!("Could not parse reserved fields message");
+            }
+            assert_desc(msg)?;
+            Ok(())
+        });
     }
 
     #[test]
     fn enum_comments() {
-        let msg = r#"enum Turn {
-            UP = 1;
-            // for what?
-            // for what, you ask?
-            DOWN = 2;
-          }"#;
-        let en = assert_complete(enumerator(msg));
-        assert_eq!(2, en.fields.len());
-        assert_desc(msg);
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            let msg = r#"enum Turn {
+                UP = 0;
+                // for what?
+                // for what, you ask?
+                DOWN = 1;
+            }"#;
+            let en = assert_complete(enumerator(msg))?;
+            result_assert_eq(2, en.fields.len(), None)?;
+            assert_desc(msg)?;
+            Ok(())
+        });
     }
 
     #[test]
     fn enum_semicolon() {
         let msg = r#"message Foo { enum Bar { BAZ = 1; }; Bar boop = 1; }"#;
-        let desc = assert_desc(msg);
+        let desc = assert_desc(msg).unwrap();
         assert_eq!(1, desc.messages.len());
         assert_eq!(
             FieldType::MessageOrEnum("Bar".to_owned()),
@@ -935,7 +1087,7 @@ mod test {
             optional uint32                  d    = 4;
         }
         "#;
-        assert_desc(msg2);
+        assert_desc(msg2).unwrap();
     }
 
     #[test]
@@ -968,7 +1120,7 @@ mod test {
             }
             other => panic!("Could not parse RPC Service: {:?}", other),
         }
-        assert_desc(msg);
+        assert_desc(msg).unwrap();
     }
 
     #[test]
@@ -985,130 +1137,138 @@ mod test {
         }
     }
 
-    mod missing_tokens {
-        use crate::parser::{one_of, enumerator, message};
-
-        #[test]
-        fn test_missing_tokens_message() {
+    #[test]
+    fn test_missing_tokens() {
+        fn test_missing_tokens_message(syntax: Syntax) -> Result<(), &'static str> {
             /* Check that base case is actually correct before we start deleting tokens */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message A {
                     optional int32 a = 1;
                 }"#
             )
-            .is_ok());
+            .is_ok(), None)?;
 
             /* Empty message name */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message {
                     optional int32 a = 1;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Empty message field name */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message A {
                     optional int32 = 1;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Empty message field type */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message A {
                     optional a = 1;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Empty message field number */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message A {
                     optional int32 a = ;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
+
+            Ok(())
         }
 
-        #[test]
-        fn test_missing_tokens_enum() {
+        fn test_missing_tokens_enum() -> Result<(), &'static str> {
             /* Check that base case is actually correct before we start deleting tokens */
-            assert!(enumerator(
+            result_assert(enumerator(
                 r#"enum A {
                     FIELD_A = 0;
                 }"#
             )
-            .is_ok());
+            .is_ok(), None)?;
 
             /* Empty enum name */
-            assert!(enumerator(
+            result_assert(enumerator(
                 r#"enum {
                     FIELD_A = 0;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Empty enum field name */
-            assert!(enumerator(
+            result_assert(enumerator(
                 r#"enum A {
                     = 0;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Empty enum field number */
-            assert!(enumerator(
+            result_assert(enumerator(
                 r#"enum A {
                     FIELD_A = ;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
+
+            Ok(())
         }
 
-        #[test]
-        fn test_missing_tokens_one_of() {
+        fn test_missing_tokens_one_of(syntax: Syntax) -> Result<(), &'static str> {
             /* Check that base case is actually correct before we start deleting tokens */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof a {
                     int32 field_a = 0;
                 }"#
             )
-            .is_ok());
+            .is_ok(), None)?;
 
             /* Empty oneof name */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof {
                     int32 field_a = 0;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Empty oneof field name */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof a {
                     int32 = 0;
                 }"#
             )
-            .is_err());
-
+            .is_err(), None)?;
             /* Empty oneof field type */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof a {
                     field_a = 0;
                 }"#
             )
-            .is_err());
-
+            .is_err(), None)?;
             /* Empty oneof field number */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof a {
                     int32 field_a = ;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
+
+            Ok(())
         }
 
+        // remember to actually call the test functions!
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            test_missing_tokens_message(syntax)?;
+            test_missing_tokens_enum()?;
+            test_missing_tokens_one_of(syntax)?;
+
+            Ok(())
+        });
     }
 
     #[test]
@@ -1142,7 +1302,7 @@ mod test {
             assert!(word(s).is_err());
             assert!(qualifiable_name(s).is_err());
         }
-
+        
         assert_both_ok_same_res("_a@", "_a");
         assert_both_ok_same_res("a_@", "a_");
         assert_both_ok_same_res("TestTypesRepeatedPacked", "TestTypesRepeatedPacked");
@@ -1175,139 +1335,150 @@ mod test {
         assert_both_ok_different_res("Test1._Test2.3Test3.Test4@", "Test1", "Test1._Test2");
     }
 
-    mod test_which_names_can_be_qualified {
-        use crate::parser::{message, enumerator, one_of};
-
-        #[test]
-        fn test_which_names_can_be_qualified_message() {
+    #[test]
+    fn test_which_names_can_be_qualified() {
+        fn test_which_names_can_be_qualified_message(syntax: Syntax) -> Result<(), &'static str> {
             /* Check that base case is actually correct before we start qualifying names */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message A {
-                    int32 a = 1;
+                    optional int32 a = 1;
                 }"#
             )
-            .is_ok());
+            .is_ok(), None)?;
 
             /* Message field types CAN be qualified */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message A {
-                    Qualified.Name a = 1;
+                    optional Qualified.Name a = 1;
                 }"#
             )
-            .is_ok());
+            .is_ok(), None)?;
 
             /* Message names CANNOT be qualified */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message Qualified.Name {
-                    int32 a = 1;
+                    optional int32 a = 1;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Message field names CANNOT be qualified */
-            assert!(message(
+            result_assert(message(syntax)(
                 r#"message A {
-                    int32 qualified.name = 1;
+                    optional int32 qualified.name = 1;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
+            
+            Ok(())
         }
 
-        #[test]
-        fn test_which_names_can_be_qualified_enum() {
+        fn test_which_names_can_be_qualified_enum() -> Result<(), &'static str> {
             /* Check that base case is actually correct before we start qualifying names */
-            assert!(enumerator(
+            result_assert(enumerator(
                 r#"enum A {
-                    enum_field = 1;
+                    enum_field = 0;
                 }"#
             )
-            .is_ok());
+            .is_ok(), None)?;
 
             /* Enum names CANNOT be qualified */
-            assert!(enumerator(
+            result_assert(enumerator(
                 r#"enum Qualified.Name {
-                    enum_field = 1;
+                    enum_field = 0;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Enum field names CANNOT be qualified */
-            assert!(enumerator(
+            result_assert(enumerator(
                 r#"enum A {
-                    QUALIFIED.NAME = 1;
+                    QUALIFIED.NAME = 0;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
+
+            Ok(())
         }
 
-        #[test]
-        fn test_which_names_can_be_qualified_oneof() {
+        fn test_which_names_can_be_qualified_oneof(syntax: Syntax) -> Result<(), &'static str> {
             /* Check that base case is actually correct before we start qualifying names */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof a {
                     int32 field_name = 1;
                 }"#
             )
-            .is_ok());
+            .is_ok(), None)?;
 
             /* Oneof field types CAN be qualified */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof a {
                     Qualified.Name field_name = 1;
                 }"#
             )
-            .is_ok());
+            .is_ok(), None)?;
 
             /* Oneof names CANNOT be qualified */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof qualified.name {
                     int32 field_name = 1;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
 
             /* Oneof field names CANNOT be qualified */
-            assert!(one_of(
+            result_assert(one_of(syntax)(
                 r#"oneof a {
                     int32 qualified.name = 1;
                 }"#
             )
-            .is_err());
+            .is_err(), None)?;
+
+            Ok(())
         }
+
+        // remember to actually call the test functions!
+        test_syntaxes(move |syntax: Syntax| -> Result<(), &str> {
+            test_which_names_can_be_qualified_message(syntax)?;
+            test_which_names_can_be_qualified_enum()?;
+            test_which_names_can_be_qualified_oneof(syntax)?;
+            
+            Ok(())
+        });
     }
 
     #[test]
     fn enum_deprecated() {
         let e = enumerator(
-            r#"enum Reason {
-            HELLO                               = 0;
+                r#"enum Reason {
+                HELLO                               = 0;
 
-            SOME_FIELD                          = 1;
+                SOME_FIELD                          = 1;
 
-            SOME_OTHER_FIELD                    = 2;
-            BLA_BLA_BLA                         = 3;
-            THING                               = 9;    // comment
-            OTHER_THING                         = 10;   // comment & comment
-            ANOTHER_THING                       = 11;
-            AGAIN_A_THING                       = 12;
-            THINGY                              = 13;
-            THINGYTHINGY                        = 14; // comment
-            // comment
-            THINGYTHINGYTHINGY                  = 15 [deprecated=true];    // comment
-            THINGYTHINGYTHINGYTHINGY            = 16;
-            THINGYTHINGYTHINGYTHINGYTHINGY      = 17;
-            BLAB                                = 34;
-            BLABBLAB                            = 35;   // comment
-            BLABBLABBLAB                        = 36 [deprecated=true];   // comment
-            BLABBLABBLABBLAB                    = 37;   // comment
+                SOME_OTHER_FIELD                    = 2;
+                BLA_BLA_BLA                         = 3;
+                THING                               = 9;    // comment
+                OTHER_THING                         = 10;   // comment & comment
+                ANOTHER_THING                       = 11;
+                AGAIN_A_THING                       = 12;
+                THINGY                              = 13;
+                THINGYTHINGY                        = 14; // comment
+                // comment
+                THINGYTHINGYTHINGY                  = 15 [deprecated=true];    // comment
+                THINGYTHINGYTHINGYTHINGY            = 16;
+                THINGYTHINGYTHINGYTHINGYTHINGY      = 17;
+                BLAB                                = 34;
+                BLABBLAB                            = 35;   // comment
+                BLABBLABBLAB                        = 36 [deprecated=true];   // comment
+                BLABBLABBLABBLAB                    = 37;   // comment
 
-            BLABBLABBLABBLABBLAB                = 100;
-            HA                                  = 101;
-            HAHA                                = 102 [deprecated=true];
-            HAHAHA                              = 103;
-            HAHAHAHA                            = 104 [deprecated=true];
-            HAHAHAHAHA                          = 105 [deprecated=true];
-        }"#);
-        assert!(e.is_ok());
+                BLABBLABBLABBLABBLAB                = 100;
+                HA                                  = 101;
+                HAHA                                = 102 [deprecated=true];
+                HAHAHA                              = 103;
+                HAHAHAHA                            = 104 [deprecated=true];
+                HAHAHAHAHA                          = 105 [deprecated=true];
+            }"#);
+            assert!(e.is_ok());
     }
 }

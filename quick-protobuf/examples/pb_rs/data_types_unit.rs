@@ -42,7 +42,7 @@ impl<'a> From<&'a str> for test {
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct unit_message { }
 
 impl<'a> MessageRead<'a> for unit_message {

@@ -14,7 +14,7 @@ use quick_protobuf::sizeofs::*;
 use super::super::*;
 
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct ImportedMessage {
     pub i: Option<bool>,
 }
@@ -36,11 +36,11 @@ impl<'a> MessageRead<'a> for ImportedMessage {
 impl MessageWrite for ImportedMessage {
     fn get_size(&self) -> usize {
         0
-        + self.i.as_ref().map_or(0, |m| 1 + sizeof_varint(*(m) as u64))
+        + self.i.as_ref().map_or(0, |&m| 1 + sizeof_varint((m) as u64))
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
-        if let Some(ref s) = self.i { w.write_with_tag(8, |w| w.write_bool(*s))?; }
+        self.i.as_ref().map_or(Ok(()), |&m| w.write_with_tag(8, |w| w.write_bool(*&m)))?;
         Ok(())
     }
 }

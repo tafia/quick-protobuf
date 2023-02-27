@@ -9,13 +9,13 @@
 #![cfg_attr(rustfmt, rustfmt_skip)]
 
 
-use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result};
+use quick_protobuf::{MessageInfo, MessageRead, MessageWrite, BytesReader, Writer, WriterBackend, Result, PackedFixed, PackedFixedIntoIter, PackedFixedRefIter};
 use core::convert::{TryFrom, TryInto};
 use quick_protobuf::sizeofs::*;
 use super::super::*;
 
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct ImportedMessage {
     pub i: bool,
 }
@@ -37,7 +37,7 @@ impl<'a> MessageRead<'a> for ImportedMessage {
 impl MessageWrite for ImportedMessage {
     fn get_size(&self) -> usize {
         0
-        + if self.i == false { 0 } else { 1 + sizeof_varint(*(&self.i) as u64) }
+        + if self.i == false { 0 } else { 1 + sizeof_varint((self.i) as u64) }
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -55,4 +55,4 @@ impl MessageWrite for ImportedMessage {
                     Ok(ImportedMessage::from_reader(&mut reader, &buf)?)
                 }
             }
-
+            

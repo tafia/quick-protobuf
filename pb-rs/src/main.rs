@@ -107,6 +107,11 @@ fn run() -> Result<(), Error> {
                 .long("add-deprecated-fields")
                 .required(false)
                 .help("Add deprecated fields and mark them as #[deprecated]")
+        ).arg(
+            Arg::with_name("GENERATE_GETTERS")
+                .long("generate-getters")
+                .required(false)
+                .help("Generate getters for fields with custom default values.")
         ).get_matches();
 
     let in_files = path_vec(values_t!(matches, "INPUT", String));
@@ -138,7 +143,8 @@ fn run() -> Result<(), Error> {
     .gen_info(matches.is_present("GEN_INFO"))
     .custom_repr(custom_repr)
     .owned(matches.is_present("OWNED"))
-    .add_deprecated_fields(matches.is_present("ADD_DEPRECATED_FIELDS"));
+    .add_deprecated_fields(matches.is_present("ADD_DEPRECATED_FIELDS"))
+    .generate_getters(matches.is_present("GENERATE_GETTERS"));
 
     FileDescriptor::run(&compiler.build())
 }
