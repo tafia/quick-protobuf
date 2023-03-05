@@ -37,7 +37,7 @@ impl<'a> MessageRead<'a> for ImportedMessage {
 impl MessageWrite for ImportedMessage {
     fn get_size(&self) -> usize {
         0
-        + if self.i == false { 0 } else { 1 + sizeof_varint((self.i) as u64) }
+        + if self.i == false { 0 } else { 1 + sizeof_varint(self.i as u64) }
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {

@@ -526,33 +526,6 @@ fn enumerator(input: &str) -> IResult<&str, Enumerator> {
     )(input)
 }
 
-// fn enumerator() -> impl FnMut(&str) -> IResult<&str, Enumerator> {
-//     move |input| {
-//         map_res(
-//             terminated(
-//                 pair(
-//                     delimited(pair(tag("enum"), many1(br)), word, many0(br)),
-//                     delimited(tag("{"), many0(enum_event), tag("}")),
-
-//                 ),
-//                 opt(pair(many0(br), tag(";"))),
-//             ),
-//             |(name, events)| {
-//                 let mut enumerator = Enumerator {
-//                     name,
-//                     ..Default::default()
-//                 };
-//                 for event in events {
-//                     if let EnumEvent::Field(f) = event {
-//                         enumerator.fields.push(f);
-//                     }
-//                 }
-//                 Ok::<Enumerator, &str>(enumerator)
-//             }
-//         )(input)
-//     }
-// }
-
 fn option_ignore(input: &str) -> IResult<&str, ()> {
     value((), delimited(pair(tag("option"), many1(br)), take_until(";"), tag(";")))(input)
 }

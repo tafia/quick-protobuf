@@ -196,7 +196,7 @@ impl ConfigBuilder {
         self
     }
 
-    /// Generate getters for fields with custom default values
+    /// Generate getters for Proto2 `optional` fields with custom default values
     pub fn generate_getters(mut self, val: bool) -> Self {
         self.generate_getters = val;
         self

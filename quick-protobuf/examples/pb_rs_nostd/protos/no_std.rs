@@ -72,8 +72,8 @@ impl<'a> MessageRead<'a> for EmbeddedMessage {
 impl MessageWrite for EmbeddedMessage {
     fn get_size(&self) -> usize {
         0
-        + if self.val == 0i32 { 0 } else { 1 + sizeof_varint((self.val) as u64) }
-        + if self.e == protos::no_std::MyEnum::Val0 { 0 } else { 1 + sizeof_varint((self.e) as u64) }
+        + if self.val == 0i32 { 0 } else { 1 + sizeof_varint(self.val as u64) }
+        + if self.e == protos::no_std::MyEnum::Val0 { 0 } else { 1 + sizeof_varint(self.e as u64) }
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -114,15 +114,15 @@ impl<'a> MessageWrite for NoStdMessage<'a> {
         0
         + if self.num == 0u32 { 0 } else { 1 + 4 }
         + if self.nums.is_empty() { 0 } else { 1 + sizeof_len(self.nums.len() * 4) }
-        + 1 + sizeof_len((self.message).get_size())
-        + self.messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
+        + 1 + sizeof_len(self.message.get_size())
+        + self.messages.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.num != 0u32 { w.write_with_tag(13, |w| w.write_fixed32(*&self.num))?; }
-                w.write_packed_fixed_with_tag(18, &self.nums)?;
+        w.write_packed_fixed_with_tag(18, &self.nums)?;
         w.write_with_tag(26, |w| w.write_message(&self.message))?;
-                for s in &self.messages { w.write_with_tag(34, |w| w.write_message(s))?; }
+        for s in &self.messages { w.write_with_tag(34, |w| w.write_message(s))?; }
         Ok(())
     }
 }
