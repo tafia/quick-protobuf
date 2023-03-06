@@ -72,7 +72,7 @@ impl<'a> MessageRead<'a> for BarMessage {
 impl MessageWrite for BarMessage {
     fn get_size(&self) -> usize {
         0
-        + if self.b_int32 == 0i32 { 0 } else { 1 + sizeof_varint(self.b_int32 as u64) }
+        + if self.b_int32 == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.b_int32) as u64) }
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -175,38 +175,38 @@ impl<'a> MessageRead<'a> for FooMessage<'a> {
 impl<'a> MessageWrite for FooMessage<'a> {
     fn get_size(&self) -> usize {
         0
-        + if self.f_int32 == 0i32 { 0 } else { 1 + sizeof_varint(self.f_int32 as u64) }
-        + if self.f_int64 == 0i64 { 0 } else { 1 + sizeof_varint(self.f_int64 as u64) }
-        + if self.f_uint32 == 0u32 { 0 } else { 1 + sizeof_varint(self.f_uint32 as u64) }
-        + if self.f_uint64 == 0u64 { 0 } else { 1 + sizeof_varint(self.f_uint64 as u64) }
-        + if self.f_sint32 == 0i32 { 0 } else { 1 + sizeof_sint32(self.f_sint32) }
-        + if self.f_sint64 == 0i64 { 0 } else { 1 + sizeof_sint64(self.f_sint64) }
-        + if self.f_bool == false { 0 } else { 1 + sizeof_varint(self.f_bool as u64) }
-        + if self.f_FooEnum == data_types::FooEnum::FIRST_VALUE { 0 } else { 1 + sizeof_varint(self.f_FooEnum as u64) }
+        + if self.f_int32 == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.f_int32) as u64) }
+        + if self.f_int64 == 0i64 { 0 } else { 1 + sizeof_varint(*(&self.f_int64) as u64) }
+        + if self.f_uint32 == 0u32 { 0 } else { 1 + sizeof_varint(*(&self.f_uint32) as u64) }
+        + if self.f_uint64 == 0u64 { 0 } else { 1 + sizeof_varint(*(&self.f_uint64) as u64) }
+        + if self.f_sint32 == 0i32 { 0 } else { 1 + sizeof_sint32(*(&self.f_sint32)) }
+        + if self.f_sint64 == 4i64 { 0 } else { 1 + sizeof_sint64(*(&self.f_sint64)) }
+        + if self.f_bool == true { 0 } else { 1 + sizeof_varint(*(&self.f_bool) as u64) }
+        + if self.f_FooEnum == data_types::FooEnum::FIRST_VALUE { 0 } else { 1 + sizeof_varint(*(&self.f_FooEnum) as u64) }
         + if self.f_fixed64 == 0u64 { 0 } else { 1 + 8 }
         + if self.f_sfixed64 == 0i64 { 0 } else { 1 + 8 }
         + if self.f_fixed32 == 0u32 { 0 } else { 1 + 4 }
         + if self.f_sfixed32 == 0i32 { 0 } else { 1 + 4 }
         + if self.f_double == 0f64 { 0 } else { 1 + 8 }
         + if self.f_float == 0f32 { 0 } else { 1 + 4 }
-        + if self.f_bytes == Cow::Borrowed(b"") { 0 } else { 1 + sizeof_len(self.f_bytes.len()) }
-        + if self.f_string == Cow::Borrowed("") { 0 } else { 2 + sizeof_len(self.f_string.len()) }
-        + self.f_self_message.as_ref().map_or(0, |m| 2 + sizeof_len(m.get_size()))
-        + 2 + sizeof_len(self.f_bar_message.get_size())
-        + if self.f_repeated_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_int32.iter().map(|&s| sizeof_varint(s as u64)).sum::<usize>()) }
-        + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_packed_int32.iter().map(|&s| sizeof_varint(s as u64)).sum::<usize>()) }
+        + if self.f_bytes == Cow::Borrowed(b"") { 0 } else { 1 + sizeof_len((&self.f_bytes).len()) }
+        + if self.f_string == Cow::Borrowed("") { 0 } else { 2 + sizeof_len((&self.f_string).len()) }
+        + self.f_self_message.as_ref().map_or(0, |m| 2 + sizeof_len((m).get_size()))
+        + 2 + sizeof_len((self.f_bar_message).get_size())
+        + if self.f_repeated_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_int32.iter().map(|&s| sizeof_varint(*(&s) as u64)).sum::<usize>()) }
+        + if self.f_repeated_packed_int32.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_packed_int32.iter().map(|&s| sizeof_varint(*(&s) as u64)).sum::<usize>()) }
         + if self.f_repeated_packed_float.is_empty() { 0 } else { 2 + sizeof_len(self.f_repeated_packed_float.len() * 4) }
-        + 2 + sizeof_len(self.f_imported.get_size())
-        + 2 + sizeof_len(self.f_baz.get_size())
-        + 2 + sizeof_len(self.f_nested.get_size())
-        + if self.f_nested_enum == data_types::mod_BazMessage::mod_Nested::NestedEnum::Foo { 0 } else { 2 + sizeof_varint(self.f_nested_enum as u64) }
-        + self.f_map.iter().map(|(k, &v)| 2 + sizeof_len(2 + sizeof_len(k.len()) + sizeof_varint(v as u64))).sum::<usize>()
-        + self.f_repeated_string.iter().map(|s| 2 + sizeof_len(s.len())).sum::<usize>()
-        + self.f_repeated_baz_message.iter().map(|s| 2 + sizeof_len(s.get_size())).sum::<usize>()
+        + 2 + sizeof_len((self.f_imported).get_size())
+        + 2 + sizeof_len((self.f_baz).get_size())
+        + 2 + sizeof_len((self.f_nested).get_size())
+        + if self.f_nested_enum == data_types::mod_BazMessage::mod_Nested::NestedEnum::Foo { 0 } else { 2 + sizeof_varint(*(&self.f_nested_enum) as u64) }
+        + self.f_map.iter().map(|(k, &v)| 2 + sizeof_len(2 + sizeof_len((&k).len()) + sizeof_varint(*(&v) as u64))).sum::<usize>()
+        + self.f_repeated_string.iter().map(|s| 2 + sizeof_len((&s).len())).sum::<usize>()
+        + self.f_repeated_baz_message.iter().map(|s| 2 + sizeof_len((s).get_size())).sum::<usize>()
         + match &self.test_oneof {
-            mod_FooMessage::OneOftest_oneof::f1(m) => 2 + sizeof_varint(*m as u64),
-            mod_FooMessage::OneOftest_oneof::f2(m) => 2 + sizeof_varint(*m as u64),
-            mod_FooMessage::OneOftest_oneof::f3(ref m) => 2 + sizeof_len(m.len()),
+            mod_FooMessage::OneOftest_oneof::f1(m) => 2 + sizeof_varint(*(&*m) as u64),
+            mod_FooMessage::OneOftest_oneof::f2(m) => 2 + sizeof_varint(*(&*m) as u64),
+            mod_FooMessage::OneOftest_oneof::f3(ref m) => 2 + sizeof_len((&m).len()),
             mod_FooMessage::OneOftest_oneof::None => 0,
         }
     }
@@ -217,9 +217,9 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if self.f_uint32 != 0u32 { w.write_with_tag(24, |w| w.write_uint32(*&self.f_uint32))?; }
         if self.f_uint64 != 0u64 { w.write_with_tag(32, |w| w.write_uint64(*&self.f_uint64))?; }
         if self.f_sint32 != 0i32 { w.write_with_tag(40, |w| w.write_sint32(*&self.f_sint32))?; }
-        if self.f_sint64 != 0i64 { w.write_with_tag(48, |w| w.write_sint64(*&self.f_sint64))?; }
-        if self.f_bool != false { w.write_with_tag(56, |w| w.write_bool(*&self.f_bool))?; }
-        if self.f_FooEnum != data_types::FooEnum::FIRST_VALUE { w.write_with_tag(64, |w| w.write_enum(self.f_FooEnum as i32))?; }
+        if self.f_sint64 != 4i64 { w.write_with_tag(48, |w| w.write_sint64(*&self.f_sint64))?; }
+        if self.f_bool != true { w.write_with_tag(56, |w| w.write_bool(*&self.f_bool))?; }
+        if self.f_FooEnum != data_types::FooEnum::FIRST_VALUE { w.write_with_tag(64, |w| w.write_enum(*&self.f_FooEnum as i32))?; }
         if self.f_fixed64 != 0u64 { w.write_with_tag(73, |w| w.write_fixed64(*&self.f_fixed64))?; }
         if self.f_sfixed64 != 0i64 { w.write_with_tag(81, |w| w.write_sfixed64(*&self.f_sfixed64))?; }
         if self.f_fixed32 != 0u32 { w.write_with_tag(93, |w| w.write_fixed32(*&self.f_fixed32))?; }
@@ -230,14 +230,14 @@ impl<'a> MessageWrite for FooMessage<'a> {
         if self.f_string != Cow::Borrowed("") { w.write_with_tag(130, |w| w.write_string(&self.f_string))?; }
         self.f_self_message.as_ref().map_or(Ok(()), |m| w.write_with_tag(138, |w| w.write_message(&*(*(m)))))?;
         w.write_with_tag(146, |w| w.write_message(&self.f_bar_message))?;
-        w.write_packed_with_tag(154, &self.f_repeated_int32, |w, &m| w.write_int32(*&m), &|&m| sizeof_varint(m as u64))?;
-        w.write_packed_with_tag(162, &self.f_repeated_packed_int32, |w, &m| w.write_int32(*&m), &|&m| sizeof_varint(m as u64))?;
+        w.write_packed_with_tag(154, &self.f_repeated_int32, |w, &m| w.write_int32(*&m), &|&m| sizeof_varint(*(&m) as u64))?;
+        w.write_packed_with_tag(162, &self.f_repeated_packed_int32, |w, &m| w.write_int32(*&m), &|&m| sizeof_varint(*(&m) as u64))?;
         w.write_packed_fixed_with_tag(170, &self.f_repeated_packed_float)?;
         w.write_with_tag(178, |w| w.write_message(&self.f_imported))?;
         w.write_with_tag(186, |w| w.write_message(&self.f_baz))?;
         w.write_with_tag(194, |w| w.write_message(&self.f_nested))?;
-        if self.f_nested_enum != data_types::mod_BazMessage::mod_Nested::NestedEnum::Foo { w.write_with_tag(200, |w| w.write_enum(self.f_nested_enum as i32))?; }
-        for (k, &v) in self.f_map.iter() { w.write_with_tag(210, |w| w.write_map(2 + sizeof_len(k.len()) + sizeof_varint(v as u64), 10, |w| w.write_string(k), 16, |w| w.write_int32(*&v)))?; }
+        if self.f_nested_enum != data_types::mod_BazMessage::mod_Nested::NestedEnum::Foo { w.write_with_tag(200, |w| w.write_enum(*&self.f_nested_enum as i32))?; }
+        for (k, &v) in self.f_map.iter() { w.write_with_tag(210, |w| w.write_map(2 + sizeof_len((&k).len()) + sizeof_varint(*(&v) as u64), 10, |w| w.write_string(k), 16, |w| w.write_int32(*&v)))?; }
         for s in &self.f_repeated_string { w.write_with_tag(242, |w| w.write_string(s))?; }
         for s in &self.f_repeated_baz_message { w.write_with_tag(250, |w| w.write_message(s))?; }
         match &self.test_oneof {
@@ -397,9 +397,9 @@ impl<'a> MessageRead<'a> for BazMessage<'a> {
 impl<'a> MessageWrite for BazMessage<'a> {
     fn get_size(&self) -> usize {
         0
-        + 1 + sizeof_len(self.nested.get_size())
-        + if self.b_int64 == 0i64 { 0 } else { 1 + sizeof_varint(self.b_int64 as u64) }
-        + if self.b_string == Cow::Borrowed("") { 0 } else { 1 + sizeof_len(self.b_string.len()) }
+        + 1 + sizeof_len((self.nested).get_size())
+        + if self.b_int64 == 0i64 { 0 } else { 1 + sizeof_varint(*(&self.b_int64) as u64) }
+        + if self.b_string == Cow::Borrowed("") { 0 } else { 1 + sizeof_len((&self.b_string).len()) }
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -537,7 +537,7 @@ impl<'a> MessageRead<'a> for Nested {
 impl MessageWrite for Nested {
     fn get_size(&self) -> usize {
         0
-        + 1 + sizeof_len(self.f_nested.get_size())
+        + 1 + sizeof_len((self.f_nested).get_size())
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -583,7 +583,7 @@ impl<'a> MessageRead<'a> for NestedMessage {
 impl MessageWrite for NestedMessage {
     fn get_size(&self) -> usize {
         0
-        + if self.f_nested == 0i32 { 0 } else { 1 + sizeof_varint(self.f_nested as u64) }
+        + if self.f_nested == 0i32 { 0 } else { 1 + sizeof_varint(*(&self.f_nested) as u64) }
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
@@ -664,7 +664,7 @@ impl<'a> MessageRead<'a> for RepeatedMessage {
 impl MessageWrite for RepeatedMessage {
     fn get_size(&self) -> usize {
         0
-        + self.bar_message.iter().map(|s| 1 + sizeof_len(s.get_size())).sum::<usize>()
+        + self.bar_message.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {

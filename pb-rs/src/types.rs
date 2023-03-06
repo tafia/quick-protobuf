@@ -344,7 +344,6 @@ impl FieldType {
                 let m = m.get_message(desc);
                 format!("{}{}::default()", m.get_modules(desc), m.name)
             }
-            // FieldType::Map(..) => "HashMap::new()".to_owned(),
             _ => unreachable!(),
         }
     }
@@ -461,18 +460,18 @@ impl FieldType {
             | FieldType::Uint32
             | FieldType::Uint64
             | FieldType::Bool
-            | FieldType::Enum(_) => format!("sizeof_varint({} as u64)", s),
-            FieldType::Sint32 => format!("sizeof_sint32({})", s),
-            FieldType::Sint64 => format!("sizeof_sint64({})", s),
+            | FieldType::Enum(_) => format!("sizeof_varint(*(&{}) as u64)", s),
+            FieldType::Sint32 => format!("sizeof_sint32(*(&{}))", s),
+            FieldType::Sint64 => format!("sizeof_sint64(*(&{}))", s),
 
             FieldType::Fixed64 | FieldType::Sfixed64 | FieldType::Double => "8".to_string(),
             FieldType::Fixed32 | FieldType::Sfixed32 | FieldType::Float => "4".to_string(),
 
-            FieldType::StringCow | FieldType::BytesCow => format!("sizeof_len({}.len())", s),
+            FieldType::StringCow | FieldType::BytesCow => format!("sizeof_len((&{}).len())", s),
 
             FieldType::String_ | FieldType::Bytes_ => format!("sizeof_len({}.len())", s),
 
-            FieldType::Message(_) => format!("sizeof_len({}.get_size())", s),
+            FieldType::Message(_) => format!("sizeof_len(({}).get_size())", s),
 
             FieldType::Map(ref k, ref v) => {
                 format!("2 + {} + {}", k.get_size("k"), v.get_size("v"))
@@ -483,7 +482,7 @@ impl FieldType {
 
     fn get_write(&self, s: &str, boxed: bool) -> String {
         match *self {
-            FieldType::Enum(_) => format!("write_enum({} as i32)", s),
+            FieldType::Enum(_) => format!("write_enum(*&{} as i32)", s),
 
             FieldType::Int32
             | FieldType::Sint32
@@ -717,12 +716,12 @@ impl Field {
             w,
             "            {}: {},",
             self.name,
-            self.write_impl_default_field(desc, config)
+            self.get_field_default(desc, config)
         )?;
         Ok(())
     }
 
-    fn write_impl_default_field(&self, desc: &FileDescriptor, config: &Config) -> String {
+    fn get_field_default(&self, desc: &FileDescriptor, config: &Config) -> String {
         match self.frequency.into() {
             GeneratedType::SingularType => {
                 if self.boxed {
@@ -986,7 +985,7 @@ impl Field {
 
                 let conditions_checked = {
                     let name = self.name.clone();
-                    let def = self.typ.singular_field_defaults(desc);
+                    let def = self.get_field_default(desc, config);
                     let m_size_addition = get_size_addition(self, tag_size, "m");
                     let self_name_size_addition =
                         get_size_addition(self, tag_size, format!("self.{name}").as_str());
@@ -1170,7 +1169,7 @@ impl Field {
                 // Check for conditions if necessary
                 let conditions_checked = {
                     let name = self.name.clone();
-                    let def = self.typ.singular_field_defaults(desc);
+                    let def = self.get_field_default(desc, config);
                     let m_core = apply_unwrapping_code(self, false, "m");
                     let self_name_core = apply_unwrapping_code(self, false, format!("self.{name}").as_str());
                     let m_write_method = get_write_method(self, m_core.as_str());
