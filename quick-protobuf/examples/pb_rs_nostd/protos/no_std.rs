@@ -48,7 +48,7 @@ impl<'a> From<&'a str> for MyEnum {
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct EmbeddedMessage {
     pub val: i32,
     pub e: protos::no_std::MyEnum,
@@ -84,11 +84,11 @@ impl MessageWrite for EmbeddedMessage {
 }
 
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct NoStdMessage<'a> {
     pub num: u32,
     pub nums: PackedFixed<'a, u32>,
-    pub message: Option<protos::no_std::EmbeddedMessage>,
+    pub message: protos::no_std::EmbeddedMessage,
     pub messages: Vec<protos::no_std::EmbeddedMessage>,
 }
 
@@ -99,7 +99,7 @@ impl<'a> MessageRead<'a> for NoStdMessage<'a> {
             match r.next_tag(bytes) {
                 Ok(13) => msg.num = r.read_fixed32(bytes)?,
                 Ok(18) => msg.nums = r.read_packed_fixed(bytes)?,
-                Ok(26) => msg.message = Some(r.read_message::<protos::no_std::EmbeddedMessage>(bytes)?),
+                Ok(26) => msg.message = r.read_message::<protos::no_std::EmbeddedMessage>(bytes)?,
                 Ok(34) => msg.messages.push(r.read_message::<protos::no_std::EmbeddedMessage>(bytes)?),
                 Ok(t) => { r.read_unknown(bytes, t)?; }
                 Err(e) => return Err(e),
@@ -114,14 +114,14 @@ impl<'a> MessageWrite for NoStdMessage<'a> {
         0
         + if self.num == 0u32 { 0 } else { 1 + 4 }
         + if self.nums.is_empty() { 0 } else { 1 + sizeof_len(self.nums.len() * 4) }
-        + self.message.as_ref().map_or(0, |m| 1 + sizeof_len((m).get_size()))
+        + 1 + sizeof_len((self.message).get_size())
         + self.messages.iter().map(|s| 1 + sizeof_len((s).get_size())).sum::<usize>()
     }
 
     fn write_message<W: WriterBackend>(&self, w: &mut Writer<W>) -> Result<()> {
         if self.num != 0u32 { w.write_with_tag(13, |w| w.write_fixed32(*&self.num))?; }
         w.write_packed_fixed_with_tag(18, &self.nums)?;
-        if let Some(ref s) = self.message { w.write_with_tag(26, |w| w.write_message(s))?; }
+        w.write_with_tag(26, |w| w.write_message(&self.message))?;
         for s in &self.messages { w.write_with_tag(34, |w| w.write_message(s))?; }
         Ok(())
     }

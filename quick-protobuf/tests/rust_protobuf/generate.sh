@@ -24,6 +24,8 @@ custom_pbrs_args["v2/test_owned_pb.proto"]="--owned"
 custom_pbrs_args["v3/test_owned_pb.proto"]="--owned"
 custom_pbrs_args["v2/test_deprecated_lifetime_can_compile.proto"]="--add-deprecated-fields"
 custom_pbrs_args["v3/test_deprecated_lifetime_can_compile.proto"]="--add-deprecated-fields"
+custom_pbrs_args["v2/test_default_values_dont_use_cow_pb.proto"]="--dont_use_cow --generate-getters"
+custom_pbrs_args["v2/test_default_values_pb.proto"]="--generate-getters"
 
 # Combined stdout and stderr for codegen of unexpectedly failed file.
 declare -A outs

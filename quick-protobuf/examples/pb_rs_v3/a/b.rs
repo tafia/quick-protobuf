@@ -14,7 +14,7 @@ use quick_protobuf::sizeofs::*;
 use super::super::*;
 
 #[allow(clippy::derive_partial_eq_without_eq)]
-#[derive(Debug, Default, PartialEq, Clone)]
+#[derive(Default, Debug, PartialEq, Clone)]
 pub struct ImportedMessage {
     pub i: bool,
 }

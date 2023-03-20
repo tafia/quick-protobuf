@@ -63,6 +63,7 @@ pub struct ConfigBuilder {
     hashbrown: bool,
     gen_info: bool,
     add_deprecated_fields: bool,
+    generate_getters: bool,
 }
 
 impl ConfigBuilder {
@@ -195,6 +196,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Generate getters for Proto2 `optional` fields with custom default values
+    pub fn generate_getters(mut self, val: bool) -> Self {
+        self.generate_getters = val;
+        self
+    }
+
     /// Build [Config] from this `ConfigBuilder`
     pub fn build(self) -> Vec<Config> {
         self.in_files
@@ -228,6 +235,7 @@ impl ConfigBuilder {
                     hashbrown: self.hashbrown,
                     gen_info: self.gen_info,
                     add_deprecated_fields: self.add_deprecated_fields,
+                    generate_getters: self.generate_getters,
                 }
             })
             .collect()
