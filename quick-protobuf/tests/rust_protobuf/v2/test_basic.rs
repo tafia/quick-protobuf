@@ -277,7 +277,7 @@ impl Arbitrary for TestTypesSingular<'static> {
             string_field: Some(Cow::from(String::arbitrary(g))),
             bytes_field: {
                 // generate random size vec filled with random vals
-                
+
                 // cap capacity / len of generated vec, we don't want to have
                 // huge memory usage
                 const CAP: usize = 10000;

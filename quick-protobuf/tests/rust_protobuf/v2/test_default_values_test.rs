@@ -12,25 +12,28 @@ fn test_default_value_simple() {
     let mut reader = BytesReader::from_bytes(bytes);
     let d = TestDefaultValuesOptional::from_reader(&mut reader, bytes).unwrap();
 
-    assert_eq!(d, TestDefaultValuesOptional {
-        double_field: None,
-        float_field: None,
-        int32_field: None,
-        int64_field: None,
-        uint32_field: None,
-        uint64_field: None,
-        sint32_field: None,
-        sint64_field: None,
-        fixed32_field: None,
-        fixed64_field: None,
-        sfixed32_field: None,
-        sfixed64_field: None,
-        bool_field: None,
-        string_field: None,
-        bytes_field: None,
-        enum_field: None,
-        enum_field_without_default: None,
-    });
+    assert_eq!(
+        d,
+        TestDefaultValuesOptional {
+            double_field: None,
+            float_field: None,
+            int32_field: None,
+            int64_field: None,
+            uint32_field: None,
+            uint64_field: None,
+            sint32_field: None,
+            sint64_field: None,
+            fixed32_field: None,
+            fixed64_field: None,
+            sfixed32_field: None,
+            sfixed64_field: None,
+            bool_field: None,
+            string_field: None,
+            bytes_field: None,
+            enum_field: None,
+            enum_field_without_default: None,
+        }
+    );
 
     assert_eq!(1.0, TestDefaultValuesOptional::DEFAULT_double_field);
     assert_eq!(2.0, TestDefaultValuesOptional::DEFAULT_float_field);
@@ -46,8 +49,14 @@ fn test_default_value_simple() {
     assert_eq!(12, TestDefaultValuesOptional::DEFAULT_sfixed64_field);
     assert_eq!(true, TestDefaultValuesOptional::DEFAULT_bool_field);
     assert_eq!("abc\n22", TestDefaultValuesOptional::DEFAULT_string_field);
-    assert_eq!(Cow::Borrowed(b"cde\n33"), TestDefaultValuesOptional::DEFAULT_bytes_field);
-    assert_eq!(EnumForDefaultValue::TWO, TestDefaultValuesOptional::DEFAULT_enum_field);
+    assert_eq!(
+        Cow::Borrowed(b"cde\n33"),
+        TestDefaultValuesOptional::DEFAULT_bytes_field
+    );
+    assert_eq!(
+        EnumForDefaultValue::TWO,
+        TestDefaultValuesOptional::DEFAULT_enum_field
+    );
 
     // Under our current system, we do NOT generate getters for fields without
     // custom defaults.
@@ -85,20 +94,29 @@ fn test_default_value_extreme() {
     let bytes = &[];
     let mut reader = BytesReader::from_bytes(bytes);
     let d = TestExtremeDefaultValues::from_reader(&mut reader, bytes).unwrap();
-    assert_eq!(d, TestExtremeDefaultValues {
-        inf_double: None,
-        neg_inf_double: None,
-        nan_double: None,
-        inf_float: None,
-        neg_inf_float: None,
-        nan_float: None,
-    });
+    assert_eq!(
+        d,
+        TestExtremeDefaultValues {
+            inf_double: None,
+            neg_inf_double: None,
+            nan_double: None,
+            inf_float: None,
+            neg_inf_float: None,
+            nan_float: None,
+        }
+    );
 
     assert_eq!(f64::INFINITY, TestExtremeDefaultValues::DEFAULT_inf_double);
-    assert_eq!(f64::NEG_INFINITY, TestExtremeDefaultValues::DEFAULT_neg_inf_double);
+    assert_eq!(
+        f64::NEG_INFINITY,
+        TestExtremeDefaultValues::DEFAULT_neg_inf_double
+    );
     assert!(TestExtremeDefaultValues::DEFAULT_nan_double.is_nan());
     assert_eq!(f32::INFINITY, TestExtremeDefaultValues::DEFAULT_inf_float);
-    assert_eq!(f32::NEG_INFINITY, TestExtremeDefaultValues::DEFAULT_neg_inf_float);
+    assert_eq!(
+        f32::NEG_INFINITY,
+        TestExtremeDefaultValues::DEFAULT_neg_inf_float
+    );
     assert!(TestExtremeDefaultValues::DEFAULT_nan_float.is_nan());
 }
 
@@ -107,13 +125,22 @@ fn test_default_value_simple_dont_use_cow() {
     let bytes = &[];
     let mut reader = BytesReader::from_bytes(bytes);
     let d = TestDefaultValuesDontUseCowOptional::from_reader(&mut reader, bytes).unwrap();
-    assert_eq!(d, TestDefaultValuesDontUseCowOptional {
-        string_field: None,
-        bytes_field: None,
-    });
+    assert_eq!(
+        d,
+        TestDefaultValuesDontUseCowOptional {
+            string_field: None,
+            bytes_field: None,
+        }
+    );
 
-    assert_eq!("abc\n22", TestDefaultValuesDontUseCowOptional::DEFAULT_string_field);
-    assert_eq!(b"cde\n33", TestDefaultValuesDontUseCowOptional::DEFAULT_bytes_field);
+    assert_eq!(
+        "abc\n22",
+        TestDefaultValuesDontUseCowOptional::DEFAULT_string_field
+    );
+    assert_eq!(
+        b"cde\n33",
+        TestDefaultValuesDontUseCowOptional::DEFAULT_bytes_field
+    );
 }
 
 #[test]

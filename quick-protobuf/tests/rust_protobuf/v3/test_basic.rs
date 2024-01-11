@@ -296,7 +296,7 @@ fn test_defaults() {
             enum_field: None,
         }
     );
-    
+
     assert_eq!(a.double_field, b.double_field.unwrap_or_default());
     assert_eq!(a.float_field, b.float_field.unwrap_or_default());
     assert_eq!(a.int32_field, b.int32_field.unwrap_or_default());

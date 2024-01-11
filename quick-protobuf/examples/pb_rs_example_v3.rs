@@ -49,9 +49,7 @@ fn main() {
         f_repeated_string: vec![Cow::Borrowed("goat"), Cow::Borrowed("running")],
         f_repeated_baz_message: vec![BazMessage {
             nested: data_types::mod_BazMessage::Nested {
-                f_nested: data_types::mod_BazMessage::mod_Nested::NestedMessage {
-                    f_nested: 2,
-                },
+                f_nested: data_types::mod_BazMessage::mod_Nested::NestedMessage { f_nested: 2 },
             },
             b_int64: 10,
             b_string: Cow::Borrowed("boom\n"),
