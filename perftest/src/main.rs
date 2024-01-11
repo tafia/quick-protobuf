@@ -27,7 +27,9 @@ const SEED: [u8; 16] = [
 fn measure<R: Debug + PartialEq, F: FnMut() -> R>(iter: u128, mut f: F, check: Option<&R>) -> u128 {
     let start = Instant::now();
     let r = f();
-    check.map(|c| assert_eq!(c, &r));
+    if let Some(c) = check {
+        assert_eq!(c, &r);
+    }
     (Instant::now() - start).as_nanos() / iter
 }
 
@@ -122,7 +124,7 @@ impl TestRunner {
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
+            let item = &data[rng.gen_range(0, data.len())];
             random_data.push(item.clone());
             total_size += item.get_size() as u32;
         }
@@ -183,7 +185,7 @@ impl TestRunner {
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
+            let item = &data[rng.gen_range(0, data.len())];
             random_data.push(item.clone());
             total_size += item.get_size() as u32;
         }
@@ -235,7 +237,7 @@ impl TestRunner {
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
+            let item = &data[rng.gen_range(0, data.len())];
             random_data.push(item.clone());
             total_size += item.get_size() as u32;
         }
@@ -290,7 +292,7 @@ impl TestRunner {
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
+            let item = &data[rng.gen_range(0, data.len())];
             random_data.push(item.clone());
             total_size += item.encoded_len() as u32;
         }
@@ -321,7 +323,7 @@ impl TestRunner {
             Some(&random_data),
         );
 
-        let tmp_buf = buf.clone();
+        let tmp_buf = buf;
         c[2] = measure(
             random_data.len() as u128,
             move || {
@@ -366,7 +368,7 @@ fn print_results(name: &str, a: &[u128], b: &[u128], c: &[u128], print_header: b
             "", "ns/iter", "ns/iter", "ns/iter", "%", "%"
         );
     }
-    println!("");
+    println!();
     println!("{}", name);
     for i in 0..3 {
         println!(
@@ -413,12 +415,8 @@ fn main() {
     if args.len() > 3 {
         panic!("usage: {} [data_size] [test]", args[0])
     }
-    let data_size = args
-        .iter()
-        .nth(1)
-        .map(|x| x.parse().unwrap())
-        .unwrap_or(1000000);
-    let selected = args.iter().nth(2).cloned();
+    let data_size = args.get(1).map(|x| x.parse().unwrap()).unwrap_or(1000000);
+    let selected = args.get(2).cloned();
 
     let mut runner = TestRunner {
         selected: selected,
@@ -427,7 +425,7 @@ fn main() {
     };
 
     let data = {
-        let mut is = File::open(&format!(
+        let mut is = File::open(format!(
             "{}/{}",
             env!("CARGO_MANIFEST_DIR"),
             "perftest_data.pbbin"

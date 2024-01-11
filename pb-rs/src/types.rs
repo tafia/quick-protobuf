@@ -20,16 +20,11 @@ fn sizeof_varint(v: u32) -> usize {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum Syntax {
+    #[default]
     Proto2,
     Proto3,
-}
-
-impl Default for Syntax {
-    fn default() -> Syntax {
-        Syntax::Proto2
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1983,7 +1978,7 @@ impl Message {
             if let Some(var) = f.default.as_ref() {
                 if let FieldType::Enum(ref e) = f.typ {
                     let e = e.get_enum(desc);
-                    e.fields.iter().find(|&(ref name, _)| name == var)
+                    e.fields.iter().find(|(name, _)| name == var)
                     .ok_or_else(|| Error::InvalidDefaultEnum(format!(
                                 "Error in message {}\n\
                                 Enum field {:?} has a default value '{}' which is not valid for enum index {:?}",
@@ -2187,7 +2182,7 @@ impl Enumerator {
     fn write_definition<W: Write>(&self, w: &mut W) -> Result<()> {
         writeln!(w, "#[derive(Debug, PartialEq, Eq, Clone, Copy)]")?;
         writeln!(w, "pub enum {} {{", self.name)?;
-        for &(ref f, ref number) in &self.fields {
+        for (f, number) in &self.fields {
             writeln!(w, "    {} = {},", f, number)?;
         }
         writeln!(w, "}}")?;
@@ -2208,7 +2203,7 @@ impl Enumerator {
         writeln!(w, "impl From<i32> for {} {{", self.name)?;
         writeln!(w, "    fn from(i: i32) -> Self {{")?;
         writeln!(w, "        match i {{")?;
-        for &(ref f, ref number) in &self.fields {
+        for (f, ref number) in &self.fields {
             writeln!(w, "            {} => {}::{},", number, self.name, f)?;
         }
         writeln!(w, "            _ => Self::default(),")?;
@@ -2222,7 +2217,7 @@ impl Enumerator {
         writeln!(w, "impl<'a> From<&'a str> for {} {{", self.name)?;
         writeln!(w, "    fn from(s: &'a str) -> Self {{")?;
         writeln!(w, "        match s {{")?;
-        for &(ref f, _) in &self.fields {
+        for (f, _) in &self.fields {
             writeln!(w, "            {:?} => {}::{},", f, self.name, f)?;
         }
         writeln!(w, "            _ => Self::default(),")?;

@@ -32,9 +32,9 @@ pub enum Error {
 pub type Result<T> = ::core::result::Result<T, Error>;
 
 #[cfg(feature = "std")]
-impl Into<std::io::Error> for Error {
-    fn into(self) -> ::std::io::Error {
-        match self {
+impl From<Error> for std::io::Error {
+    fn from(val: Error) -> Self {
+        match val {
             Error::Io(x) => x,
             Error::Utf8(x) => std::io::Error::new(std::io::ErrorKind::InvalidData, x),
             x => std::io::Error::new(std::io::ErrorKind::Other, x),

@@ -38,7 +38,7 @@ fn main() {
     // protobuf
     protobuf_codegen_pure::Codegen::new()
         .out_dir("src")
-        .inputs(&["src/perftest_data.proto"])
+        .inputs(["src/perftest_data.proto"])
         .include("src")
         .run()
         .expect("protoc");
@@ -71,6 +71,6 @@ fn main() {
     let old = ::std::env::var("OUT_DIR");
     env::set_var("OUT_DIR", ".");
     prost_build::compile_protos(&["src/perftest_data.proto"], &["src"]).unwrap();
-    let _ = old.map(|val| env::set_var("OUT_DIR", &val));
+    let _ = old.map(|val| env::set_var("OUT_DIR", val));
     fs::rename("perftest_data.rs", "src/perftest_data_prost.rs").unwrap();
 }

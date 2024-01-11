@@ -1,4 +1,4 @@
-use crate::types::{FileDescriptor, Frequency, MessageIndex};
+use crate::types::{FileDescriptor, MessageIndex};
 use std::cmp::min;
 use std::collections::HashMap;
 
@@ -6,6 +6,7 @@ use std::collections::HashMap;
 ///
 /// Uses Tarjan's algorithm
 /// https://www.geeksforgeeks.org/tarjan-algorithm-find-strongly-connected-components/
+#[allow(clippy::too_many_arguments)]
 fn scc(
     vertices: &[MessageIndex],
     desc: &FileDescriptor,
