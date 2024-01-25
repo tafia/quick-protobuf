@@ -61,7 +61,7 @@ const WIRE_TYPE_FIXED32: u8 = 5;
 /// // FooBar is a message generated from a proto file
 /// // in parcicular it contains a `from_reader` function
 /// use foo_bar::FooBar;
-/// use quick_protobuf::{MessageRead, BytesReader};
+/// use quick_protobuf::{BytesReader, MessageRead};
 ///
 /// fn main() {
 ///     // bytes is a buffer on the data we want to deserialize
@@ -81,7 +81,11 @@ const WIRE_TYPE_FIXED32: u8 = 5;
 ///     //     let foobar: FooBar = r.read_message(&bytes).expect(...);
 ///     //     ...
 ///     // }
-///     println!("Found {} foos and {} bars", foobar.foos.len(), foobar.bars.len());
+///     println!(
+///         "Found {} foos and {} bars",
+///         foobar.foos.len(),
+///         foobar.bars.len()
+///     );
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -414,8 +418,7 @@ impl BytesReader {
     #[cfg_attr(std, inline)]
     pub fn read_bytes<'a>(&mut self, bytes: &'a [u8]) -> Result<&'a [u8]> {
         self.read_len_varint(bytes, |r, b| {
-            b.get(r.start..r.end)
-                .ok_or(Error::UnexpectedEndOfBuffer)
+            b.get(r.start..r.end).ok_or(Error::UnexpectedEndOfBuffer)
         })
     }
 
@@ -605,8 +608,8 @@ impl BytesReader {
 /// fn main() {
 ///     // create a reader, which will parse the protobuf binary file and pop events
 ///     // this reader will read the entire file into an internal buffer
-///     let mut reader = Reader::from_file("/path/to/binary/protobuf.bin")
-///         .expect("Cannot read input file");
+///     let mut reader =
+///         Reader::from_file("/path/to/binary/protobuf.bin").expect("Cannot read input file");
 ///
 ///     // Use the generated module fns with the reader to convert your data into rust structs.
 ///     //
@@ -618,12 +621,17 @@ impl BytesReader {
 ///     // let foobar = reader.read(FooBar::from_reader).expect("Cannot read FooBar message");
 ///     //
 ///     // Else to read a length then a message, you can use:
-///     let foobar: FooBar = reader.read(|r, b| r.read_message(b))
+///     let foobar: FooBar = reader
+///         .read(|r, b| r.read_message(b))
 ///         .expect("Cannot read FooBar message");
 ///     // Reader::read_message uses `FooBar::from_reader` internally through the `MessageRead`
 ///     // trait.
 ///
-///     println!("Found {} foos and {} bars!", foobar.foos.len(), foobar.bars.len());
+///     println!(
+///         "Found {} foos and {} bars!",
+///         foobar.foos.len(),
+///         foobar.bars.len()
+///     );
 /// }
 /// ```
 pub struct Reader {
@@ -703,7 +711,7 @@ pub fn deserialize_from_slice<'a, M: MessageRead<'a>>(bytes: &'a [u8]) -> Result
 /// `PackedFixed` variant that owns its own data (perhaps when setting the data
 /// themselves). It is mainly for this reason that the `Owned` variant is
 /// provided, which owns a `Vec<T>`.
-/// 
+///
 /// One implementation detail is that the `Owned` variant is always aligned, so
 /// no use of `read_unaligned` is necessary. Methods are provided to convert
 /// from `Borrowed` to `Owned`, if it is found that it helps compiler
@@ -837,9 +845,7 @@ impl<'a, T: Copy + PartialEq> PackedFixed<'a, T> {
     // This method is private and mainly to avoid repetition in code.
     fn make_owned_variant_from_unaligned_buf(&self) -> Self {
         match &self {
-            PackedFixed::Borrowed(_) => {
-                PackedFixed::Owned(self.make_vec_from_unaligned_buf())
-            }
+            PackedFixed::Borrowed(_) => PackedFixed::Owned(self.make_vec_from_unaligned_buf()),
             _ => unreachable!(),
         }
     }
@@ -1014,14 +1020,20 @@ fn test_packed_fixed_iter() {
 
 #[test]
 fn test_packed_fixed_eq() {
-    let v = vec![0x01u8, 0x00u8, 0x00u8, 0x00u8, 0x02u8, 0x00u8, 0x00u8, 0x00u8, 0x03u8, 0x00u8, 0x00u8, 0x00u8];
+    let v = vec![
+        0x01u8, 0x00u8, 0x00u8, 0x00u8, 0x02u8, 0x00u8, 0x00u8, 0x00u8, 0x03u8, 0x00u8, 0x00u8,
+        0x00u8,
+    ];
     let borrowed: PackedFixed<i32> = PackedFixed::Borrowed(&v);
     let mut owned: PackedFixed<i32> = borrowed.clone();
     owned.own();
 
-    let owned_reversed: PackedFixed<i32> = vec![3,2,1].into();
+    let owned_reversed: PackedFixed<i32> = vec![3, 2, 1].into();
 
-    let v_reversed = vec![0x03u8, 0x00u8, 0x00u8, 0x00u8, 0x02u8, 0x00u8, 0x00u8, 0x00u8, 0x01u8, 0x00u8, 0x00u8, 0x00u8];
+    let v_reversed = vec![
+        0x03u8, 0x00u8, 0x00u8, 0x00u8, 0x02u8, 0x00u8, 0x00u8, 0x00u8, 0x01u8, 0x00u8, 0x00u8,
+        0x00u8,
+    ];
     let borrowed_reversed: PackedFixed<i32> = PackedFixed::Borrowed(&v_reversed);
 
     let ndy: PackedFixed<i32> = PackedFixed::NoDataYet;

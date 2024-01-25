@@ -1,7 +1,7 @@
 extern crate quick_protobuf;
 
-use quick_protobuf::{sizeofs::*, PackedFixed};
 use quick_protobuf::{deserialize_from_slice, serialize_into_slice, serialize_into_vec};
+use quick_protobuf::{sizeofs::*, PackedFixed};
 use quick_protobuf::{
     BytesReader, MessageRead, MessageWrite, Reader, Result, Writer, WriterBackend,
 };

@@ -1,8 +1,8 @@
 //! A module to manage protobuf serialization
 
-use crate::PackedFixed;
 use crate::errors::{Error, Result};
 use crate::message::MessageWrite;
+use crate::PackedFixed;
 
 use byteorder::{ByteOrder, LittleEndian as LE};
 
@@ -209,7 +209,7 @@ impl<W: WriterBackend> Writer<W> {
             PackedFixed::Owned(contents) => {
                 let len = ::core::mem::size_of::<M>() * contents.len();
                 unsafe { ::core::slice::from_raw_parts(contents.as_ptr() as *const u8, len) }
-            },
+            }
         };
         self.write_bytes(bytes)
     }
@@ -262,7 +262,11 @@ impl<W: WriterBackend> Writer<W> {
     /// Writes tag then repeated field
     ///
     /// If array is empty, then do nothing (do not even write the tag)
-    pub fn write_packed_fixed_with_tag<M: Copy + PartialEq>(&mut self, tag: u32, pf: &PackedFixed<M>) -> Result<()> {
+    pub fn write_packed_fixed_with_tag<M: Copy + PartialEq>(
+        &mut self,
+        tag: u32,
+        pf: &PackedFixed<M>,
+    ) -> Result<()> {
         if pf.is_empty() {
             return Ok(());
         }
@@ -290,7 +294,9 @@ impl<W: WriterBackend> Writer<W> {
         let bytes = match pf {
             PackedFixed::NoDataYet => unreachable!(),
             PackedFixed::Borrowed(bytes) => &bytes[0..len],
-            PackedFixed::Owned(contents) => unsafe { ::core::slice::from_raw_parts(contents.as_ptr() as *const u8, len) },
+            PackedFixed::Owned(contents) => unsafe {
+                ::core::slice::from_raw_parts(contents.as_ptr() as *const u8, len)
+            },
         };
         self.write_bytes(bytes)
     }
