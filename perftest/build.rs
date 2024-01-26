@@ -63,6 +63,7 @@ fn main() {
         nostd: false,
         gen_info: false,
         add_deprecated_fields: false,
+        generate_getters: true,
     };
     FileDescriptor::write_proto(&config).unwrap();
 
