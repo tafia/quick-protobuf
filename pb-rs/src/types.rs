@@ -1537,7 +1537,9 @@ impl Message {
 
         self.write_impl_message_read(w, desc, config)?;
         writeln!(w)?;
-        self.write_impl_message_write(w, desc, config)?;
+        if config.gen_write {
+            self.write_impl_message_write(w, desc, config)?;
+        }
 
         if config.gen_info {
             self.write_impl_message_info(w, desc, config)?;
@@ -2556,6 +2558,7 @@ pub struct Config {
     pub owned: bool,
     pub nostd: bool,
     pub hashbrown: bool,
+    pub gen_write: bool,
     pub gen_info: bool,
     pub add_deprecated_fields: bool,
     pub generate_getters: bool,
