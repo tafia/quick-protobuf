@@ -1,4 +1,3 @@
-use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::default::Default;
 use std::fmt::Debug;
 use std::fs::File;
@@ -12,6 +11,8 @@ use perftest_data_quick::PerftestData as QuickPerftestData;
 
 use prost::Message as ProstMessage;
 use protobuf::Message;
+use rand::{Rng, SeedableRng};
+use rand_xoshiro::Xoshiro256PlusPlus;
 use quick_protobuf::{BytesReader, MessageRead, MessageWrite, Reader, Writer};
 
 mod perftest_data;
@@ -20,8 +21,9 @@ mod perftest_data_quick {
     include!(concat!(env!("OUT_DIR"), "/perftest_data_quick.rs"));
 }
 
-const SEED: [u8; 16] = [
+const SEED: [u8; 32] = [
     10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160,
+    15, 25, 35, 45, 55, 65, 75, 85, 95, 105, 115, 125, 135, 145, 155, 165,
 ];
 
 fn measure<R: Debug + PartialEq, F: FnMut() -> R>(iter: u128, mut f: F, check: Option<&R>) -> u128 {
@@ -41,12 +43,12 @@ impl TestRunner {
     fn run_test<M: Clone + Message + Default + PartialEq>(&self, data: &[M]) -> [u128; 4] {
         let mut a = [0; 4];
 
-        let mut rng = SmallRng::from_seed(SEED);
+        let mut rng = Xoshiro256PlusPlus::from_seed(SEED);
         let mut random_data = Vec::new();
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let item = data[rng.gen_range(0, data.len())].clone();
+            let item = data[rng.gen_range(0..data.len())].clone();
             total_size += item.compute_size();
             random_data.push(item);
         }
@@ -117,12 +119,12 @@ impl TestRunner {
     {
         let mut b = [0; 4];
 
-        let mut rng = SmallRng::from_seed(SEED);
+        let mut rng = Xoshiro256PlusPlus::from_seed(SEED);
         let mut random_data: Vec<M> = Vec::new();
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
+            let ref item = data[rng.gen_range(0..data.len())];
             random_data.push(item.clone());
             total_size += item.get_size() as u32;
         }
@@ -178,12 +180,12 @@ impl TestRunner {
     fn quick_run_test_strings(&self, data: &[perftest_data_quick::TestStrings]) -> [u128; 4] {
         let mut b = [0; 4];
 
-        let mut rng = SmallRng::from_seed(SEED);
+        let mut rng = Xoshiro256PlusPlus::from_seed(SEED);
         let mut random_data = Vec::new();
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
+            let ref item = data[rng.gen_range(0..data.len())];
             random_data.push(item.clone());
             total_size += item.get_size() as u32;
         }
@@ -230,12 +232,12 @@ impl TestRunner {
     fn quick_run_test_bytes(&self, data: &[perftest_data_quick::TestBytes]) -> [u128; 4] {
         let mut b = [0; 4];
 
-        let mut rng = SmallRng::from_seed(SEED);
+        let mut rng = Xoshiro256PlusPlus::from_seed(SEED);
         let mut random_data = Vec::new();
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
+            let ref item = data[rng.gen_range(0..data.len())];
             random_data.push(item.clone());
             total_size += item.get_size() as u32;
         }
@@ -285,12 +287,12 @@ impl TestRunner {
     ) -> [u128; 4] {
         let mut c = [0; 4];
 
-        let mut rng = SmallRng::from_seed(SEED);
+        let mut rng = Xoshiro256PlusPlus::from_seed(SEED);
         let mut random_data: Vec<M> = Vec::new();
 
         let mut total_size = 0;
         while total_size < self.data_size {
-            let ref item = data[rng.gen_range(0, data.len())];
+            let ref item = data[rng.gen_range(0..data.len())];
             random_data.push(item.clone());
             total_size += item.encoded_len() as u32;
         }
