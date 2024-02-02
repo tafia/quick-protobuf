@@ -565,6 +565,7 @@ impl BytesReader {
 
     /// Gets the remaining length of bytes not read yet
     #[cfg_attr(std, inline(always))]
+    #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         self.end - self.start
     }
@@ -642,6 +643,7 @@ pub struct Reader {
 impl Reader {
     /// Creates a new `Reader`
     #[cfg(feature = "std")]
+    #[allow(clippy::uninit_vec)]
     pub fn from_reader<R: Read>(mut r: R, capacity: usize) -> Result<Reader> {
         let mut buf = Vec::with_capacity(capacity);
         unsafe {
