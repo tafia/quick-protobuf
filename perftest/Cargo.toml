@@ -5,6 +5,7 @@ authors = ["Stepan Koltsov <stepan.koltsov@gmail.com>",
            "Johann Tuffe <tafia973@gmail.com>"]
 build = "build.rs"
 edition = "2021"
+rust-version = "1.70"
 
 [dependencies]
 protobuf = "2.25.2"
