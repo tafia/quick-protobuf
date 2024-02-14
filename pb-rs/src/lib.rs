@@ -67,12 +67,18 @@ pub struct ConfigBuilder {
 }
 
 impl ConfigBuilder {
-    pub fn new<P: AsRef<Path>>(
-        in_files: &[P],
-        output: Option<&P>,
-        output_dir: Option<&P>,
-        include_paths: &[P],
-    ) -> Result<ConfigBuilder> {
+    pub fn new<P1, P2, P3, P4>(
+        in_files: &[P1],
+        output: Option<&P2>,
+        output_dir: Option<&P3>,
+        include_paths: &[P4],
+    ) -> Result<ConfigBuilder>
+    where
+        P1: AsRef<Path>,
+        P2: AsRef<Path>,
+        P3: AsRef<Path>,
+        P4: AsRef<Path>,
+    {
         let in_files = in_files
             .iter()
             .map(|f| f.as_ref().into())
