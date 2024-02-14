@@ -8,6 +8,7 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/tafia/quick-protobuf"
 edition = "2018"
+rust-version = "1.65"
 
 [dependencies]
 nom = "7"
