@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - run: |
+            export CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
+            # ^^ the above line should be removed once it becomes a standard feature of cargo beyond 1.70
+            set -x
+            rustc --version
+            cargo --version
+            cargo fmt --all -- --check
+            cargo clippy -- -D warnings
+            cargo build
+            cargo build --no-default-features
+            cargo test
+            cargo test --no-default-features
+            cargo test --doc
